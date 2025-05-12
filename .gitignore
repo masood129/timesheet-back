@@ -1,0 +1,20 @@
+# وابستگی‌های Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# فایل‌های محیطی و حساس
+#.env
+#config.env
+
+# فایل‌های لاگ و کش
+*.log
+.DS_Store
+
+# فایل‌های موقتی
+*.tmp
+*.bak
+
+# پوشه‌های بیلد یا خروجی
+dist/
+build/

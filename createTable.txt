@@ -1,0 +1,32 @@
+CREATE TABLE Projects (
+  Id INT PRIMARY KEY IDENTITY(1,1),
+  ProjectName NVARCHAR(100),
+  securityLevel INT ,
+)
+
+CREATE TABLE DailyDetails (
+    Date DATE NOT NULL,
+    UserId INT NOT NULL,
+    ArrivalTime TIME,
+    LeaveTime TIME,
+    LeaveType NVARCHAR(50),
+    PersonalTime INT,
+    Description NVARCHAR(MAX),
+    GoCost INT,
+    ReturnCost INT,
+    PersonalCarCost INT,
+    PRIMARY KEY (Date, UserId),
+    FOREIGN KEY (UserId) REFERENCES Users(Id)
+);
+
+
+CREATE TABLE DailyProjectTasks (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Date DATE NOT NULL,
+    UserId INT NOT NULL,
+    ProjectId INT NOT NULL,
+    Duration INT,
+    Description NVARCHAR(MAX),
+    FOREIGN KEY (Date, UserId) REFERENCES DailyDetails(Date, UserId),
+    FOREIGN KEY (ProjectId) REFERENCES Projects(Id)
+);

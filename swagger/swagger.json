@@ -1,0 +1,457 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Project API",
+    "description": "API for managing projects and daily details with MSSQL integration for a Flutter calendar app",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local server"
+    }
+  ],
+  "paths": {
+    "/projects": {
+      "get": {
+        "summary": "Retrieve all projects",
+        "tags": ["Projects"],
+        "responses": {
+          "200": {
+            "description": "List of projects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Project"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new project",
+        "tags": ["Projects"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Project created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or ID already exists"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/projects/{id}": {
+      "get": {
+        "summary": "Get a project by ID",
+        "tags": ["Projects"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a project",
+        "tags": ["Projects"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Project updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a project",
+        "tags": ["Projects"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Project deleted"
+          },
+          "404": {
+            "description": "Project not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/daily-details/{date}": {
+      "get": {
+        "summary": "Get daily details for a specific date",
+        "tags": ["DailyDetails"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Daily details not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/daily-details": {
+      "post": {
+        "summary": "Create or update daily details",
+        "tags": ["DailyDetails"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DailyDetailInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Daily details created or updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/daily-details/month/{year}/{month}": {
+      "get": {
+        "summary": "Get monthly details",
+        "tags": ["DailyDetails"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monthly details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DailyDetail"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Project": {
+        "type": "object",
+        "properties": {
+          "Id": {
+            "type": "integer"
+          },
+          "ProjectName": {
+            "type": "string"
+          },
+          "securityLevel": {
+            "type": "integer"
+          }
+        }
+      },
+      "ProjectInput": {
+        "type": "object",
+        "required": ["Id", "ProjectName", "securityLevel"],
+        "properties": {
+          "Id": {
+            "type": "integer"
+          },
+          "ProjectName": {
+            "type": "string"
+          },
+          "securityLevel": {
+            "type": "integer"
+          }
+        }
+      },
+      "DailyDetail": {
+        "type": "object",
+        "properties": {
+          "Date": {
+            "type": "string",
+            "format": "date"
+          },
+          "UserId": {
+            "type": "integer"
+          },
+          "ArrivalTime": {
+            "type": "string",
+            "format": "time"
+          },
+          "LeaveTime": {
+            "type": "string",
+            "format": "time"
+          },
+          "LeaveType": {
+            "type": "string"
+          },
+          "PersonalTime": {
+            "type": "integer"
+          },
+          "Description": {
+            "type": "string"
+          },
+          "GoCost": {
+            "type": "integer"
+          },
+          "ReturnCost": {
+            "type": "integer"
+          },
+          "PersonalCarCost": {
+            "type": "integer"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Id": {
+                  "type": "integer"
+                },
+                "Date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "UserId": {
+                  "type": "integer"
+                },
+                "ProjectId": {
+                  "type": "integer"
+                },
+                "Duration": {
+                  "type": "integer"
+                },
+                "Description": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "DailyDetailInput": {
+        "type": "object",
+        "required": ["date", "userId"],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "arrivalTime": {
+            "type": "string",
+            "format": "time"
+          },
+          "leaveTime": {
+            "type": "string",
+            "format": "time"
+          },
+          "leaveType": {
+            "type": "string"
+          },
+          "personalTime": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "goCost": {
+            "type": "integer"
+          },
+          "returnCost": {
+            "type": "integer"
+          },
+          "personalCarCost": {
+            "type": "integer"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "projectId": {
+                  "type": "integer"
+                },
+                "duration": {
+                  "type": "integer"
+                },
+                "description": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
