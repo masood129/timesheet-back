@@ -315,9 +315,16 @@ router.get('/daily-details/:date', async (req, res) => {
       .input('userId', sql.Int, userId)
       .query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
 
+    const carCostsResult = await pool
+      .request()
+      .input('date', sql.Date, date)
+      .input('userId', sql.Int, userId)
+      .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
+
     res.json({
       ...detailResult.recordset[0],
       tasks: tasksResult.recordset,
+      personalCarCosts: carCostsResult.recordset,
     });
   } catch (err) {
     console.error('Error in GET /daily-details/:date:', err);
@@ -350,7 +357,7 @@ router.get('/daily-details/:date', async (req, res) => {
  *         description: Server error
  */
 router.post('/daily-details', async (req, res) => {
-  const { date, userId, arrivalTime, leaveTime, leaveType, personalTime, description, goCost, returnCost, personalCarCost, tasks } = req.body;
+  const { date, userId, arrivalTime, leaveTime, leaveType, personalTime, description, goCost, returnCost, tasks, personalCarCosts } = req.body;
 
   if (!date || !userId) {
     return res.status(400).send('Date and UserId are required');
@@ -400,8 +407,9 @@ router.post('/daily-details', async (req, res) => {
     request.input('date', sql.Date, date);
     request.input('userId', sql.Int, userId);
 
-    // Delete existing tasks for the date
+    // Delete existing tasks and personal car costs for the date
     await request.query('DELETE FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
+    await request.query('DELETE FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
     // Insert or update DailyDetails
     const detailResult = await request
@@ -412,19 +420,18 @@ router.post('/daily-details', async (req, res) => {
       .input('description', sql.NVarChar, description || null)
       .input('goCost', sql.Int, goCost || null)
       .input('returnCost', sql.Int, returnCost || null)
-      .input('personalCarCost', sql.Int, personalCarCost || null)
       .query(`
         IF EXISTS (SELECT 1 FROM DailyDetails WHERE Date = @date AND UserId = @userId)
           UPDATE DailyDetails
           SET ArrivalTime = @arrivalTime, LeaveTime = @leaveTime, LeaveType = @leaveType,
               PersonalTime = @personalTime, Description = @description, GoCost = @goCost,
-              ReturnCost = @returnCost, PersonalCarCost = @personalCarCost
+              ReturnCost = @returnCost
           OUTPUT INSERTED.*
           WHERE Date = @date AND UserId = @userId
         ELSE
-          INSERT INTO DailyDetails (Date, UserId, ArrivalTime, LeaveTime, LeaveType, PersonalTime, Description, GoCost, ReturnCost, PersonalCarCost)
+          INSERT INTO DailyDetails (Date, UserId, ArrivalTime, LeaveTime, LeaveType, PersonalTime, Description, GoCost, ReturnCost)
           OUTPUT INSERTED.*
-          VALUES (@date, @userId, @arrivalTime, @leaveTime, @leaveType, @personalTime, @description, @goCost, @returnCost, @personalCarCost)
+          VALUES (@date, @userId, @arrivalTime, @leaveTime, @leaveType, @personalTime, @description, @goCost, @returnCost)
       `);
 
     // Insert tasks
@@ -440,12 +447,26 @@ router.post('/daily-details', async (req, res) => {
       tasksResult.push(taskResult.recordset[0]);
     }
 
+    // Insert personal car costs
+    const carCostsResult = [];
+    for (const carCost of personalCarCosts || []) {
+      const carCostResult = await request
+        .input('projectId', sql.Int, carCost.projectId)
+        .input('cost', sql.Int, carCost.cost || null)
+        .input('carCostDescription', sql.NVarChar, carCost.description || null)
+        .query(
+          'INSERT INTO DailyPersonalCarCosts (Date, UserId, ProjectId, Cost, Description) OUTPUT INSERTED.* VALUES (@date, @userId, @projectId, @cost, @carCostDescription)'
+        );
+      carCostsResult.push(carCostResult.recordset[0]);
+    }
+
     // تأیید تراکنش
     await transaction.commit();
 
     res.status(201).json({
       ...detailResult.recordset[0],
       tasks: tasksResult,
+      personalCarCosts: carCostsResult,
     });
   } catch (err) {
     if (transaction && transactionBegun) {
@@ -519,9 +540,17 @@ router.get('/daily-details/month/:year/:month', async (req, res) => {
         .input('date', sql.Date, detail.Date)
         .input('userId', sql.Int, userId)
         .query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
+
+      const carCostsResult = await pool
+        .request()
+        .input('date', sql.Date, detail.Date)
+        .input('userId', sql.Int, userId)
+        .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
+
       details.push({
         ...detail,
         tasks: tasksResult.recordset,
+        personalCarCosts: carCostsResult.recordset,
       });
     }
 
