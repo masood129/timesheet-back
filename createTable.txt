@@ -30,3 +30,33 @@ CREATE TABLE DailyProjectTasks (
     FOREIGN KEY (Date, UserId) REFERENCES DailyDetails(Date, UserId),
     FOREIGN KEY (ProjectId) REFERENCES Projects(Id)
 );
+
+
+
+-- اطمینان از وجود جدول DailyDetails
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DailyDetails' AND SCHEMA_NAME(schema_id) = 'dbo')
+BEGIN
+    RAISERROR ('Table DailyDetails does not exist in schema [flutter].[dbo]. Please create it first.', 16, 1);
+    RETURN;
+END
+
+-- اطمینان از وجود جدول Projects
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Projects' AND SCHEMA_NAME(schema_id) = 'dbo')
+BEGIN
+    RAISERROR ('Table Projects does not exist in schema [flutter].[dbo]. Please create it first.', 16, 1);
+    RETURN;
+END
+
+-- ایجاد جدول جدید برای هزینه‌های خودرو شخصی
+CREATE TABLE [flutter].[dbo].[DailyPersonalCarCosts] (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Date DATE NOT NULL,
+    UserId INT NOT NULL,
+    ProjectId INT NOT NULL,
+    Cost INT NOT NULL,
+    Description NVARCHAR(MAX),
+    CONSTRAINT FK_DailyPersonalCarCosts_DailyDetails FOREIGN KEY (Date, UserId) 
+        REFERENCES [flutter].[dbo].[DailyDetails](Date, UserId),
+    CONSTRAINT FK_DailyPersonalCarCosts_Projects FOREIGN KEY (ProjectId) 
+        REFERENCES [flutter].[dbo].[Projects](Id)
+);
