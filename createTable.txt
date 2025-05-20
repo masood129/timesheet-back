@@ -5,19 +5,18 @@ CREATE TABLE Projects (
 )
 
 CREATE TABLE DailyDetails (
-    Date DATE NOT NULL,
-    UserId INT NOT NULL,
-    ArrivalTime TIME,
-    LeaveTime TIME,
+    Date DATE,
+    UserId INT,
+    ArrivalTime NVARCHAR(8),
+    LeaveTime NVARCHAR(8),
     LeaveType NVARCHAR(50),
     PersonalTime INT,
     Description NVARCHAR(MAX),
     GoCost INT,
     ReturnCost INT,
-    PersonalCarCost INT,
-    PRIMARY KEY (Date, UserId),
-    FOREIGN KEY (UserId) REFERENCES Users(Id)
+    PRIMARY KEY (Date, UserId)
 );
+
 
 
 CREATE TABLE DailyProjectTasks (
@@ -30,6 +29,12 @@ CREATE TABLE DailyProjectTasks (
     FOREIGN KEY (Date, UserId) REFERENCES DailyDetails(Date, UserId),
     FOREIGN KEY (ProjectId) REFERENCES Projects(Id)
 );
+
+
+
+
+
+
 
 
 

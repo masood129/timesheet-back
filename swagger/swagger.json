@@ -119,7 +119,15 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProjectInput"
+                "type": "object",
+                "properties": {
+                  "ProjectName": {
+                    "type": "string"
+                  },
+                  "securityLevel": {
+                    "type": "integer"
+                  }
+                }
               }
             }
           }
@@ -306,13 +314,16 @@
         "type": "object",
         "properties": {
           "Id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Unique identifier for the project"
           },
           "ProjectName": {
-            "type": "string"
+            "type": "string",
+            "description": "Name of the project"
           },
           "securityLevel": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Security level of the project"
           }
         }
       },
@@ -321,13 +332,16 @@
         "required": ["Id", "ProjectName", "securityLevel"],
         "properties": {
           "Id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Unique identifier for the project"
           },
           "ProjectName": {
-            "type": "string"
+            "type": "string",
+            "description": "Name of the project"
           },
           "securityLevel": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Security level of the project"
           }
         }
       },
@@ -336,60 +350,107 @@
         "properties": {
           "Date": {
             "type": "string",
-            "format": "date"
+            "format": "date",
+            "description": "Date of the daily details"
           },
           "UserId": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Identifier of the user"
           },
           "ArrivalTime": {
             "type": "string",
-            "format": "time"
+            "format": "date-time",
+            "description": "Arrival time in ISO format"
           },
           "LeaveTime": {
             "type": "string",
-            "format": "time"
+            "format": "date-time",
+            "description": "Leave time in ISO format"
           },
           "LeaveType": {
-            "type": "string"
+            "type": "string",
+            "description": "Type of leave"
           },
           "PersonalTime": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Personal time in minutes"
           },
           "Description": {
-            "type": "string"
+            "type": "string",
+            "description": "Additional description"
           },
           "GoCost": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Cost of going"
           },
           "ReturnCost": {
-            "type": "integer"
-          },
-          "PersonalCarCost": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Cost of returning"
           },
           "tasks": {
             "type": "array",
+            "description": "List of tasks for the day",
             "items": {
               "type": "object",
               "properties": {
                 "Id": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Task identifier"
                 },
                 "Date": {
                   "type": "string",
-                  "format": "date"
+                  "format": "date",
+                  "description": "Date of the task"
                 },
                 "UserId": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Identifier of the user"
                 },
                 "ProjectId": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Identifier of the project"
                 },
                 "Duration": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Duration of the task in minutes"
                 },
                 "Description": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Task description"
+                }
+              }
+            }
+          },
+          "personalCarCosts": {
+            "type": "array",
+            "description": "List of personal car costs",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Id": {
+                  "type": "integer",
+                  "description": "Cost identifier"
+                },
+                "Date": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date of the cost"
+                },
+                "UserId": {
+                  "type": "integer",
+                  "description": "Identifier of the user"
+                },
+                "ProjectId": {
+                  "type": "integer",
+                  "description": "Identifier of the project"
+                },
+                "Cost": {
+                  "type": "integer",
+                  "description": "Cost amount"
+                },
+                "Description": {
+                  "type": "string",
+                  "description": "Cost description"
                 }
               }
             }
@@ -402,50 +463,81 @@
         "properties": {
           "date": {
             "type": "string",
-            "format": "date"
+            "format": "date",
+            "description": "Date of the daily details"
           },
           "userId": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Identifier of the user"
           },
           "arrivalTime": {
             "type": "string",
-            "format": "time"
+            "format": "date-time",
+            "description": "Arrival time in ISO format"
           },
           "leaveTime": {
             "type": "string",
-            "format": "time"
+            "format": "date-time",
+            "description": "Leave time in ISO format"
           },
           "leaveType": {
-            "type": "string"
+            "type": "string",
+            "description": "Type of leave"
           },
           "personalTime": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Personal time in minutes"
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "description": "Additional description"
           },
           "goCost": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Cost of going"
           },
           "returnCost": {
-            "type": "integer"
-          },
-          "personalCarCost": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Cost of returning"
           },
           "tasks": {
             "type": "array",
+            "description": "List of tasks for the day",
             "items": {
               "type": "object",
               "properties": {
                 "projectId": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Identifier of the project"
                 },
                 "duration": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Duration of the task in minutes"
                 },
                 "description": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Task description"
+                }
+              }
+            }
+          },
+          "personalCarCosts": {
+            "type": "array",
+            "description": "List of personal car costs",
+            "items": {
+              "type": "object",
+              "properties": {
+                "projectId": {
+                  "type": "integer",
+                  "description": "Identifier of the project"
+                },
+                "cost": {
+                  "type": "integer",
+                  "description": "Cost amount"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Cost description"
                 }
               }
             }
