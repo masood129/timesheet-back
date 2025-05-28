@@ -65,3 +65,6 @@ CREATE TABLE [flutter].[dbo].[DailyPersonalCarCosts] (
     CONSTRAINT FK_DailyPersonalCarCosts_Projects FOREIGN KEY (ProjectId) 
         REFERENCES [flutter].[dbo].[Projects](Id)
 );
+
+ALTER TABLE DailyPersonalCarCosts
+ADD Kilometers INT NULL;

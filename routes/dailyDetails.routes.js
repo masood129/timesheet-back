@@ -1,3 +1,4 @@
+// فایل: dailyDetails.routes.js
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db.config');
@@ -64,7 +65,6 @@ router.get('/:date', async (req, res) => {
     const detail = detailResult.recordset[0];
     const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
 
-    // تبدیل زمان‌های رشته‌ای به فرمت ISO
     if (detail.ArrivalTime) {
       const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
       detail.ArrivalTime = DateTime.fromObject(
@@ -139,30 +139,39 @@ router.post('/', async (req, res) => {
   const validateTime = (time, paramName) => {
     if (!time) return null;
 
-    // پشتیبانی از فرمت‌های ISO و HH:mm(:ss)
-    const isoRegex = /^\d{4}-\d{2}-\d{2}T([0-1]?[0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9])?\.\d{3}([+-]\d{2}:?\d{2}|Z)$/;
+    const isoRegex = /^\d{4}-\d{2}-\d{2}T([0-1]?[0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9])?([+-]\d{2}:?\d{2}|Z)?$/;
     const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9])?$/;
     let hours, minutes, seconds = 0;
 
     console.log(`Validating ${paramName}: ${time}`);
 
-    if (isoRegex.test(time)) {
-      const dt = DateTime.fromISO(time, { zone: 'Asia/Tehran' });
+    // مدیریت فرمت‌های غیراستاندارد
+    let cleanedTime = time;
+    if (cleanedTime.includes('+0330+03:30')) {
+      cleanedTime = cleanedTime.replace('+0330+03:30', '+03:30');
+    }
+
+    if (isoRegex.test(cleanedTime)) {
+      const dt = DateTime.fromISO(cleanedTime, { zone: 'Asia/Tehran' });
       if (!dt.isValid) {
-        console.error(`Invalid ISO time format for ${paramName}: ${time}`);
+        console.error(`Invalid ISO time format for ${paramName}: ${cleanedTime}`);
         throw new Error(`Validation failed for parameter '${paramName}'. Invalid ISO time.`);
       }
       hours = dt.hour;
       minutes = dt.minute;
-      seconds = dt.second;
-    } else if (timeRegex.test(time)) {
-      [hours, minutes, seconds = 0] = time.split(':').map(Number);
+      seconds = dt.second || 0;
+    } else if (timeRegex.test(cleanedTime)) {
+      [hours, minutes, seconds = 0] = cleanedTime.split(':').map(Number);
     } else {
-      console.error(`Invalid time format for ${paramName}: ${time}`);
+      console.error(`Invalid time format for ${paramName}: ${cleanedTime}`);
       throw new Error(`Validation failed for parameter '${paramName}'. Invalid time.`);
     }
 
-    // فرمت HH:mm:ss برای ذخیره به‌عنوان NVARCHAR
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
+      console.error(`Invalid time values for ${paramName}: ${hours}:${minutes}:${seconds}`);
+      throw new Error(`Validation failed for parameter '${paramName}'. Invalid time values.`);
+    }
+
     const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     console.log(`Formatted ${paramName} for SQL: ${formattedTime}`);
     return formattedTime;
@@ -170,8 +179,8 @@ router.post('/', async (req, res) => {
 
   if (personalCarCosts && personalCarCosts.length > 0) {
     for (const carCost of personalCarCosts) {
-      if (!carCost.projectId || !carCost.cost || carCost.cost <= 0) {
-        return res.status(400).send('شناسه پروژه و هزینه خودرو شخصی باید معتبر و بزرگ‌تر از صفر باشند');
+      if (!carCost.projectId || !carCost.cost || carCost.cost <= 0 || !carCost.kilometers || carCost.kilometers <= 0) {
+        return res.status(400).send('شناسه پروژه، تعداد کیلومترها و هزینه خودرو شخصی باید معتبر و بزرگ‌تر از صفر باشند');
       }
     }
   }
@@ -247,10 +256,11 @@ router.post('/', async (req, res) => {
       carCostRequest.input('userId', sql.Int, userId);
       const carCostResult = await carCostRequest
         .input('carCostProjectId', sql.Int, carCost.projectId)
+        .input('kilometers', sql.Int, carCost.kilometers)
         .input('cost', sql.Int, carCost.cost)
         .input('carCostDescription', sql.NVarChar, carCost.description || null)
         .query(
-          'INSERT INTO DailyPersonalCarCosts (Date, UserId, ProjectId, Cost, Description) OUTPUT INSERTED.* VALUES (@date, @userId, @carCostProjectId, @cost, @carCostDescription)'
+          'INSERT INTO DailyPersonalCarCosts (Date, UserId, ProjectId, Kilometers, Cost, Description) OUTPUT INSERTED.* VALUES (@date, @userId, @carCostProjectId, @kilometers, @cost, @carCostDescription)'
         );
       carCostsResult.push(carCostResult.recordset[0]);
     }
@@ -258,7 +268,6 @@ router.post('/', async (req, res) => {
     const responseDetail = detailResult.recordset[0];
     const detailDate = DateTime.fromJSDate(responseDetail.Date, { zone: 'Asia/Tehran' });
 
-    // تبدیل زمان‌های رشته‌ای به فرمت ISO برای پاسخ
     if (responseDetail.ArrivalTime) {
       const [hours, minutes, seconds = '00'] = responseDetail.ArrivalTime.split(':').map(Number);
       responseDetail.ArrivalTime = DateTime.fromObject(
@@ -376,7 +385,6 @@ router.get('/month/:year/:month', async (req, res) => {
 
       const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
 
-      // تبدیل زمان‌های رشته‌ای به فرمت ISO
       if (detail.ArrivalTime) {
         const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
         detail.ArrivalTime = DateTime.fromObject(
