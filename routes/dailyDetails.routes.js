@@ -5,6 +5,38 @@ const { sql, poolPromise } = require('../config/db.config');
 const { DateTime } = require('luxon');
 
 /**
+ * اعتبارسنجی فرمت تاریخ (YYYY-MM-DD)
+ * @param {string} dateString - رشته تاریخ
+ * @returns {boolean} - آیا تاریخ معتبر است یا خیر
+ */
+function isValidDate(dateString) {
+  if (!dateString || typeof dateString !== 'string') {
+    console.log(`Invalid date string: ${dateString}`);
+    return false;
+  }
+  // حذف فاصله‌های احتمالی ابتدا و انتها
+  const trimmedDate = dateString.trim();
+  const dt = DateTime.fromFormat(trimmedDate, 'yyyy-MM-dd', { zone: 'Asia/Tehran' });
+  const isValid = dt.isValid;
+  if (!isValid) {
+    console.log(`Date validation failed for: ${trimmedDate}, Reason: ${dt.invalidReason}`);
+  }
+  return isValid;
+}
+
+/**
+ * تبدیل رشته تاریخ به شیء Date برای sql.Date
+ * @param {string} dateString - رشته تاریخ (YYYY-MM-DD)
+ * @returns {Date|null} - شیء Date یا null اگر تاریخ نامعتبر باشد
+ */
+function parseDate(dateString) {
+  if (!isValidDate(dateString)) return null;
+  const trimmedDate = dateString.trim();
+  const dt = DateTime.fromFormat(trimmedDate, 'yyyy-MM-dd', { zone: 'Asia/Tehran' });
+  return dt.toJSDate();
+}
+
+/**
  * @swagger
  * /daily-details/{date}:
  *   get:
@@ -31,6 +63,8 @@ const { DateTime } = require('luxon');
  *               $ref: '#/components/schemas/DailyDetail'
  *       404:
  *         description: Daily details not found
+ *       400:
+ *         description: Invalid date format
  *       500:
  *         description: Server error
  */
@@ -40,10 +74,19 @@ router.get('/:date', async (req, res) => {
     const { date } = req.params;
     const { userId } = req.query;
 
+    if (!isValidDate(date)) {
+      return res.status(400).send('فرمت تاریخ نامعتبر است. از فرمت YYYY-MM-DD استفاده کنید');
+    }
+
+    const parsedDate = parseDate(date);
+    if (!parsedDate) {
+      return res.status(400).send('تاریخ ارسالی نامعتبر است');
+    }
+
     const detailResult = await pool
       .request()
-      .input('date', sql.Date, date)
-      .input('userId', sql.Int, userId)
+      .input('date', sql.Date, parsedDate)
+      .input('userId', sql.Int, parseInt(userId))
       .query('SELECT * FROM DailyDetails WHERE Date = @date AND UserId = @userId');
 
     if (detailResult.recordset.length === 0) {
@@ -52,14 +95,14 @@ router.get('/:date', async (req, res) => {
 
     const tasksResult = await pool
       .request()
-      .input('date', sql.Date, date)
-      .input('userId', sql.Int, userId)
+      .input('date', sql.Date, parsedDate)
+      .input('userId', sql.Int, parseInt(userId))
       .query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
 
     const carCostsResult = await pool
       .request()
-      .input('date', sql.Date, date)
-      .input('userId', sql.Int, userId)
+      .input('date', sql.Date, parsedDate)
+      .input('userId', sql.Int, parseInt(userId))
       .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
     const detail = detailResult.recordset[0];
@@ -101,7 +144,7 @@ router.get('/:date', async (req, res) => {
     });
   } catch (err) {
     console.error('Error in GET /daily-details/:date:', err);
-    res.status(500).send('خطای سرور در دریافت جزئیات روزانه');
+    res.status(500).send(`خطای سرور در دریافت جزئیات روزانه: ${err.message}`);
   }
 });
 
@@ -136,6 +179,15 @@ router.post('/', async (req, res) => {
     return res.status(400).send('تاریخ و شناسه کاربر الزامی هستند');
   }
 
+  if (!isValidDate(date)) {
+    return res.status(400).send('فرمت تاریخ نامعتبر است. از فرمت YYYY-MM-DD استفاده کنید');
+  }
+
+  const parsedDate = parseDate(date);
+  if (!parsedDate) {
+    return res.status(400).send('تاریخ ارسالی نامعتبر است');
+  }
+
   const validateTime = (time, paramName) => {
     if (!time) return null;
 
@@ -145,7 +197,6 @@ router.post('/', async (req, res) => {
 
     console.log(`Validating ${paramName}: ${time}`);
 
-    // مدیریت فرمت‌های غیراستاندارد
     let cleanedTime = time;
     if (cleanedTime.includes('+0330+03:30')) {
       cleanedTime = cleanedTime.replace('+0330+03:30', '+03:30');
@@ -203,8 +254,8 @@ router.post('/', async (req, res) => {
     transactionBegun = true;
 
     const request = transaction.request();
-    request.input('date', sql.Date, date);
-    request.input('userId', sql.Int, userId);
+    request.input('date', sql.Date, parsedDate);
+    request.input('userId', sql.Int, parseInt(userId));
 
     console.log('Deleting existing tasks and car costs...');
     await request.query('DELETE FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
@@ -237,8 +288,8 @@ router.post('/', async (req, res) => {
     const tasksResult = [];
     for (const task of tasks || []) {
       const taskRequest = transaction.request();
-      taskRequest.input('date', sql.Date, date);
-      taskRequest.input('userId', sql.Int, userId);
+      taskRequest.input('date', sql.Date, parsedDate);
+      taskRequest.input('userId', sql.Int, parseInt(userId));
       const taskResult = await taskRequest
         .input('taskProjectId', sql.Int, task.projectId)
         .input('duration', sql.Int, task.duration || null)
@@ -252,8 +303,8 @@ router.post('/', async (req, res) => {
     const carCostsResult = [];
     for (const carCost of personalCarCosts || []) {
       const carCostRequest = transaction.request();
-      carCostRequest.input('date', sql.Date, date);
-      carCostRequest.input('userId', sql.Int, userId);
+      carCostRequest.input('date', sql.Date, parsedDate);
+      carCostRequest.input('userId', sql.Int, parseInt(userId));
       const carCostResult = await carCostRequest
         .input('carCostProjectId', sql.Int, carCost.projectId)
         .input('kilometers', sql.Int, carCost.kilometers)
@@ -313,7 +364,6 @@ router.post('/', async (req, res) => {
       }
     }
     console.error('Error in POST /daily-details:', err);
-    console.error('Error stack:', err.stack);
     res.status(500).send(`خطای سرور: ${err.message}`);
   }
 });
@@ -360,9 +410,9 @@ router.get('/month/:year/:month', async (req, res) => {
 
     const detailResult = await pool
       .request()
-      .input('year', sql.Int, year)
-      .input('month', sql.Int, month)
-      .input('userId', sql.Int, userId)
+      .input('year', sql.Int, parseInt(year))
+      .input('month', sql.Int, parseInt(month))
+      .input('userId', sql.Int, parseInt(userId))
       .query(`
         SELECT * FROM DailyDetails
         WHERE YEAR(Date) = @year AND MONTH(Date) = @month AND UserId = @userId
@@ -371,16 +421,21 @@ router.get('/month/:year/:month', async (req, res) => {
 
     const details = [];
     for (const detail of detailResult.recordset) {
+      if (!detail.Date || !(detail.Date instanceof Date)) {
+        console.warn(`Invalid Date in record: ${JSON.stringify(detail)}`);
+        continue;
+      }
+
       const tasksResult = await pool
         .request()
         .input('date', sql.Date, detail.Date)
-        .input('userId', sql.Int, userId)
+        .input('userId', sql.Int, parseInt(userId))
         .query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
 
       const carCostsResult = await pool
         .request()
         .input('date', sql.Date, detail.Date)
-        .input('userId', sql.Int, userId)
+        .input('userId', sql.Int, parseInt(userId))
         .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
       const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
@@ -424,8 +479,161 @@ router.get('/month/:year/:month', async (req, res) => {
     res.json(details);
   } catch (err) {
     console.error('Error in GET /daily-details/month/:year/:month:', err);
-    res.status(500).send('خطای سرور در دریافت جزئیات ماهانه');
+    res.status(500).send(`خطای سرور در دریافت جزئیات ماهانه: ${err.message}`);
   }
 });
+
+/**
+ * @swagger
+ * /daily-details/range:
+ *   get:
+ *     summary: Get daily details for a date range
+ *     tags: [DailyDetails]
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: endDate
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Daily details for the range
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/DailyDetail'
+ *       400:
+ *         description: Invalid input
+ *       500:
+ *         description: Server error
+ */
+router.get('/range', async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const { startDate, endDate, userId } = req.query;
+
+    // لاگ ورودی‌ها
+    console.log(`Received request: startDate=${startDate}, endDate=${endDate}, userId=${userId}`);
+
+    // اعتبارسنجی ورودی‌ها
+    if (!startDate || !endDate || !userId) {
+      console.log('Missing required parameters');
+      return res.status(400).send('startDate, endDate و userId الزامی هستند');
+    }
+
+    // اعتبارسنجی فرمت تاریخ
+    if (!isValidDate(startDate) || !isValidDate(endDate)) {
+      console.log(`Invalid date format: startDate=${startDate}, endDate=${endDate}`);
+      return res.status(400).send('فرمت تاریخ نامعتبر است. از فرمت YYYY-MM-DD استفاده کنید');
+    }
+
+    const parsedStartDate = parseDate(startDate);
+    const parsedEndDate = parseDate(endDate);
+
+    if (!parsedStartDate || !parsedEndDate) {
+      console.log('Failed to parse dates');
+      return res.status(400).send('تاریخ‌های ارسالی نامعتبر هستند');
+    }
+
+    // اطمینان از اینکه startDate قبل از endDate باشد
+    if (parsedStartDate > parsedEndDate) {
+      console.log('startDate is after endDate');
+      return res.status(400).send('startDate باید قبل از endDate باشد');
+    }
+
+    console.log(`Querying DailyDetails for userId: ${userId}, startDate: ${startDate}, endDate: ${endDate}`);
+
+    const detailResult = await pool
+      .request()
+      .input('startDate', sql.Date, parsedStartDate)
+      .input('endDate', sql.Date, parsedEndDate)
+      .input('userId', sql.Int, parseInt(userId))
+      .query(`
+        SELECT * FROM DailyDetails
+        WHERE Date >= @startDate AND Date <= @endDate AND UserId = @userId
+        ORDER BY Date
+      `);
+
+    console.log(`Found ${detailResult.recordset.length} records`);
+
+    const details = [];
+    for (const detail of detailResult.recordset) {
+      if (!detail.Date || !(detail.Date instanceof Date)) {
+        console.warn(`Invalid Date in record: ${JSON.stringify(detail)}`);
+        continue;
+      }
+
+      console.log(`Processing date: ${detail.Date.toISOString()}`);
+
+      const tasksResult = await pool
+        .request()
+        .input('date', sql.Date, detail.Date)
+        .input('userId', sql.Int, parseInt(userId))
+        .query('SELECT * FROM DailyProjectTasks WHERE Date @date AND UserId = @userId');
+
+      const carCostsResult = await pool
+        .request()
+        .input('date', sql.Date, detail.Date)
+        .input('userId', sql.Int, parseInt(userId))
+        .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
+
+      const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
+
+      if (detail.ArrivalTime) {
+        const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
+        detail.ArrivalTime = DateTime.fromObject(
+          {
+            year: detailDate.year,
+            month: detailDate.month,
+            day: detailDate.day,
+            hour: hours,
+            minute: minutes,
+            second: seconds,
+           },
+            { zone: 'Asia/Tehran' }
+          ).toISO();
+        }
+        if (detail.LeaveTime) {
+          const [hours, minutes, seconds = '00'] = detail.LeaveTime.split(':').map(Number);
+          detail.LeaveTime = DateTime.fromObject(
+            {
+              year: detailDate.year,
+              month: detailDate.month,
+              day: detailDate.day,
+              hour: hours,
+              minute: minutes,
+              second: seconds,
+            },
+            { zone: 'Asia/Tehran' }
+          ).toISO();
+        }
+
+        details.push({
+          ...detail,
+          tasks: tasksResult.recordset,
+          personalCarCosts: carCostsResult.recordset,
+        });
+      }
+
+      res.json(details);
+    } catch (err) {
+      console.error('Error in GET /daily-details/range:', err);
+      res.status(500).send(`خطای سرور: ${err.message}`);
+    }
+  });
 
 module.exports = router;
