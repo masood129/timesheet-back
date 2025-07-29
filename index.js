@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger/swagger.json');
 const projectRoutes = require('./routes/project.routes');
@@ -8,17 +9,24 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Accept'],
+}));
 app.use(express.json());
 
-// Routes
+app.use((req, res, next) => {
+  console.log(`Incoming request: ${req.method} ${req.originalUrl}`);
+  console.log(`Query parameters: ${JSON.stringify(req.query)}`);
+  console.log(`Route parameters: ${JSON.stringify(req.params)}`);
+  next();
+});
+
 app.use('/projects', projectRoutes);
 app.use('/daily-details', dailyDetailsRoutes);
-
-// Swagger UI
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
-// Start server
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
   console.log(`Swagger UI available at http://localhost:${port}/api-docs`);
