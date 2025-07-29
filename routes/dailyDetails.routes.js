@@ -1,18 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const {sql, poolPromise} = require('../config/db.config');
-const {DateTime} = require('luxon');
+const { sql, poolPromise } = require('../config/db.config');
+const { DateTime } = require('luxon');
 
 function isValidDate(dateString) {
     if (!dateString || typeof dateString !== 'string') {
         return false;
     }
     const trimmedDate = dateString.trim();
-    let dt = DateTime.fromFormat(trimmedDate, 'yyyy-MM-dd', {zone: 'Asia/Tehran'});
+    let dt = DateTime.fromFormat(trimmedDate, 'yyyy-MM-dd', { zone: 'Asia/Tehran' });
     if (dt.isValid) {
         return true;
     }
-    dt = DateTime.fromISO(trimmedDate, {zone: 'Asia/Tehran'});
+    dt = DateTime.fromISO(trimmedDate, { zone: 'Asia/Tehran' });
     return dt.isValid;
 }
 
@@ -20,11 +20,11 @@ function parseDate(dateString) {
     if (!isValidDate(dateString)) return null;
     const trimmedDate = dateString.trim();
     let dt;
-    dt = DateTime.fromFormat(trimmedDate, 'yyyy-MM-dd', {zone: 'Asia/Tehran'});
+    dt = DateTime.fromFormat(trimmedDate, 'yyyy-MM-dd', { zone: 'Asia/Tehran' });
     if (dt.isValid) {
         return dt.toJSDate();
     }
-    dt = DateTime.fromISO(trimmedDate, {zone: 'Asia/Tehran'});
+    dt = DateTime.fromISO(trimmedDate, { zone: 'Asia/Tehran' });
     if (dt.isValid) {
         return dt.toJSDate();
     }
@@ -44,17 +44,20 @@ function parseDate(dateString) {
  *         schema:
  *           type: string
  *           format: date
+ *         description: Start date of the range (YYYY-MM-DD)
  *       - in: query
  *         name: endDate
  *         required: true
  *         schema:
  *           type: string
  *           format: date
+ *         description: End date of the range (YYYY-MM-DD)
  *       - in: query
  *         name: userId
  *         required: true
  *         schema:
  *           type: integer
+ *         description: Identifier of the user
  *     responses:
  *       200:
  *         description: Daily details for the range
@@ -65,67 +68,59 @@ function parseDate(dateString) {
  *               items:
  *                 $ref: '#/components/schemas/DailyDetail'
  *       400:
- *         description: Invalid input
+ *         description: Invalid input (e.g., missing or invalid parameters)
  *       500:
  *         description: Server error
  */
 router.get('/range', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const {startDate, endDate, userId} = req.query;
-        console.log(`Request received: startDate=${startDate}, endDate=${endDate}, userId=${userId}`);
+        const { startDate, endDate, userId } = req.query;
 
         if (!startDate || !endDate || !userId) {
-            return res.status(400).send('startDate، باید endDate و userId الزامی است');
+            return res.status(400).send('startDate, endDate, and userId are required');
         }
 
         if (startDate === 'range' || endDate === 'range') {
-            returnres.status(400).send('ورودی نامعتبر: مقدار "range" در تاریخ‌ها شناسایی شد');
+            return res.status(400).send('Invalid input: "range" detected in date parameters');
         }
 
         if (!isValidDate(startDate) || !isValidDate(endDate)) {
-            return res.status(400).send('فرمت تاریخ نامعتبر است. از فرمت YYYY-MM-DD یا ISO 8601 استفاده کنید');
+            return res.status(400).send('Invalid date format. Use YYYY-MM-DD or ISO 8601');
         }
 
         const parsedStartDate = parseDate(startDate);
         const parsedEndDate = parseDate(endDate);
 
         if (!parsedStartDate || !parsedEndDate) {
-            return res.status(400).send('تاریخ‌های ارسالی نامعتبر هستند');
+            return res.status(400).send('Invalid date parameters');
         }
 
         if (parsedStartDate > parsedEndDate) {
-            return res.status(400).send('startDate باید قبل از endDate باشد');
+            return res.status(400).send('startDate must be before endDate');
         }
 
-        // اضافه کردن یک روز به endDate برای اطمینان از پوشش کامل
-        const adjustedEndDate = DateTime.fromJSDate(parsedEndDate, {zone: 'Asia/Tehran'})
-            .plus({days: 1})
+        const adjustedEndDate = DateTime.fromJSDate(parsedEndDate, { zone: 'Asia/Tehran' })
+            .plus({ days: 1 })
             .startOf('day')
             .toJSDate();
 
-        console.log(`Executing query: startDate=${parsedStartDate}, endDate=${adjustedEndDate}, userId=${userId}`);
         const detailResult = await pool
             .request()
             .input('startDate', sql.Date, parsedStartDate)
             .input('endDate', sql.Date, adjustedEndDate)
             .input('userId', sql.Int, parseInt(userId))
             .query(`
-                SELECT Date, CAST (Date AS DATE) AS DateOnly, UserId, LeaveType, ArrivalTime, LeaveTime, PersonalTime, Description, GoCost, ReturnCost
+                SELECT Date, CAST(Date AS DATE) AS DateOnly, UserId, LeaveType, ArrivalTime, LeaveTime, PersonalTime, Description, GoCost, ReturnCost
                 FROM DailyDetails
                 WHERE CAST(Date AS DATE) >= @startDate AND CAST(Date AS DATE) <= @endDate AND UserId = @userId
                 ORDER BY Date
             `);
 
-        console.log(`Query returned ${detailResult.recordset.length} records`);
-        detailResult.recordset.forEach(record => {
-            console.log(`Record: Date=${record.Date}, DateOnly=${record.DateOnly}`);
-        });
-
         const details = [];
         for (const detail of detailResult.recordset) {
             if (!detail.Date || !(detail.Date instanceof Date)) {
-                console.log(`Skipping invalid date: ${detail.Date}`);
+                console.warn(`Skipping record with invalid date: ${detail.Date}`);
                 continue;
             }
 
@@ -141,7 +136,7 @@ router.get('/range', async (req, res) => {
                 .input('userId', sql.Int, parseInt(userId))
                 .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
-            const detailDate = DateTime.fromJSDate(detail.Date, {zone: 'Asia/Tehran'});
+            const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
 
             if (detail.ArrivalTime) {
                 const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
@@ -154,7 +149,7 @@ router.get('/range', async (req, res) => {
                         minute: minutes,
                         second: seconds,
                     },
-                    {zone: 'Asia/Tehran'}
+                    { zone: 'Asia/Tehran' }
                 ).toISO();
             }
             if (detail.LeaveTime) {
@@ -168,7 +163,7 @@ router.get('/range', async (req, res) => {
                         minute: minutes,
                         second: seconds,
                     },
-                    {zone: 'Asia/Tehran'}
+                    { zone: 'Asia/Tehran' }
                 ).toISO();
             }
 
@@ -179,13 +174,13 @@ router.get('/range', async (req, res) => {
             });
         }
 
-        console.log(`Returning ${details.length} records`);
         res.json(details);
     } catch (err) {
-        console.error(`Server error: ${err.message}`);
-        res.status(500).send(`خطای سرور: ${err.message}`);
+        console.error(`Error in GET /daily-details/range: ${err.message}`);
+        res.status(500).send(`Server error: ${err.message}`);
     }
 });
+
 /**
  * @swagger
  * /daily-details/{date}:
@@ -199,11 +194,13 @@ router.get('/range', async (req, res) => {
  *         schema:
  *           type: string
  *           format: date
+ *         description: Date of the daily details (YYYY-MM-DD)
  *       - in: query
  *         name: userId
  *         required: true
  *         schema:
  *           type: integer
+ *         description: Identifier of the user
  *     responses:
  *       200:
  *         description: Daily details
@@ -211,30 +208,30 @@ router.get('/range', async (req, res) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/DailyDetail'
+ *       400:
+ *         description: Invalid date format or parameters
  *       404:
  *         description: Daily details not found
- *       400:
- *         description: Invalid date format
  *       500:
  *         description: Server error
  */
 router.get('/:date', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const {date} = req.params;
-        const {userId} = req.query;
+        const { date } = req.params;
+        const { userId } = req.query;
 
         if (date === 'range') {
-            return res.status(400).send('ورودی نامعتبر: مقدار "range" در تاریخ شناسایی شد');
+            return res.status(400).send('Invalid input: "range" detected in date parameter');
         }
 
         if (!isValidDate(date)) {
-            return res.status(400).send('فرمت تاریخ نامعتبر است. از فرمت YYYY-MM-DD یا ISO 8601 استفاده کنید');
+            return res.status(400).send('Invalid date format. Use YYYY-MM-DD or ISO 8601');
         }
 
         const parsedDate = parseDate(date);
         if (!parsedDate) {
-            return res.status(400).send('تاریخ ارسالی نامعتبر است');
+            return res.status(400).send('Invalid date parameter');
         }
 
         const detailResult = await pool
@@ -244,7 +241,7 @@ router.get('/:date', async (req, res) => {
             .query('SELECT * FROM DailyDetails WHERE CAST(Date AS DATE) = @date AND UserId = @userId');
 
         if (detailResult.recordset.length === 0) {
-            return res.status(404).send('جزئیات روزانه یافت نشد');
+            return res.status(404).send('Daily details not found');
         }
 
         const tasksResult = await pool
@@ -260,7 +257,7 @@ router.get('/:date', async (req, res) => {
             .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
         const detail = detailResult.recordset[0];
-        const detailDate = DateTime.fromJSDate(detail.Date, {zone: 'Asia/Tehran'});
+        const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
 
         if (detail.ArrivalTime) {
             const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
@@ -273,7 +270,7 @@ router.get('/:date', async (req, res) => {
                     minute: minutes,
                     second: seconds,
                 },
-                {zone: 'Asia/Tehran'}
+                { zone: 'Asia/Tehran' }
             ).toISO();
         }
         if (detail.LeaveTime) {
@@ -287,7 +284,7 @@ router.get('/:date', async (req, res) => {
                     minute: minutes,
                     second: seconds,
                 },
-                {zone: 'Asia/Tehran'}
+                { zone: 'Asia/Tehran' }
             ).toISO();
         }
 
@@ -297,7 +294,8 @@ router.get('/:date', async (req, res) => {
             personalCarCosts: carCostsResult.recordset,
         });
     } catch (err) {
-        res.status(500).send(`خطای سرور در دریافت جزئیات روزانه: ${err.message}`);
+        console.error(`Error in GET /daily-details/:date: ${err.message}`);
+        res.status(500).send(`Server error: ${err.message}`);
     }
 });
 
@@ -321,7 +319,7 @@ router.get('/:date', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/DailyDetail'
  *       400:
- *         description: Invalid input
+ *         description: Invalid input (e.g., missing or invalid parameters)
  *       500:
  *         description: Server error
  */
@@ -341,16 +339,16 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     if (!date || !userId) {
-        return res.status(400).send('تاریخ و شناسه کاربر الزامی هستند');
+        return res.status(400).send('date and userId are required');
     }
 
     if (!isValidDate(date)) {
-        return res.status(400).send('فرمت تاریخ نامعتبر است. از فرمت YYYY-MM-DD یا ISO 8601 استفاده کنید');
+        return res.status(400).send('Invalid date format. Use YYYY-MM-DD or ISO 8601');
     }
 
     const parsedDate = parseDate(date);
     if (!parsedDate) {
-        return res.status(400).send('تاریخ ارسالی نامعتبر است');
+        return res.status(400).send('Invalid date parameter');
     }
 
     const validateTime = (time, paramName) => {
@@ -366,7 +364,7 @@ router.post('/', async (req, res) => {
         }
 
         if (isoRegex.test(cleanedTime)) {
-            const dt = DateTime.fromISO(cleanedTime, {zone: 'Asia/Tehran'});
+            const dt = DateTime.fromISO(cleanedTime, { zone: 'Asia/Tehran' });
             if (!dt.isValid) {
                 throw new Error(`Validation failed for parameter '${paramName}'. Invalid ISO time.`);
             }
@@ -376,7 +374,7 @@ router.post('/', async (req, res) => {
         } else if (timeRegex.test(cleanedTime)) {
             [hours, minutes, seconds = 0] = cleanedTime.split(':').map(Number);
         } else {
-            throw new Error(`Validation failed for parameter '${paramName}'. Invalid time.`);
+            throw new Error(`Validation failed for parameter '${paramName}'. Invalid time format.`);
         }
 
         if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
@@ -389,7 +387,7 @@ router.post('/', async (req, res) => {
     if (personalCarCosts && personalCarCosts.length > 0) {
         for (const carCost of personalCarCosts) {
             if (!carCost.projectId || !carCost.cost || carCost.cost <= 0 || !carCost.kilometers || carCost.kilometers <= 0) {
-                return res.status(400).send('شناسه پروژه، تعداد کیلومترها و هزینه خودرو شخصی باید معتبر و بزرگ‌تر از صفر باشند');
+                return res.status(400).send('projectId, kilometers, and cost must be valid and greater than zero for personal car costs');
             }
         }
     }
@@ -404,12 +402,14 @@ router.post('/', async (req, res) => {
 
         pool = await poolPromise;
         if (!pool) {
-            throw new Error('اتصال به پایگاه داده برقرار نشد');
+            throw new Error('Failed to connect to database');
         }
 
         transaction = new sql.Transaction(pool);
         await transaction.begin();
         transactionBegun = true;
+
+        console.log(`Starting transaction for daily details: date=${date}, userId=${userId}`);
 
         const request = transaction.request();
         request.input('date', sql.Date, parsedDate);
@@ -427,18 +427,18 @@ router.post('/', async (req, res) => {
             .input('goCost', sql.Int, goCost || null)
             .input('returnCost', sql.Int, returnCost || null)
             .query(`
-        IF EXISTS (SELECT 1 FROM DailyDetails WHERE Date = @date AND UserId = @userId)
-          UPDATE DailyDetails
-          SET ArrivalTime = @arrivalTime, LeaveTime = @leaveTime, LeaveType = @leaveType,
-              PersonalTime = @personalTime, Description = @description, GoCost = @goCost,
-              ReturnCost = @returnCost
-          OUTPUT INSERTED.*
-          WHERE Date = @date AND UserId = @userId
-        ELSE
-          INSERT INTO DailyDetails (Date, UserId, ArrivalTime, LeaveTime, LeaveType, PersonalTime, Description, GoCost, ReturnCost)
-          OUTPUT INSERTED.*
-          VALUES (@date, @userId, @arrivalTime, @leaveTime, @leaveType, @personalTime, @description, @goCost, @returnCost)
-      `);
+                IF EXISTS (SELECT 1 FROM DailyDetails WHERE Date = @date AND UserId = @userId)
+                    UPDATE DailyDetails
+                    SET ArrivalTime = @arrivalTime, LeaveTime = @leaveTime, LeaveType = @leaveType,
+                        PersonalTime = @personalTime, Description = @description, GoCost = @goCost,
+                        ReturnCost = @returnCost
+                    OUTPUT INSERTED.*
+                    WHERE Date = @date AND UserId = @userId
+                ELSE
+                    INSERT INTO DailyDetails (Date, UserId, ArrivalTime, LeaveTime, LeaveType, PersonalTime, Description, GoCost, ReturnCost)
+                    OUTPUT INSERTED.*
+                    VALUES (@date, @userId, @arrivalTime, @leaveTime, @leaveType, @personalTime, @description, @goCost, @returnCost)
+            `);
 
         const tasksResult = [];
         for (const task of tasks || []) {
@@ -472,7 +472,7 @@ router.post('/', async (req, res) => {
         }
 
         const responseDetail = detailResult.recordset[0];
-        const detailDate = DateTime.fromJSDate(responseDetail.Date, {zone: 'Asia/Tehran'});
+        const detailDate = DateTime.fromJSDate(responseDetail.Date, { zone: 'Asia/Tehran' });
 
         if (responseDetail.ArrivalTime) {
             const [hours, minutes, seconds = '00'] = responseDetail.ArrivalTime.split(':').map(Number);
@@ -485,7 +485,7 @@ router.post('/', async (req, res) => {
                     minute: minutes,
                     second: seconds,
                 },
-                {zone: 'Asia/Tehran'}
+                { zone: 'Asia/Tehran' }
             ).toISO();
         }
         if (responseDetail.LeaveTime) {
@@ -499,11 +499,12 @@ router.post('/', async (req, res) => {
                     minute: minutes,
                     second: seconds,
                 },
-                {zone: 'Asia/Tehran'}
+                { zone: 'Asia/Tehran' }
             ).toISO();
         }
 
         await transaction.commit();
+        console.log(`Transaction committed successfully for daily details: date=${date}, userId=${userId}`);
 
         res.status(201).json({
             ...responseDetail,
@@ -514,11 +515,13 @@ router.post('/', async (req, res) => {
         if (transaction && transactionBegun) {
             try {
                 await transaction.rollback();
+                console.error(`Transaction rolled back due to error: ${err.message}`);
             } catch (rollbackErr) {
-                console.error('خطا در بازگردانی تراکنش:', rollbackErr);
+                console.error(`Error during transaction rollback: ${rollbackErr.message}`);
             }
         }
-        res.status(500).send(`خطای سرور: ${err.message}`);
+        console.error(`Error in POST /daily-details: ${err.message}`);
+        res.status(500).send(`Server error: ${err.message}`);
     }
 });
 
@@ -534,16 +537,19 @@ router.post('/', async (req, res) => {
  *         required: true
  *         schema:
  *           type: integer
+ *         description: Year of the monthly details
  *       - in: path
  *         name: month
  *         required: true
  *         schema:
  *           type: integer
+ *         description: Month of the monthly details (1-12)
  *       - in: query
  *         name: userId
  *         required: true
  *         schema:
  *           type: integer
+ *         description: Identifier of the user
  *     responses:
  *       200:
  *         description: Monthly details
@@ -553,28 +559,35 @@ router.post('/', async (req, res) => {
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/DailyDetail'
+ *       400:
+ *         description: Invalid input (e.g., invalid year or month)
  *       500:
  *         description: Server error
  */
 router.get('/month/:year/:month', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const {year, month} = req.params;
-        const {userId} = req.query;
+        const { year, month } = req.params;
+        const { userId } = req.query;
 
-        // محاسبه تاریخ شروع و پایان ماه میلادی
+        const parsedYear = parseInt(year);
+        const parsedMonth = parseInt(month);
+
+        if (isNaN(parsedYear) || isNaN(parsedMonth) || parsedMonth < 1 || parsedMonth > 12) {
+            return res.status(400).send('Invalid year or month');
+        }
+
         const startDate = DateTime.fromObject({
-            year: parseInt(year),
-            month: parseInt(month),
+            year: parsedYear,
+            month: parsedMonth,
             day: 1
-        }, {zone: 'Asia/Tehran'}).toJSDate();
+        }, { zone: 'Asia/Tehran' }).toJSDate();
         const endDate = DateTime.fromObject({
-            year: parseInt(year),
-            month: parseInt(month) + 1,
+            year: parsedYear,
+            month: parsedMonth + 1,
             day: 1
-        }, {zone: 'Asia/Tehran'}).minus({days: 1}).toJSDate();
+        }, { zone: 'Asia/Tehran' }).minus({ days: 1 }).toJSDate();
 
-        console.log(`Executing query for month: year=${year}, month=${month}, userId=${userId}`);
         const detailResult = await pool
             .request()
             .input('startDate', sql.Date, startDate)
@@ -592,6 +605,7 @@ router.get('/month/:year/:month', async (req, res) => {
         const details = [];
         for (const detail of detailResult.recordset) {
             if (!detail.Date || !(detail.Date instanceof Date)) {
+                console.warn(`Skipping record with invalid date: ${detail.Date}`);
                 continue;
             }
             const tasksResult = await pool
@@ -606,7 +620,7 @@ router.get('/month/:year/:month', async (req, res) => {
                 .input('userId', sql.Int, parseInt(userId))
                 .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
-            const detailDate = DateTime.fromJSDate(detail.Date, {zone: 'Asia/Tehran'});
+            const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
 
             if (detail.ArrivalTime) {
                 const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
@@ -619,7 +633,7 @@ router.get('/month/:year/:month', async (req, res) => {
                         minute: minutes,
                         second: seconds,
                     },
-                    {zone: 'Asia/Tehran'}
+                    { zone: 'Asia/Tehran' }
                 ).toISO();
             }
             if (detail.LeaveTime) {
@@ -633,7 +647,7 @@ router.get('/month/:year/:month', async (req, res) => {
                         minute: minutes,
                         second: seconds,
                     },
-                    {zone: 'Asia/Tehran'}
+                    { zone: 'Asia/Tehran' }
                 ).toISO();
             }
 
@@ -646,7 +660,8 @@ router.get('/month/:year/:month', async (req, res) => {
 
         res.json(details);
     } catch (err) {
-        res.status(500).send(`خطای سرور در دریافت جزئیات ماهانه: ${err.message}`);
+        console.error(`Error in GET /daily-details/month/:year/:month: ${err.message}`);
+        res.status(500).send(`Server error: ${err.message}`);
     }
 });
 
