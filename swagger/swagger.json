@@ -364,6 +364,172 @@
           }
         }
       }
+    },
+    "/monthly-reports/{year}/{month}": {
+      "post": {
+        "summary": "Create monthly report (by user)",
+        "tags": ["MonthlyReports"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Report created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/{reportId}/submit-to-manager": {
+      "put": {
+        "summary": "Submit report to manager (by user)",
+        "tags": ["MonthlyReports"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Submitted"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/{reportId}/approve-manager": {
+      "put": {
+        "summary": "Approve and submit to finance (by manager)",
+        "tags": ["MonthlyReports"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approved"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/{reportId}/approve-finance": {
+      "put": {
+        "summary": "Final approve (by finance)",
+        "tags": ["MonthlyReports"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approved"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/{reportId}": {
+      "get": {
+        "summary": "Get report by ID",
+        "tags": ["MonthlyReports"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthlyReport"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -599,6 +765,38 @@
                 }
               }
             }
+          }
+        }
+      },
+      "MonthlyReport": {
+        "type": "object",
+        "properties": {
+          "ReportId": {
+            "type": "integer"
+          },
+          "UserId": {
+            "type": "integer"
+          },
+          "Year": {
+            "type": "integer"
+          },
+          "Month": {
+            "type": "integer"
+          },
+          "TotalHours": {
+            "type": "integer"
+          },
+          "GymCost": {
+            "type": "integer"
+          },
+          "Status": {
+            "type": "string"
+          },
+          "ManagerComment": {
+            "type": "string"
+          },
+          "FinanceComment": {
+            "type": "string"
           }
         }
       }

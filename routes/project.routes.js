@@ -6,7 +6,7 @@ const { sql, poolPromise } = require('../config/db.config');
  * @swagger
  * /projects:
  *   get:
- *     summary: Retrieve all projects
+ *     summary: Retrieve all projects accessible to the current user
  *     tags: [Projects]
  *     responses:
  *       200:
@@ -21,9 +21,17 @@ const { sql, poolPromise } = require('../config/db.config');
  *         description: Server error
  */
 router.get('/', async (req, res) => {
+  const userId = req.user.userId; // فرضی از auth middleware
   try {
     const pool = await poolPromise;
-    const result = await pool.request().query('SELECT * FROM Projects');
+    const result = await pool.request()
+        .input('userId', sql.Int, userId)
+        .query(`
+        SELECT p.* 
+        FROM Projects p
+        JOIN UserProjectAccess upa ON p.Id = upa.ProjectId
+        WHERE upa.UserId = @userId
+      `);
     res.json(result.recordset);
   } catch (err) {
     console.error('Error in GET /projects:', err);
@@ -35,7 +43,7 @@ router.get('/', async (req, res) => {
  * @swagger
  * /projects/{id}:
  *   get:
- *     summary: Get a project by ID
+ *     summary: Get a project by ID if accessible to the current user
  *     tags: [Projects]
  *     parameters:
  *       - in: path
@@ -50,20 +58,38 @@ router.get('/', async (req, res) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Project'
+ *       403:
+ *         description: Access denied to this project
  *       404:
  *         description: Project not found
  *       500:
  *         description: Server error
  */
 router.get('/:id', async (req, res) => {
+  const userId = req.user.userId; // فرضی از auth middleware
   try {
     const pool = await poolPromise;
     const result = await pool
-      .request()
-      .input('id', sql.Int, req.params.id)
-      .query('SELECT * FROM Projects WHERE Id = @id');
+        .request()
+        .input('id', sql.Int, req.params.id)
+        .input('userId', sql.Int, userId)
+        .query(`
+        SELECT p.* 
+        FROM Projects p
+        JOIN UserProjectAccess upa ON p.Id = upa.ProjectId
+        WHERE p.Id = @id AND upa.UserId = @userId
+      `);
     if (result.recordset.length === 0) {
-      return res.status(404).send('پروژه یافت نشد');
+      // چک کنیم آیا پروژه وجود دارد یا نه، برای تمایز 404 و 403
+      const existsResult = await pool
+          .request()
+          .input('id', sql.Int, req.params.id)
+          .query('SELECT COUNT(*) as count FROM Projects WHERE Id = @id');
+      if (existsResult.recordset[0].count === 0) {
+        return res.status(404).send('پروژه یافت نشد');
+      } else {
+        return res.status(403).send('دسترسی به این پروژه مجاز نیست');
+      }
     }
     res.json(result.recordset[0]);
   } catch (err) {
@@ -104,20 +130,20 @@ router.post('/', async (req, res) => {
   try {
     const pool = await poolPromise;
     const checkResult = await pool
-      .request()
-      .input('id', sql.Int, Id)
-      .query('SELECT COUNT(*) as count FROM Projects WHERE Id = @id');
+        .request()
+        .input('id', sql.Int, Id)
+        .query('SELECT COUNT(*) as count FROM Projects WHERE Id = @id');
     if (checkResult.recordset[0].count > 0) {
       return res.status(400).send('شناسه پروژه قبلاً وجود دارد');
     }
     const result = await pool
-      .request()
-      .input('Id', sql.Int, Id)
-      .input('ProjectName', sql.NVarChar, ProjectName)
-      .input('securityLevel', sql.Int, securityLevel)
-      .query(
-        'INSERT INTO Projects (Id, ProjectName, securityLevel) OUTPUT INSERTED.* VALUES (@Id, @ProjectName, @securityLevel)'
-      );
+        .request()
+        .input('Id', sql.Int, Id)
+        .input('ProjectName', sql.NVarChar, ProjectName)
+        .input('securityLevel', sql.Int, securityLevel)
+        .query(
+            'INSERT INTO Projects (Id, ProjectName, securityLevel) OUTPUT INSERTED.* VALUES (@Id, @ProjectName, @securityLevel)'
+        );
     res.status(201).json(result.recordset[0]);
   } catch (err) {
     console.error('Error in POST /projects:', err);
@@ -170,13 +196,13 @@ router.put('/:id', async (req, res) => {
   try {
     const pool = await poolPromise;
     const result = await pool
-      .request()
-      .input('id', sql.Int, req.params.id)
-      .input('ProjectName', sql.NVarChar, ProjectName || null)
-      .input('securityLevel', sql.Int, securityLevel ?? null)
-      .query(
-        'UPDATE Projects SET ProjectName = COALESCE(@ProjectName, ProjectName), securityLevel = COALESCE(@securityLevel, securityLevel) OUTPUT INSERTED.* WHERE Id = @id'
-      );
+        .request()
+        .input('id', sql.Int, req.params.id)
+        .input('ProjectName', sql.NVarChar, ProjectName || null)
+        .input('securityLevel', sql.Int, securityLevel ?? null)
+        .query(
+            'UPDATE Projects SET ProjectName = COALESCE(@ProjectName, ProjectName), securityLevel = COALESCE(@securityLevel, securityLevel) OUTPUT INSERTED.* WHERE Id = @id'
+        );
     if (result.recordset.length === 0) {
       return res.status(404).send('پروژه یافت نشد');
     }
@@ -211,9 +237,9 @@ router.delete('/:id', async (req, res) => {
   try {
     const pool = await poolPromise;
     const result = await pool
-      .request()
-      .input('id', sql.Int, req.params.id)
-      .query('DELETE FROM Projects WHERE Id = @id');
+        .request()
+        .input('id', sql.Int, req.params.id)
+        .query('DELETE FROM Projects WHERE Id = @id');
     if (result.rowsAffected[0] === 0) {
       return res.status(404).send('پروژه یافت نشد');
     }

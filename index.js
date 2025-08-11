@@ -4,6 +4,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger/swagger.json');
 const projectRoutes = require('./routes/project.routes');
 const dailyDetailsRoutes = require('./routes/dailyDetails.routes');
+const monthlyReportsRoutes = require('./routes/monthlyReports.routes');
 require('dotenv').config();
 
 const app = express();
@@ -25,6 +26,7 @@ app.use((req, res, next) => {
 
 app.use('/projects', projectRoutes);
 app.use('/daily-details', dailyDetailsRoutes);
+app.use('/monthly-reports', monthlyReportsRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.listen(port, () => {
