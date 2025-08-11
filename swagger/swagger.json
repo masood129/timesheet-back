@@ -14,8 +14,10 @@
   "paths": {
     "/projects": {
       "get": {
-        "summary": "Retrieve all projects",
-        "tags": ["Projects"],
+        "summary": "Retrieve all projects accessible to the current user",
+        "tags": [
+          "Projects"
+        ],
         "responses": {
           "200": {
             "description": "List of projects",
@@ -37,7 +39,9 @@
       },
       "post": {
         "summary": "Create a new project",
-        "tags": ["Projects"],
+        "tags": [
+          "Projects"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -70,8 +74,10 @@
     },
     "/projects/{id}": {
       "get": {
-        "summary": "Get a project by ID",
-        "tags": ["Projects"],
+        "summary": "Get a project by ID if accessible to the current user",
+        "tags": [
+          "Projects"
+        ],
         "parameters": [
           {
             "in": "path",
@@ -93,6 +99,9 @@
               }
             }
           },
+          "403": {
+            "description": "Access denied to this project"
+          },
           "404": {
             "description": "Project not found"
           },
@@ -103,7 +112,9 @@
       },
       "put": {
         "summary": "Update a project",
-        "tags": ["Projects"],
+        "tags": [
+          "Projects"
+        ],
         "parameters": [
           {
             "in": "path",
@@ -156,7 +167,9 @@
       },
       "delete": {
         "summary": "Delete a project",
-        "tags": ["Projects"],
+        "tags": [
+          "Projects"
+        ],
         "parameters": [
           {
             "in": "path",
@@ -183,7 +196,9 @@
     "/daily-details/{date}": {
       "get": {
         "summary": "Get daily details for a specific date",
-        "tags": ["DailyDetails"],
+        "tags": [
+          "DailyDetails"
+        ],
         "parameters": [
           {
             "in": "path",
@@ -192,7 +207,8 @@
             "schema": {
               "type": "string",
               "format": "date"
-            }
+            },
+            "description": "Date for the daily details (YYYY-MM-DD)"
           },
           {
             "in": "query",
@@ -200,7 +216,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Identifier of the user"
           }
         ],
         "responses": {
@@ -226,7 +243,9 @@
     "/daily-details": {
       "post": {
         "summary": "Create or update daily details",
-        "tags": ["DailyDetails"],
+        "tags": [
+          "DailyDetails"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -257,60 +276,12 @@
         }
       }
     },
-    "/daily-details/month/{year}/{month}": {
-      "get": {
-        "summary": "Get monthly details",
-        "tags": ["DailyDetails"],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "year",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "in": "path",
-            "name": "month",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Monthly details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DailyDetail"
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
     "/daily-details/range": {
       "get": {
         "summary": "Get daily details for a date range",
-        "tags": ["DailyDetails"],
+        "tags": [
+          "DailyDetails"
+        ],
         "parameters": [
           {
             "in": "query",
@@ -365,10 +336,70 @@
         }
       }
     },
+    "/daily-details/month/{year}/{month}": {
+      "get": {
+        "summary": "Get monthly details",
+        "tags": [
+          "DailyDetails"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Year of the monthly details"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Month of the monthly details (1-12)"
+          },
+          {
+            "in": "query",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Identifier of the user"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monthly details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DailyDetail"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input (e.g., invalid year or month)"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
     "/monthly-reports/{year}/{month}": {
       "post": {
         "summary": "Create monthly report (by user)",
-        "tags": ["MonthlyReports"],
+        "tags": [
+          "MonthlyReports"
+        ],
         "parameters": [
           {
             "in": "path",
@@ -403,7 +434,9 @@
     "/monthly-reports/{reportId}/submit-to-manager": {
       "put": {
         "summary": "Submit report to manager (by user)",
-        "tags": ["MonthlyReports"],
+        "tags": [
+          "MonthlyReports"
+        ],
         "parameters": [
           {
             "in": "path",
@@ -427,7 +460,9 @@
     "/monthly-reports/{reportId}/approve-manager": {
       "put": {
         "summary": "Approve and submit to finance (by manager)",
-        "tags": ["MonthlyReports"],
+        "tags": [
+          "MonthlyReports"
+        ],
         "parameters": [
           {
             "in": "path",
@@ -465,7 +500,9 @@
     "/monthly-reports/{reportId}/approve-finance": {
       "put": {
         "summary": "Final approve (by finance)",
-        "tags": ["MonthlyReports"],
+        "tags": [
+          "MonthlyReports"
+        ],
         "parameters": [
           {
             "in": "path",
@@ -503,7 +540,9 @@
     "/monthly-reports/{reportId}": {
       "get": {
         "summary": "Get report by ID",
-        "tags": ["MonthlyReports"],
+        "tags": [
+          "MonthlyReports"
+        ],
         "parameters": [
           {
             "in": "path",
@@ -553,7 +592,11 @@
       },
       "ProjectInput": {
         "type": "object",
-        "required": ["Id", "ProjectName", "securityLevel"],
+        "required": [
+          "Id",
+          "ProjectName",
+          "securityLevel"
+        ],
         "properties": {
           "Id": {
             "type": "integer",
@@ -683,7 +726,10 @@
       },
       "DailyDetailInput": {
         "type": "object",
-        "required": ["date", "userId"],
+        "required": [
+          "date",
+          "userId"
+        ],
         "properties": {
           "date": {
             "type": "string",
