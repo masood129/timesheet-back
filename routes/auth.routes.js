@@ -23,7 +23,7 @@ const { sql, poolPromise } = require('../config/db.config');
  *                 description: User's username
  *     responses:
  *       200:
- *         description: Successful login, returns JWT token
+ *         description: Successful login, returns JWT token and userId
  *         content:
  *           application/json:
  *             schema:
@@ -32,6 +32,9 @@ const { sql, poolPromise } = require('../config/db.config');
  *                 token:
  *                   type: string
  *                   description: JWT token for authentication
+ *                 userId:
+ *                   type: integer
+ *                   description: User's ID
  *       400:
  *         description: Invalid input
  *       401:
@@ -49,9 +52,9 @@ router.post('/login', async (req, res) => {
   try {
     const pool = await poolPromise;
     const result = await pool
-      .request()
-      .input('username', sql.NVarChar, username)
-      .query('SELECT UserId, Username, Role FROM Users WHERE Username = @username');
+        .request()
+        .input('username', sql.NVarChar, username)
+        .query('SELECT UserId, Username, Role FROM Users WHERE Username = @username');
 
     if (result.recordset.length === 0) {
       return res.status(401).send('Invalid username');
@@ -59,12 +62,12 @@ router.post('/login', async (req, res) => {
 
     const user = result.recordset[0];
     const token = jwt.sign(
-      { userId: user.Id, role: user.Role },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' } // توکن برای ۱ ساعت معتبر است
+        { userId: user.UserId, role: user.Role },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
     );
 
-    res.json({ token });
+    res.json({ token, userId: user.UserId , Username: user.Username, Role: user.Role});
   } catch (err) {
     console.error('Error in POST /auth/login:', err.message);
     res.status(500).send('Server error');

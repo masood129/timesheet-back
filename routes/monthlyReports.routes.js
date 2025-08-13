@@ -1,14 +1,58 @@
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db.config');
-const { DateTime } = require('luxon');
 
-// فرض middleware auth (برای نقش‌ها) - در تولید واقعی اضافه کنید
+
 const checkRole = (roles) => (req, res, next) => {
-    // فرضی: req.user از JWT
     if (!roles.includes(req.user?.role)) return res.status(403).send('Access denied');
     next();
 };
+
+/**
+ * @swagger
+ * /monthly-gym-costs:
+ *   post:
+ *     summary: Save monthly gym cost
+ *     tags: [MonthlyReports]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId: { type: integer }
+ *               year: { type: integer }
+ *               month: { type: integer }
+ *               cost: { type: integer }
+ *     responses:
+ *       201: { description: Gym cost saved }
+ *       400: { description: Invalid input }
+ *       500: { description: Server error }
+ */
+router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
+    const { userId, year, month, cost } = req.body;
+    if (!userId || !year || !month || !cost) {
+        return res.status(400).send('Missing required fields');
+    }
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('userId', sql.Int, userId)
+            .input('year', sql.Int, year)
+            .input('month', sql.Int, month)
+            .input('cost', sql.Int, cost)
+            .query(`
+                IF EXISTS (SELECT 1 FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @year AND Month = @month)
+                    UPDATE MonthlyGymCosts SET Cost = @cost WHERE UserId = @userId AND Year = @year AND Month = @month
+                ELSE
+                    INSERT INTO MonthlyGymCosts (UserId, Year, Month, Cost) VALUES (@userId, @year, @month, @cost)
+            `);
+        res.status(201).send('Gym cost saved');
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
 
 /**
  * @swagger
@@ -34,10 +78,9 @@ const checkRole = (roles) => (req, res, next) => {
  */
 router.post('/:year/:month', checkRole(['user']), async (req, res) => {
     const { year, month } = req.params;
-    const userId = req.user.userId; // فرضی از auth
+    const userId = req.user.userId;
     try {
         const pool = await poolPromise;
-        // محاسبه مجموع ساعات
         const hoursResult = await pool.request()
             .input('userId', sql.Int, userId)
             .input('year', sql.Int, year)
@@ -45,7 +88,6 @@ router.post('/:year/:month', checkRole(['user']), async (req, res) => {
             .query('SELECT SUM(Duration) AS TotalHours FROM DailyProjectTasks WHERE UserId = @userId AND YEAR(Date) = @year AND MONTH(Date) = @month');
         const totalHours = hoursResult.recordset[0].TotalHours || 0;
 
-        // گرفتن هزینه ورزش
         const gymResult = await pool.request()
             .input('userId', sql.Int, userId)
             .input('year', sql.Int, year)
