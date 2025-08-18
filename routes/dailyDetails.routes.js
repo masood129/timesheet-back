@@ -383,8 +383,8 @@ router.post('/', async (req, res) => {
 
         if (personalCarCosts.length > 0) {
             for (const cost of personalCarCosts) {
-                if (!cost.projectId || !cost.cost) {
-                    return res.status(400).send('Each personal car cost must have projectId and cost');
+                if (!cost.projectId || !cost.cost || !cost.kilometers) {
+                    return res.status(400).send('Each personal car cost must have projectId, cost, and kilometers');
                 }
             }
         }
@@ -443,8 +443,7 @@ router.post('/', async (req, res) => {
         await deleteCarCostsRequest.query('DELETE FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
         for (const task of tasks) {
-            const taskRequest = transaction
-            Stuart
+            const taskRequest = transaction.request();
             taskRequest.input('date', sql.Date, parsedDate);
             taskRequest.input('userId', sql.Int, userId);
             taskRequest.input('projectId', sql.Int, task.projectId);
@@ -461,11 +460,12 @@ router.post('/', async (req, res) => {
             costRequest.input('date', sql.Date, parsedDate);
             costRequest.input('userId', sql.Int, userId);
             costRequest.input('projectId', sql.Int, cost.projectId);
+            costRequest.input('kilometers', sql.Int, cost.kilometers || null);
             costRequest.input('cost', sql.Int, cost.cost);
             costRequest.input('description', sql.NVarChar, cost.description || null);
             await costRequest.query(`
-                INSERT INTO DailyPersonalCarCosts (Date, UserId, ProjectId, Cost, Description)
-                VALUES (@date, @userId, @projectId, @cost, @description)
+                INSERT INTO DailyPersonalCarCosts (Date, UserId, ProjectID, Kilometers, Cost, Description)
+                VALUES (@date, @userId, @projectId, @kilometers, @cost, @description)
             `);
         }
 

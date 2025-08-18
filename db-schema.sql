@@ -77,12 +77,12 @@ CREATE TABLE DailyProjectTasks (
 
 -- ایجاد جدول DailyPersonalCarCosts برای هزینه‌های ماشین شخصی
 CREATE TABLE DailyPersonalCarCosts (
-                                       Id INT PRIMARY KEY IDENTITY(1,1),
-                                       Date DATE NOT NULL,
-                                       UserId INT NOT NULL,
-                                       Cost INT NOT NULL,
-                                       Description NVARCHAR(500) NULL,
-                                       FOREIGN KEY (UserId) REFERENCES Users(UserId)
+                                       Date DATE,
+                                       UserId INT,
+                                       ProjectID INT, -- نام ستون ممکن است متفاوت باشد
+                                       Kilometers INT, -- ستون برای کیلومتر
+                                       Cost INT,
+                                       Description NVARCHAR(MAX)
 );
 
 -- ایجاد جدول MonthlyGymCosts برای هزینه‌های ماهیانه ورزش
