@@ -15,18 +15,14 @@
     "/auth/login": {
       "post": {
         "summary": "Authenticate user and generate JWT token using username only",
-        "tags": [
-          "Auth"
-        ],
+        "tags": ["Auth"],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "username"
-                ],
+                "required": ["username"],
                 "properties": {
                   "username": {
                     "type": "string",
@@ -39,7 +35,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful login, returns JWT token",
+            "description": "Successful login, returns JWT token and user details",
             "content": {
               "application/json": {
                 "schema": {
@@ -48,619 +44,87 @@
                     "token": {
                       "type": "string",
                       "description": "JWT token for authentication"
+                    },
+                    "userId": {
+                      "type": "integer",
+                      "description": "User's ID"
+                    },
+                    "Username": {
+                      "type": "string",
+                      "description": "User's username"
+                    },
+                    "Role": {
+                      "type": "string",
+                      "description": "User's role (user, group_manager, general_manager, finance_manager)"
                     }
                   }
                 }
               }
             }
           },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Invalid username"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/projects": {
-      "get": {
-        "summary": "Retrieve all projects accessible to the current user",
-        "tags": [
-          "Projects"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of projects",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Project"
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      },
-      "post": {
-        "summary": "Create a new project",
-        "tags": [
-          "Projects"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProjectInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Project created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input or ID already exists"
-          },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/projects/{id}": {
-      "get": {
-        "summary": "Get a project by ID if accessible to the current user",
-        "tags": [
-          "Projects"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Project identifier"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Project details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "403": {
-            "description": "Access denied to this project"
-          },
-          "404": {
-            "description": "Project not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      },
-      "put": {
-        "summary": "Update a project",
-        "tags": [
-          "Projects"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Project identifier"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "ProjectName": {
-                    "type": "string",
-                    "description": "Name of the project"
-                  },
-                  "securityLevel": {
-                    "type": "integer",
-                    "description": "Security level of the project"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Project updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "404": {
-            "description": "Project not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      },
-      "delete": {
-        "summary": "Delete a project",
-        "tags": [
-          "Projects"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Project identifier"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Project deleted"
-          },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "404": {
-            "description": "Project not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/daily-details/{date}": {
-      "get": {
-        "summary": "Get daily details for a specific date",
-        "tags": [
-          "DailyDetails"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "date",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            },
-            "description": "Date for the daily details (YYYY-MM-DD)"
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Identifier of the user"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Daily details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DailyDetail"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid date format"
-          },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "404": {
-            "description": "Daily details not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/daily-details": {
-      "post": {
-        "summary": "Create or update daily details",
-        "tags": [
-          "DailyDetails"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DailyDetailInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Daily details created or updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DailyDetail"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/daily-details/range": {
-      "get": {
-        "summary": "Get daily details for a date range",
-        "tags": [
-          "DailyDetails"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "query",
-            "name": "startDate",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            },
-            "description": "Start date of the range (YYYY-MM-DD)"
-          },
-          {
-            "in": "query",
-            "name": "endDate",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            },
-            "description": "End date of the range (YYYY-MM-DD)"
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Identifier of the user"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Daily details for the range",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DailyDetail"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input (e.g., missing or invalid parameters)"
-          },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "403": {
-            "description": "Access denied (can only view own details)"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/daily-details/month/{year}/{month}": {
-      "get": {
-        "summary": "Get monthly details",
-        "tags": [
-          "DailyDetails"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "year",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Year of the monthly details"
-          },
-          {
-            "in": "path",
-            "name": "month",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Month of the monthly details (1-12)"
-          },
-          {
-            "in": "query",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Identifier of the user"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Monthly details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DailyDetail"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input (e.g., invalid year or month)"
-          },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "403": {
-            "description": "Access denied (can only view own details)"
-          },
-          "500": {
-            "description": "Server error"
-          }
+          "400": { "description": "Invalid input" },
+          "401": { "description": "Invalid username" },
+          "500": { "description": "Server error" }
         }
       }
     },
     "/monthly-reports/{year}/{month}": {
       "post": {
-        "summary": "Create monthly report",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "summary": "Create monthly report (by user, group_manager, or general_manager)",
+        "tags": ["MonthlyReports"],
+        "security": [{"bearerAuth": []}],
         "parameters": [
           {
             "in": "path",
             "name": "year",
             "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Year of the report"
+            "schema": { "type": "integer" }
           },
           {
             "in": "path",
             "name": "month",
             "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Month of the report (1-12)"
+            "schema": { "type": "integer" }
           }
         ],
         "responses": {
-          "201": {
-            "description": "Report created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string",
-                  "example": "Report created"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "403": {
-            "description": "Access denied (requires user role)"
-          },
-          "500": {
-            "description": "Server error"
-          }
+          "201": { "description": "Report created" },
+          "400": { "description": "Invalid input" },
+          "500": { "description": "Server error" }
         }
       }
     },
-    "/monthly-reports/{reportId}/submit-to-manager": {
+    "/monthly-reports/{reportId}/submit-to-group-manager": {
       "put": {
-        "summary": "Submit report to manager",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "summary": "Submit report to group manager (by user or group manager)",
+        "tags": ["MonthlyReports"],
+        "security": [{"bearerAuth": []}],
         "parameters": [
           {
             "in": "path",
             "name": "reportId",
             "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Report identifier"
+            "schema": { "type": "integer" }
           }
         ],
         "responses": {
-          "200": {
-            "description": "Report submitted to manager",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string",
-                  "example": "Submitted to manager"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "403": {
-            "description": "Access denied (requires user role)"
-          },
-          "500": {
-            "description": "Server error"
-          }
+          "200": { "description": "Submitted to group manager" },
+          "403": { "description": "Access denied" },
+          "500": { "description": "Server error" }
         }
       }
     },
-    "/monthly-reports/{reportId}/approve-manager": {
+    "/monthly-reports/{reportId}/approve-group-manager": {
       "put": {
-        "summary": "Approve and submit to finance",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "summary": "Approve and submit to general manager or finance (by group manager)",
+        "tags": ["MonthlyReports"],
+        "security": [{"bearerAuth": []}],
         "parameters": [
           {
             "in": "path",
             "name": "reportId",
             "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Report identifier"
+            "schema": { "type": "integer" }
           }
         ],
         "requestBody": {
@@ -669,59 +133,63 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "comment": {
-                    "type": "string",
-                    "description": "Manager's comment"
-                  }
+                  "comment": { "type": "string" },
+                  "toGeneralManager": { "type": "boolean" }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": {
-            "description": "Report approved and submitted to finance",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string",
-                  "example": "Approved and submitted to finance"
+          "200": { "description": "Approved and submitted" },
+          "403": { "description": "Access denied" },
+          "500": { "description": "Server error" }
+        }
+      }
+    },
+    "/monthly-reports/{reportId}/approve-general-manager": {
+      "put": {
+        "summary": "Approve and submit to finance (by general manager)",
+        "tags": ["MonthlyReports"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": { "type": "string" }
                 }
               }
             }
-          },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "403": {
-            "description": "Access denied (requires manager role)"
-          },
-          "500": {
-            "description": "Server error"
           }
+        },
+        "responses": {
+          "200": { "description": "Approved and submitted to finance" },
+          "403": { "description": "Access denied" },
+          "500": { "description": "Server error" }
         }
       }
     },
     "/monthly-reports/{reportId}/approve-finance": {
       "put": {
-        "summary": "Final approve by finance",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "summary": "Final approve (by finance)",
+        "tags": ["MonthlyReports"],
+        "security": [{"bearerAuth": []}],
         "parameters": [
           {
             "in": "path",
             "name": "reportId",
             "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Report identifier"
+            "schema": { "type": "integer" }
           }
         ],
         "requestBody": {
@@ -730,374 +198,85 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "comment": {
-                    "type": "string",
-                    "description": "Finance team's comment"
-                  }
+                  "comment": { "type": "string" }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": {
-            "description": "Report final approved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string",
-                  "example": "Final approved"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "403": {
-            "description": "Access denied (requires finance role)"
-          },
-          "500": {
-            "description": "Server error"
-          }
+          "200": { "description": "Approved" },
+          "403": { "description": "Access denied" },
+          "500": { "description": "Server error" }
         }
       }
     },
     "/monthly-reports/{reportId}": {
       "get": {
         "summary": "Get report by ID",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "tags": ["MonthlyReports"],
+        "security": [{"bearerAuth": []}],
         "parameters": [
           {
             "in": "path",
             "name": "reportId",
             "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Report identifier"
+            "schema": { "type": "integer" }
           }
         ],
         "responses": {
-          "200": {
-            "description": "Report details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MonthlyReport"
-                }
-              }
-            }
+          "200": { "description": "Report details" },
+          "403": { "description": "Access denied" },
+          "404": { "description": "Report not found" },
+          "500": { "description": "Server error" }
+        }
+      }
+    },
+    "/monthly-reports/group/{year}/{month}": {
+      "get": {
+        "summary": "Get reports for group manager or general manager",
+        "tags": ["MonthlyReports"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": { "type": "integer" }
           },
-          "401": {
-            "description": "Unauthorized: Invalid or missing token"
-          },
-          "500": {
-            "description": "Server error"
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": { "type": "integer" }
           }
+        ],
+        "responses": {
+          "200": { "description": "List of reports" },
+          "403": { "description": "Access denied" },
+          "500": { "description": "Server error" }
         }
       }
     }
   },
   "components": {
     "schemas": {
-      "Project": {
-        "type": "object",
-        "properties": {
-          "Id": {
-            "type": "integer",
-            "description": "Unique identifier for the project"
-          },
-          "ProjectName": {
-            "type": "string",
-            "description": "Name of the project"
-          },
-          "securityLevel": {
-            "type": "integer",
-            "description": "Security level of the project"
-          }
-        }
-      },
-      "ProjectInput": {
-        "type": "object",
-        "required": [
-          "Id",
-          "ProjectName",
-          "securityLevel"
-        ],
-        "properties": {
-          "Id": {
-            "type": "integer",
-            "description": "Unique identifier for the project"
-          },
-          "ProjectName": {
-            "type": "string",
-            "description": "Name of the project"
-          },
-          "securityLevel": {
-            "type": "integer",
-            "description": "Security level of the project"
-          }
-        }
-      },
-      "DailyDetail": {
-        "type": "object",
-        "properties": {
-          "Date": {
-            "type": "string",
-            "format": "date",
-            "description": "Date of the daily details (YYYY-MM-DD)"
-          },
-          "UserId": {
-            "type": "integer",
-            "description": "Identifier of the user"
-          },
-          "ArrivalTime": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Arrival time in ISO format"
-          },
-          "LeaveTime": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Leave time in ISO format"
-          },
-          "LeaveType": {
-            "type": "string",
-            "description": "Type of leave"
-          },
-          "PersonalTime": {
-            "type": "integer",
-            "description": "Personal time in minutes"
-          },
-          "Description": {
-            "type": "string",
-            "description": "Additional description"
-          },
-          "GoCost": {
-            "type": "integer",
-            "description": "Cost of going"
-          },
-          "ReturnCost": {
-            "type": "integer",
-            "description": "Cost of returning"
-          },
-          "tasks": {
-            "type": "array",
-            "description": "List of tasks for the day",
-            "items": {
-              "type": "object",
-              "properties": {
-                "Id": {
-                  "type": "integer",
-                  "description": "Task identifier"
-                },
-                "Date": {
-                  "type": "string",
-                  "format": "date",
-                  "description": "Date of the task"
-                },
-                "UserId": {
-                  "type": "integer",
-                  "description": "Identifier of the user"
-                },
-                "ProjectId": {
-                  "type": "integer",
-                  "description": "Identifier of the project"
-                },
-                "Duration": {
-                  "type": "integer",
-                  "description": "Duration of the task in minutes"
-                },
-                "Description": {
-                  "type": "string",
-                  "description": "Task description"
-                }
-              }
-            }
-          },
-          "personalCarCosts": {
-            "type": "array",
-            "description": "List of personal car costs",
-            "items": {
-              "type": "object",
-              "properties": {
-                "Id": {
-                  "type": "integer",
-                  "description": "Cost identifier"
-                },
-                "Date": {
-                  "type": "string",
-                  "format": "date",
-                  "description": "Date of the cost"
-                },
-                "UserId": {
-                  "type": "integer",
-                  "description": "Identifier of the user"
-                },
-                "ProjectId": {
-                  "type": "integer",
-                  "description": "Identifier of the project"
-                },
-                "Cost": {
-                  "type": "integer",
-                  "description": "Cost amount"
-                },
-                "Description": {
-                  "type": "string",
-                  "description": "Cost description"
-                }
-              }
-            }
-          }
-        }
-      },
-      "DailyDetailInput": {
-        "type": "object",
-        "required": [
-          "date",
-          "userId"
-        ],
-        "properties": {
-          "date": {
-            "type": "string",
-            "format": "date",
-            "description": "Date of the daily details (YYYY-MM-DD)"
-          },
-          "userId": {
-            "type": "integer",
-            "description": "Identifier of the user"
-          },
-          "arrivalTime": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Arrival time in ISO format"
-          },
-          "leaveTime": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Leave time in ISO format"
-          },
-          "leaveType": {
-            "type": "string",
-            "description": "Type of leave"
-          },
-          "personalTime": {
-            "type": "integer",
-            "description": "Personal time in minutes"
-          },
-          "description": {
-            "type": "string",
-            "description": "Additional description"
-          },
-          "goCost": {
-            "type": "integer",
-            "description": "Cost of going"
-          },
-          "returnCost": {
-            "type": "integer",
-            "description": "Cost of returning"
-          },
-          "tasks": {
-            "type": "array",
-            "description": "List of tasks for the day",
-            "items": {
-              "type": "object",
-              "properties": {
-                "projectId": {
-                  "type": "integer",
-                  "description": "Identifier of the project"
-                },
-                "duration": {
-                  "type": "integer",
-                  "description": "Duration of the task in minutes"
-                },
-                "description": {
-                  "type": "string",
-                  "description": "Task description"
-                }
-              }
-            }
-          },
-          "personalCarCosts": {
-            "type": "array",
-            "description": "List of personal car costs",
-            "items": {
-              "type": "object",
-              "properties": {
-                "projectId": {
-                  "type": "integer",
-                  "description": "Identifier of the project"
-                },
-                "cost": {
-                  "type": "integer",
-                  "description": "Cost amount"
-                },
-                "description": {
-                  "type": "string",
-                  "description": "Cost description"
-                }
-              }
-            }
-          }
-        }
-      },
       "MonthlyReport": {
         "type": "object",
         "properties": {
-          "ReportId": {
-            "type": "integer",
-            "description": "Unique identifier for the report"
-          },
-          "UserId": {
-            "type": "integer",
-            "description": "Identifier of the user"
-          },
-          "Year": {
-            "type": "integer",
-            "description": "Year of the report"
-          },
-          "Month": {
-            "type": "integer",
-            "description": "Month of the report (1-12)"
-          },
-          "TotalHours": {
-            "type": "integer",
-            "description": "Total hours worked in the month"
-          },
-          "GymCost": {
-            "type": "integer",
-            "description": "Gym cost for the month"
-          },
-          "Status": {
-            "type": "string",
-            "description": "Status of the report (draft, submitted_to_manager, submitted_to_finance, approved)"
-          },
-          "ManagerComment": {
-            "type": "string",
-            "description": "Comment from the manager"
-          },
-          "FinanceComment": {
-            "type": "string",
-            "description": "Comment from the finance team"
-          },
-          "SubmittedAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Date and time when the report was submitted to manager"
-          },
-          "ApprovedAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Date and time when the report was final approved"
-          }
+          "ReportId": { "type": "integer", "description": "Unique identifier for the report" },
+          "UserId": { "type": "integer", "description": "Identifier of the user" },
+          "Year": { "type": "integer", "description": "Year of the report" },
+          "Month": { "type": "integer", "description": "Month of the report (1-12)" },
+          "TotalHours": { "type": "integer", "description": "Total hours worked in the month" },
+          "GymCost": { "type": "integer", "description": "Gym cost for the month" },
+          "Status": { "type": "string", "description": "Status of the report (draft, submitted_to_group_manager, submitted_to_general_manager, submitted_to_finance, approved)" },
+          "ManagerComment": { "type": "string", "description": "Comment from the manager" },
+          "FinanceComment": { "type": "string", "description": "Comment from the finance team" },
+          "SubmittedAt": { "type": "string", "format": "date-time", "description": "Date and time when the report was submitted to manager" },
+          "ApprovedAt": { "type": "string", "format": "date-time", "description": "Date and time when the report was final approved" },
+          "GroupId": { "type": "integer", "description": "Identifier of the group" },
+          "GeneralManagerStatus": { "type": "string", "description": "Status of general manager approval (pending, approved_by_general_manager)" }
         }
       }
     },

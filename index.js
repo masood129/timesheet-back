@@ -27,6 +27,7 @@ const authMiddleware = (req, res, next) => {
             role: decoded.role
         };
         next();
+        console.log('Decoded user:', req.user);
     } catch (err) {
         console.error('JWT verification error:', err.message);
         res.status(401).send('Access denied: Invalid token');

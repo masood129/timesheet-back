@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { sql, poolPromise } = require('../config/db.config');
-
+const {sql, poolPromise} = require('../config/db.config');
 
 const checkRole = (roles) => (req, res, next) => {
     if (!roles.includes(req.user?.role)) return res.status(403).send('Access denied');
@@ -31,7 +30,7 @@ const checkRole = (roles) => (req, res, next) => {
  *       500: { description: Server error }
  */
 router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
-    const { userId, year, month, cost } = req.body;
+    const {userId, year, month, cost} = req.body;
     if (!userId || !year || !month || !cost) {
         return res.status(400).send('Missing required fields');
     }
@@ -76,11 +75,17 @@ router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
  *       400: { description: Invalid input }
  *       500: { description: Server error }
  */
-router.post('/:year/:month', checkRole(['user']), async (req, res) => {
-    const { year, month } = req.params;
+router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manager']), async (req, res) => {
+    const {year, month} = req.params;
     const userId = req.user.userId;
     try {
         const pool = await poolPromise;
+        // یافتن گروه کاربر
+        const groupResult = await pool.request()
+            .input('userId', sql.Int, userId)
+            .query('SELECT GroupId FROM UserGroup WHERE UserId = @userId');
+        const groupId = groupResult.recordset[0]?.GroupId || null;
+
         const hoursResult = await pool.request()
             .input('userId', sql.Int, userId)
             .input('year', sql.Int, year)
@@ -101,7 +106,8 @@ router.post('/:year/:month', checkRole(['user']), async (req, res) => {
             .input('month', sql.Int, month)
             .input('totalHours', sql.Int, totalHours)
             .input('gymCost', sql.Int, gymCost)
-            .query('INSERT INTO MonthlyReports (UserId, Year, Month, TotalHours, GymCost, Status) VALUES (@userId, @year, @month, @totalHours, @gymCost, \'draft\')');
+            .input('groupId', sql.Int, groupId)
+            .query('INSERT INTO MonthlyReports (UserId, Year, Month, TotalHours, GymCost, Status, GroupId) VALUES (@userId, @year, @month, @totalHours, @gymCost, \'draft\', @groupId)');
         res.status(201).send('Report created');
     } catch (err) {
         res.status(500).send(err.message);
@@ -110,9 +116,9 @@ router.post('/:year/:month', checkRole(['user']), async (req, res) => {
 
 /**
  * @swagger
- * /monthly-reports/{reportId}/submit-to-manager:
+ * /monthly-reports/{reportId}/submit-to-group-manager:
  *   put:
- *     summary: Submit report to manager (by user)
+ *     summary: Submit report to group manager (by user or group manager)
  *     tags: [MonthlyReports]
  *     parameters:
  *       - in: path
@@ -121,16 +127,36 @@ router.post('/:year/:month', checkRole(['user']), async (req, res) => {
  *         schema:
  *           type: integer
  *     responses:
- *       200: { description: Submitted }
+ *       200: { description: Submitted to group manager }
+ *       403: { description: Access denied }
+ *       500: { description: Server error }
  */
-router.put('/:reportId/submit-to-manager', checkRole(['user']), async (req, res) => {
-    const { reportId } = req.params;
+router.put('/:reportId/submit-to-group-manager', checkRole(['user', 'group_manager']), async (req, res) => {
+    const {reportId} = req.params;
+    const userId = req.user.userId;
     try {
         const pool = await poolPromise;
+        const reportResult = await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .query('SELECT UserId, Status FROM MonthlyReports WHERE ReportId = @reportId');
+
+        if (reportResult.recordset.length === 0) {
+            return res.status(404).send('Report not found');
+        }
+
+        const report = reportResult.recordset[0];
+        if (report.Status !== 'draft') {
+            return res.status(400).send('Report cannot be submitted; it is not in draft status');
+        }
+
+        if (req.user.role === 'user' && report.UserId !== userId) {
+            return res.status(403).send('Access denied: Users can only submit their own reports');
+        }
+
         await pool.request()
             .input('reportId', sql.Int, reportId)
-            .query('UPDATE MonthlyReports SET Status = \'submitted_to_manager\', SubmittedAt = GETDATE() WHERE ReportId = @reportId AND Status = \'draft\'');
-        res.send('Submitted to manager');
+            .query('UPDATE MonthlyReports SET Status = \'submitted_to_group_manager\', SubmittedAt = GETDATE() WHERE ReportId = @reportId AND Status = \'draft\'');
+        res.send('Submitted to group manager');
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -138,9 +164,70 @@ router.put('/:reportId/submit-to-manager', checkRole(['user']), async (req, res)
 
 /**
  * @swagger
- * /monthly-reports/{reportId}/approve-manager:
+ * /monthly-reports/{reportId}/approve-group-manager:
  *   put:
- *     summary: Approve and submit to finance (by manager)
+ *     summary: Approve and submit to general manager or finance (by group manager)
+ *     tags: [MonthlyReports]
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               comment: { type: string }
+ *               toGeneralManager: { type: boolean }
+ *     responses:
+ *       200: { description: Approved and submitted }
+ *       403: { description: Access denied }
+ *       500: { description: Server error }
+ */
+router.put('/:reportId/approve-group-manager', checkRole(['group_manager']), async (req, res) => {
+    const {reportId} = req.params;
+    const {comment, toGeneralManager} = req.body;
+    const userId = req.user.userId;
+    try {
+        const pool = await poolPromise;
+        const reportResult = await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('userId', sql.Int, userId)
+            .query(`
+                SELECT mr.* FROM MonthlyReports mr
+                                     JOIN Groups g ON mr.GroupId = g.GroupId
+                WHERE mr.ReportId = @reportId AND g.ManagerId = @userId
+            `);
+
+        if (reportResult.recordset.length === 0) {
+            return res.status(403).send('Access denied: Not the group manager for this report');
+        }
+
+        const newStatus = toGeneralManager ? 'submitted_to_general_manager' : 'submitted_to_finance';
+        await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('comment', sql.NVarChar, comment)
+            .input('newStatus', sql.NVarChar, newStatus)
+            .query(`
+                UPDATE MonthlyReports
+                SET Status = @newStatus,
+                    ManagerComment = @comment
+                WHERE ReportId = @reportId AND Status = 'submitted_to_group_manager'
+            `);
+        res.send(`Approved and submitted to ${toGeneralManager ? 'general manager' : 'finance'}`);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+/**
+ * @swagger
+ * /monthly-reports/{reportId}/approve-general-manager:
+ *   put:
+ *     summary: Approve and submit to finance (by general manager)
  *     tags: [MonthlyReports]
  *     parameters:
  *       - in: path
@@ -156,17 +243,25 @@ router.put('/:reportId/submit-to-manager', checkRole(['user']), async (req, res)
  *             properties:
  *               comment: { type: string }
  *     responses:
- *       200: { description: Approved }
+ *       200: { description: Approved and submitted to finance }
+ *       403: { description: Access denied }
+ *       500: { description: Server error }
  */
-router.put('/:reportId/approve-manager', checkRole(['manager']), async (req, res) => {
-    const { reportId } = req.params;
-    const { comment } = req.body;
+router.put('/:reportId/approve-general-manager', checkRole(['general_manager']), async (req, res) => {
+    const {reportId} = req.params;
+    const {comment} = req.body;
     try {
         const pool = await poolPromise;
         await pool.request()
             .input('reportId', sql.Int, reportId)
             .input('comment', sql.NVarChar, comment)
-            .query('UPDATE MonthlyReports SET Status = \'submitted_to_finance\', ManagerComment = @comment WHERE ReportId = @reportId AND Status = \'submitted_to_manager\'');
+            .query(`
+                UPDATE MonthlyReports
+                SET Status = 'submitted_to_finance',
+                    GeneralManagerStatus = 'approved_by_general_manager',
+                    ManagerComment = @comment
+                WHERE ReportId = @reportId AND Status = 'submitted_to_general_manager'
+            `);
         res.send('Approved and submitted to finance');
     } catch (err) {
         res.status(500).send(err.message);
@@ -194,16 +289,24 @@ router.put('/:reportId/approve-manager', checkRole(['manager']), async (req, res
  *               comment: { type: string }
  *     responses:
  *       200: { description: Approved }
+ *       403: { description: Access denied }
+ *       500: { description: Server error }
  */
-router.put('/:reportId/approve-finance', checkRole(['finance']), async (req, res) => {
-    const { reportId } = req.params;
-    const { comment } = req.body;
+router.put('/:reportId/approve-finance', checkRole(['finance_manager']), async (req, res) => {
+    const {reportId} = req.params;
+    const {comment} = req.body;
     try {
         const pool = await poolPromise;
         await pool.request()
             .input('reportId', sql.Int, reportId)
             .input('comment', sql.NVarChar, comment)
-            .query('UPDATE MonthlyReports SET Status = \'approved\', FinanceComment = @comment, ApprovedAt = GETDATE() WHERE ReportId = @reportId AND Status = \'submitted_to_finance\'');
+            .query(`
+                UPDATE MonthlyReports
+                SET Status = 'approved',
+                    FinanceComment = @comment,
+                    ApprovedAt = GETDATE()
+                WHERE ReportId = @reportId AND Status = 'submitted_to_finance'
+            `);
         res.send('Final approved');
     } catch (err) {
         res.status(500).send(err.message);
@@ -224,15 +327,77 @@ router.put('/:reportId/approve-finance', checkRole(['finance']), async (req, res
  *           type: integer
  *     responses:
  *       200: { description: Report details }
+ *       403: { description: Access denied }
+ *       404: { description: Report not found }
+ *       500: { description: Server error }
  */
 router.get('/:reportId', async (req, res) => {
-    const { reportId } = req.params;
+    const {reportId} = req.params;
+    const userId = req.user.userId;
+    const role = req.user.role;
     try {
         const pool = await poolPromise;
+        let query = 'SELECT * FROM MonthlyReports WHERE ReportId = @reportId';
+        if (role === 'user') {
+            query += ' AND UserId = @userId';
+        } else if (role === 'group_manager') {
+            query += ' AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
+        }
+
         const result = await pool.request()
             .input('reportId', sql.Int, reportId)
-            .query('SELECT * FROM MonthlyReports WHERE ReportId = @reportId');
+            .input('userId', sql.Int, userId)
+            .query(query);
+
+        if (result.recordset.length === 0) {
+            return res.status(404).send('Report not found or access denied');
+        }
         res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+/**
+ * @swagger
+ * /monthly-reports/group/{year}/{month}:
+ *   get:
+ *     summary: Get reports for group manager or general manager
+ *     tags: [MonthlyReports]
+ *     parameters:
+ *       - in: path
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: month
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200: { description: List of reports }
+ *       403: { description: Access denied }
+ *       500: { description: Server error }
+ */
+router.get('/group/:year/:month', checkRole(['group_manager', 'general_manager', 'finance_manager']), async (req, res) => {
+    const {year, month} = req.params;
+    const userId = req.user.userId;
+    const role = req.user.role;
+    try {
+        const pool = await poolPromise;
+        let query = 'SELECT mr.*, u.Username FROM MonthlyReports mr JOIN Users u ON mr.UserId = u.UserId WHERE Year = @year AND Month = @month';
+        if (role === 'group_manager') {
+            query += ' AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
+        }
+        // general_manager و finance_manager می‌توانند همه گزارش‌ها را ببینند
+
+        const result = await pool.request()
+            .input('year', sql.Int, year)
+            .input('month', sql.Int, month)
+            .input('userId', sql.Int, userId)
+            .query(query);
+        res.json(result.recordset);
     } catch (err) {
         res.status(500).send(err.message);
     }

@@ -1,18 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { sql, poolPromise } = require('../config/db.config');
-const { DateTime } = require('luxon');
+const {sql, poolPromise} = require('../config/db.config');
+const {DateTime} = require('luxon');
 
 function isValidDate(dateString) {
     if (!dateString || typeof dateString !== 'string') {
         return false;
     }
     const trimmedDate = dateString.trim();
-    let dt = DateTime.fromFormat(trimmedDate, 'yyyy-MM-dd', { zone: 'Asia/Tehran' });
+    let dt = DateTime.fromFormat(trimmedDate, 'yyyy-MM-dd', {zone: 'Asia/Tehran'});
     if (dt.isValid) {
         return true;
     }
-    dt = DateTime.fromISO(trimmedDate, { zone: 'Asia/Tehran' });
+    dt = DateTime.fromISO(trimmedDate, {zone: 'Asia/Tehran'});
     return dt.isValid;
 }
 
@@ -20,11 +20,11 @@ function parseDate(dateString) {
     if (!isValidDate(dateString)) return null;
     const trimmedDate = dateString.trim();
     let dt;
-    dt = DateTime.fromFormat(trimmedDate, 'yyyy-MM-dd', { zone: 'Asia/Tehran' });
+    dt = DateTime.fromFormat(trimmedDate, 'yyyy-MM-dd', {zone: 'Asia/Tehran'});
     if (dt.isValid) {
         return dt.toJSDate();
     }
-    dt = DateTime.fromISO(trimmedDate, { zone: 'Asia/Tehran' });
+    dt = DateTime.fromISO(trimmedDate, {zone: 'Asia/Tehran'});
     if (dt.isValid) {
         return dt.toJSDate();
     }
@@ -52,12 +52,6 @@ function parseDate(dateString) {
  *           type: string
  *           format: date
  *         description: End date of the range (YYYY-MM-DD)
- *       - in: query
- *         name: userId
- *         required: true
- *         schema:
- *           type: integer
- *         description: Identifier of the user
  *     responses:
  *       200:
  *         description: Daily details for the range
@@ -75,10 +69,11 @@ function parseDate(dateString) {
 router.get('/range', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const { startDate, endDate, userId } = req.query;
+        const {startDate, endDate} = req.query;
+        const userId = req.user.userId;
 
-        if (!startDate || !endDate || !userId) {
-            return res.status(400).send('startDate, endDate, and userId are required');
+        if (!startDate || !endDate) {
+            return res.status(400).send('startDate and endDate are required');
         }
 
         if (startDate === 'range' || endDate === 'range') {
@@ -100,8 +95,8 @@ router.get('/range', async (req, res) => {
             return res.status(400).send('startDate must be before endDate');
         }
 
-        const adjustedEndDate = DateTime.fromJSDate(parsedEndDate, { zone: 'Asia/Tehran' })
-            .plus({ days: 1 })
+        const adjustedEndDate = DateTime.fromJSDate(parsedEndDate, {zone: 'Asia/Tehran'})
+            .plus({days: 1})
             .startOf('day')
             .toJSDate();
 
@@ -109,11 +104,22 @@ router.get('/range', async (req, res) => {
             .request()
             .input('startDate', sql.Date, parsedStartDate)
             .input('endDate', sql.Date, adjustedEndDate)
-            .input('userId', sql.Int, parseInt(userId))
+            .input('userId', sql.Int, userId)
             .query(`
-                SELECT Date, CAST(Date AS DATE) AS DateOnly, UserId, LeaveType, ArrivalTime, LeaveTime, PersonalTime, Description, GoCost, ReturnCost
+                SELECT Date,
+                       CAST(Date AS DATE) AS DateOnly,
+                       UserId,
+                       LeaveType,
+                       ArrivalTime,
+                       LeaveTime,
+                       PersonalTime,
+                       Description,
+                       GoCost,
+                       ReturnCost
                 FROM DailyDetails
-                WHERE CAST(Date AS DATE) >= @startDate AND CAST(Date AS DATE) <= @endDate AND UserId = @userId
+                WHERE CAST(Date AS DATE) >= @startDate
+                  AND CAST(Date AS DATE) <= @endDate
+                  AND UserId = @userId
                 ORDER BY Date
             `);
 
@@ -127,16 +133,16 @@ router.get('/range', async (req, res) => {
             const tasksResult = await pool
                 .request()
                 .input('date', sql.Date, detail.Date)
-                .input('userId', sql.Int, parseInt(userId))
+                .input('userId', sql.Int, userId)
                 .query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
 
             const carCostsResult = await pool
                 .request()
                 .input('date', sql.Date, detail.Date)
-                .input('userId', sql.Int, parseInt(userId))
+                .input('userId', sql.Int, userId)
                 .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
-            const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
+            const detailDate = DateTime.fromJSDate(detail.Date, {zone: 'Asia/Tehran'});
 
             if (detail.ArrivalTime) {
                 const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
@@ -149,7 +155,7 @@ router.get('/range', async (req, res) => {
                         minute: minutes,
                         second: seconds,
                     },
-                    { zone: 'Asia/Tehran' }
+                    {zone: 'Asia/Tehran'}
                 ).toISO();
             }
             if (detail.LeaveTime) {
@@ -163,7 +169,7 @@ router.get('/range', async (req, res) => {
                         minute: minutes,
                         second: seconds,
                     },
-                    { zone: 'Asia/Tehran' }
+                    {zone: 'Asia/Tehran'}
                 ).toISO();
             }
 
@@ -195,12 +201,6 @@ router.get('/range', async (req, res) => {
  *           type: string
  *           format: date
  *         description: Date for the daily details (YYYY-MM-DD)
- *       - in: query
- *         name: userId
- *         required: true
- *         schema:
- *           type: integer
- *         description: Identifier of the user
  *     responses:
  *       200:
  *         description: Daily details
@@ -208,6 +208,8 @@ router.get('/range', async (req, res) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/DailyDetail'
+ *       400:
+ *         description: Invalid date format
  *       404:
  *         description: Daily details not found
  *       500:
@@ -216,8 +218,8 @@ router.get('/range', async (req, res) => {
 router.get('/:date', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const { date } = req.params;
-        const { userId } = req.query;
+        const {date} = req.params;
+        const userId = req.user.userId;
 
         if (!isValidDate(date)) {
             return res.status(400).send('Invalid date format. Use YYYY-MM-DD or ISO 8601');
@@ -232,7 +234,7 @@ router.get('/:date', async (req, res) => {
         const detailResult = await pool
             .request()
             .input('date', sql.Date, parsedDate)
-            .input('userId', sql.Int, parseInt(userId))
+            .input('userId', sql.Int, userId)
             .query('SELECT * FROM DailyDetails WHERE Date = @date AND UserId = @userId');
 
         if (detailResult.recordset.length === 0) {
@@ -244,16 +246,16 @@ router.get('/:date', async (req, res) => {
         const tasksResult = await pool
             .request()
             .input('date', sql.Date, parsedDate)
-            .input('userId', sql.Int, parseInt(userId))
+            .input('userId', sql.Int, userId)
             .query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
 
         const carCostsResult = await pool
             .request()
             .input('date', sql.Date, parsedDate)
-            .input('userId', sql.Int, parseInt(userId))
+            .input('userId', sql.Int, userId)
             .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
-        const detailDate = DateTime.fromJSDate(parsedDate, { zone: 'Asia/Tehran' });
+        const detailDate = DateTime.fromJSDate(parsedDate, {zone: 'Asia/Tehran'});
 
         if (detail.ArrivalTime) {
             const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
@@ -266,7 +268,7 @@ router.get('/:date', async (req, res) => {
                     minute: minutes,
                     second: seconds,
                 },
-                { zone: 'Asia/Tehran' }
+                {zone: 'Asia/Tehran'}
             ).toISO();
         }
         if (detail.LeaveTime) {
@@ -280,15 +282,17 @@ router.get('/:date', async (req, res) => {
                     minute: minutes,
                     second: seconds,
                 },
-                { zone: 'Asia/Tehran' }
+                {zone: 'Asia/Tehran'}
             ).toISO();
         }
 
-        res.json({
+        const response = {
             ...detail,
             tasks: tasksResult.recordset,
             personalCarCosts: carCostsResult.recordset,
-        });
+        };
+
+        res.json(response);
     } catch (err) {
         console.error(`Error in GET /daily-details/:date: ${err.message}`);
         res.status(500).send(`Server error: ${err.message}`);
@@ -320,93 +324,114 @@ router.get('/:date', async (req, res) => {
  *         description: Server error
  */
 router.post('/', async (req, res) => {
-    const {
-        date,
-        userId,
-        arrivalTime,
-        leaveTime,
-        leaveType,
-        personalTime,
-        description,
-        goCost,
-        returnCost,
-        tasks = [],
-        personalCarCosts = [],
-    } = req.body;
-
-    if (!date || !userId) {
-        return res.status(400).send('Date and userId are required');
-    }
-
-    if (!isValidDate(date)) {
-        return res.status(400).send('Invalid date format. Use YYYY-MM-DD or ISO 8601');
-    }
-
-    const parsedDate = parseDate(date);
-
-    if (!parsedDate) {
-        return res.status(400).send('Invalid date parameter');
-    }
-
     let transaction;
     let transactionBegun = false;
     try {
         const pool = await poolPromise;
-        transaction = pool.transaction();
+        transaction = new sql.Transaction(pool);
         await transaction.begin();
         transactionBegun = true;
 
-        // Parse ArrivalTime and LeaveTime if provided
-        let formattedArrivalTime = null;
-        let formattedLeaveTime = null;
+        const {
+            date,
+            arrivalTime,
+            leaveTime,
+            leaveType,
+            personalTime,
+            description,
+            goCost,
+            returnCost,
+            tasks = [],
+            personalCarCosts = [],
+        } = req.body;
+        const userId = req.user.userId;
 
-        if (arrivalTime) {
-            const arrivalDt = DateTime.fromISO(arrivalTime, { zone: 'Asia/Tehran' });
-            if (!arrivalDt.isValid) {
-                throw new Error('Invalid arrivalTime format');
-            }
-            formattedArrivalTime = arrivalDt.toFormat('HH:mm:ss');
+        if (!date || !isValidDate(date)) {
+            return res.status(400).send('Valid date is required');
         }
 
-        if (leaveTime) {
-            const leaveDt = DateTime.fromISO(leaveTime, { zone: 'Asia/Tehran' });
-            if (!leaveDt.isValid) {
-                throw new Error('Invalid leaveTime format');
-            }
-            formattedLeaveTime = leaveDt.toFormat('HH:mm:ss');
+        const parsedDate = parseDate(date);
+        if (!parsedDate) {
+            return res.status(400).send('Invalid date format');
         }
 
-        // Insert or update DailyDetails
-        const dailyDetailRequest = transaction.request();
-        dailyDetailRequest.input('date', sql.Date, parsedDate);
-        dailyDetailRequest.input('userId', sql.Int, userId);
-        dailyDetailRequest.input('arrivalTime', sql.NVarChar, formattedArrivalTime);
-        dailyDetailRequest.input('leaveTime', sql.NVarChar, formattedLeaveTime);
-        dailyDetailRequest.input('leaveType', sql.NVarChar, leaveType || null);
-        dailyDetailRequest.input('personalTime', sql.Int, personalTime || null);
-        dailyDetailRequest.input('description', sql.NVarChar, description || null);
-        dailyDetailRequest.input('goCost', sql.Int, goCost || null);
-        dailyDetailRequest.input('returnCost', sql.Int, returnCost || null);
+        // تبدیل فرمت زمان به HH:mm:ss
+        const formatTime = (isoTime) => {
+            if (!isoTime) return null;
+            const dt = DateTime.fromISO(isoTime, {zone: 'Asia/Tehran'});
+            if (!dt.isValid) return null;
+            return dt.toFormat('HH:mm:ss');
+        };
 
-        await dailyDetailRequest.query(`
-            MERGE INTO DailyDetails AS target
-            USING (VALUES (@date, @userId)) AS source (Date, UserId)
-            ON target.Date = source.Date AND target.UserId = source.UserId
-            WHEN MATCHED THEN
-                UPDATE SET
-                    ArrivalTime = COALESCE(@arrivalTime, target.ArrivalTime),
-                    LeaveTime = COALESCE(@leaveTime, target.LeaveTime),
-                    LeaveType = COALESCE(@leaveType, target.LeaveType),
-                    PersonalTime = COALESCE(@personalTime, target.PersonalTime),
-                    Description = COALESCE(@description, target.Description),
-                    GoCost = COALESCE(@goCost, target.GoCost),
-                    ReturnCost = COALESCE(@returnCost, target.ReturnCost)
-            WHEN NOT MATCHED THEN
-                INSERT (Date, UserId, ArrivalTime, LeaveTime, LeaveType, PersonalTime, Description, GoCost, ReturnCost)
-                VALUES (@date, @userId, @arrivalTime, @leaveTime, @leaveType, @personalTime, @description, @goCost, @returnCost);
+        const formattedArrivalTime = formatTime(arrivalTime);
+        const formattedLeaveTime = formatTime(leaveTime);
+
+        if (arrivalTime && !formattedArrivalTime) {
+            return res.status(400).send('Invalid arrivalTime format. Use ISO 8601');
+        }
+        if (leaveTime && !formattedLeaveTime) {
+            return res.status(400).send('Invalid leaveTime format. Use ISO 8601');
+        }
+
+        if (tasks.length > 0) {
+            for (const task of tasks) {
+                if (!task.projectId || !task.duration) {
+                    return res.status(400).send('Each task must have projectId and duration');
+                }
+            }
+        }
+
+        if (personalCarCosts.length > 0) {
+            for (const cost of personalCarCosts) {
+                if (!cost.projectId || !cost.cost) {
+                    return res.status(400).send('Each personal car cost must have projectId and cost');
+                }
+            }
+        }
+
+        const existingDetailsRequest = transaction.request();
+        existingDetailsRequest.input('date', sql.Date, parsedDate);
+        existingDetailsRequest.input('userId', sql.Int, userId);
+        const existingDetailsResult = await existingDetailsRequest.query(`
+            SELECT *
+            FROM DailyDetails
+            WHERE Date = @date
+              AND UserId = @userId
         `);
 
-        // Delete existing tasks and personal car costs
+        const request = transaction.request();
+        request.input('date', sql.Date, parsedDate);
+        request.input('userId', sql.Int, userId);
+        request.input('arrivalTime', sql.NVarChar, formattedArrivalTime || null);
+        request.input('leaveTime', sql.NVarChar, formattedLeaveTime || null);
+        request.input('leaveType', sql.NVarChar, leaveType || null);
+        request.input('personalTime', sql.Int, personalTime || null);
+        request.input('description', sql.NVarChar, description || null);
+        request.input('goCost', sql.Int, goCost || null);
+        request.input('returnCost', sql.Int, returnCost || null);
+
+        if (existingDetailsResult.recordset.length > 0) {
+            await request.query(`
+                UPDATE DailyDetails
+                SET ArrivalTime  = @arrivalTime,
+                    LeaveTime    = @leaveTime,
+                    LeaveType    = @leaveType,
+                    PersonalTime = @personalTime,
+                    Description  = @description,
+                    GoCost       = @goCost,
+                    ReturnCost   = @returnCost
+                WHERE Date = @date
+                  AND UserId = @userId
+            `);
+        } else {
+            await request.query(`
+                INSERT INTO DailyDetails (Date, UserId, ArrivalTime, LeaveTime, LeaveType,
+                                          PersonalTime, Description, GoCost, ReturnCost)
+                VALUES (@date, @userId, @arrivalTime, @leaveTime, @leaveType,
+                        @personalTime, @description, @goCost, @returnCost)
+            `);
+        }
+
         const deleteTasksRequest = transaction.request();
         deleteTasksRequest.input('date', sql.Date, parsedDate);
         deleteTasksRequest.input('userId', sql.Int, userId);
@@ -417,9 +442,9 @@ router.post('/', async (req, res) => {
         deleteCarCostsRequest.input('userId', sql.Int, userId);
         await deleteCarCostsRequest.query('DELETE FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
-        // Insert new tasks
         for (const task of tasks) {
-            const taskRequest = transaction.request();
+            const taskRequest = transaction
+            Stuart
             taskRequest.input('date', sql.Date, parsedDate);
             taskRequest.input('userId', sql.Int, userId);
             taskRequest.input('projectId', sql.Int, task.projectId);
@@ -431,7 +456,6 @@ router.post('/', async (req, res) => {
             `);
         }
 
-        // Insert new personal car costs
         for (const cost of personalCarCosts) {
             const costRequest = transaction.request();
             costRequest.input('date', sql.Date, parsedDate);
@@ -447,7 +471,6 @@ router.post('/', async (req, res) => {
 
         await transaction.commit();
 
-        // Fetch the updated daily details to return
         const fetchRequest = pool.request();
         fetchRequest.input('date', sql.Date, parsedDate);
         fetchRequest.input('userId', sql.Int, userId);
@@ -457,7 +480,7 @@ router.post('/', async (req, res) => {
         const tasksResult = await fetchRequest.query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
         const carCostsResult = await fetchRequest.query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
-        const detailDate = DateTime.fromJSDate(parsedDate, { zone: 'Asia/Tehran' });
+        const detailDate = DateTime.fromJSDate(parsedDate, {zone: 'Asia/Tehran'});
 
         if (detail.ArrivalTime) {
             const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
@@ -470,7 +493,7 @@ router.post('/', async (req, res) => {
                     minute: minutes,
                     second: seconds,
                 },
-                { zone: 'Asia/Tehran' }
+                {zone: 'Asia/Tehran'}
             ).toISO();
         }
         if (detail.LeaveTime) {
@@ -484,7 +507,7 @@ router.post('/', async (req, res) => {
                     minute: minutes,
                     second: seconds,
                 },
-                { zone: 'Asia/Tehran' }
+                {zone: 'Asia/Tehran'}
             ).toISO();
         }
 
@@ -528,12 +551,6 @@ router.post('/', async (req, res) => {
  *         schema:
  *           type: integer
  *         description: Month of the monthly details (1-12)
- *       - in: query
- *         name: userId
- *         required: true
- *         schema:
- *           type: integer
- *         description: Identifier of the user
  *     responses:
  *       200:
  *         description: Monthly details
@@ -551,8 +568,8 @@ router.post('/', async (req, res) => {
 router.get('/month/:year/:month', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const { year, month } = req.params;
-        const { userId } = req.query;
+        const {year, month} = req.params;
+        const userId = req.user.userId;
 
         const parsedYear = parseInt(year);
         const parsedMonth = parseInt(month);
@@ -565,18 +582,18 @@ router.get('/month/:year/:month', async (req, res) => {
             year: parsedYear,
             month: parsedMonth,
             day: 1
-        }, { zone: 'Asia/Tehran' }).toJSDate();
+        }, {zone: 'Asia/Tehran'}).toJSDate();
         const endDate = DateTime.fromObject({
             year: parsedYear,
             month: parsedMonth + 1,
             day: 1
-        }, { zone: 'Asia/Tehran' }).minus({ days: 1 }).toJSDate();
+        }, {zone: 'Asia/Tehran'}).minus({days: 1}).toJSDate();
 
         const detailResult = await pool
             .request()
             .input('startDate', sql.Date, startDate)
             .input('endDate', sql.Date, endDate)
-            .input('userId', sql.Int, parseInt(userId))
+            .input('userId', sql.Int, userId)
             .query(`
                 SELECT *
                 FROM DailyDetails
@@ -595,16 +612,16 @@ router.get('/month/:year/:month', async (req, res) => {
             const tasksResult = await pool
                 .request()
                 .input('date', sql.Date, detail.Date)
-                .input('userId', sql.Int, parseInt(userId))
+                .input('userId', sql.Int, userId)
                 .query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
 
             const carCostsResult = await pool
                 .request()
                 .input('date', sql.Date, detail.Date)
-                .input('userId', sql.Int, parseInt(userId))
+                .input('userId', sql.Int, userId)
                 .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
-            const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
+            const detailDate = DateTime.fromJSDate(detail.Date, {zone: 'Asia/Tehran'});
 
             if (detail.ArrivalTime) {
                 const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
@@ -617,7 +634,7 @@ router.get('/month/:year/:month', async (req, res) => {
                         minute: minutes,
                         second: seconds,
                     },
-                    { zone: 'Asia/Tehran' }
+                    {zone: 'Asia/Tehran'}
                 ).toISO();
             }
             if (detail.LeaveTime) {
@@ -631,7 +648,7 @@ router.get('/month/:year/:month', async (req, res) => {
                         minute: minutes,
                         second: seconds,
                     },
-                    { zone: 'Asia/Tehran' }
+                    {zone: 'Asia/Tehran'}
                 ).toISO();
             }
 
