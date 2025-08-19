@@ -928,6 +928,81 @@
           }
         }
       }
+    },
+    "/monthly-reports/group/range/{startYear}/{startMonth}/{endYear}/{endMonth}": {
+      "get": {
+        "summary": "Get reports for group manager, general manager, or finance manager within a year-month range",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "startYear",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Start year of the range"
+          },
+          {
+            "in": "path",
+            "name": "startMonth",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Start month of the range (1-12)"
+          },
+          {
+            "in": "path",
+            "name": "endYear",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "End year of the range"
+          },
+          {
+            "in": "path",
+            "name": "endMonth",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "End month of the range (1-12)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MonthlyReport"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input (e.g., invalid year or month)"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
     }
   },
   "components": {

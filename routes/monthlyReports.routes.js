@@ -80,7 +80,6 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
     const userId = req.user.userId;
     try {
         const pool = await poolPromise;
-        // یافتن گروه کاربر
         const groupResult = await pool.request()
             .input('userId', sql.Int, userId)
             .query('SELECT GroupId FROM UserGroup WHERE UserId = @userId');
@@ -197,9 +196,11 @@ router.put('/:reportId/approve-group-manager', checkRole(['group_manager']), asy
             .input('reportId', sql.Int, reportId)
             .input('userId', sql.Int, userId)
             .query(`
-                SELECT mr.* FROM MonthlyReports mr
-                                     JOIN Groups g ON mr.GroupId = g.GroupId
-                WHERE mr.ReportId = @reportId AND g.ManagerId = @userId
+                SELECT mr.*
+                FROM MonthlyReports mr
+                         JOIN Groups g ON mr.GroupId = g.GroupId
+                WHERE mr.ReportId = @reportId
+                  AND g.ManagerId = @userId
             `);
 
         if (reportResult.recordset.length === 0) {
@@ -213,9 +214,10 @@ router.put('/:reportId/approve-group-manager', checkRole(['group_manager']), asy
             .input('newStatus', sql.NVarChar, newStatus)
             .query(`
                 UPDATE MonthlyReports
-                SET Status = @newStatus,
+                SET Status         = @newStatus,
                     ManagerComment = @comment
-                WHERE ReportId = @reportId AND Status = 'submitted_to_group_manager'
+                WHERE ReportId = @reportId
+                  AND Status = 'submitted_to_group_manager'
             `);
         res.send(`Approved and submitted to ${toGeneralManager ? 'general manager' : 'finance'}`);
     } catch (err) {
@@ -257,10 +259,11 @@ router.put('/:reportId/approve-general-manager', checkRole(['general_manager']),
             .input('comment', sql.NVarChar, comment)
             .query(`
                 UPDATE MonthlyReports
-                SET Status = 'submitted_to_finance',
+                SET Status               = 'submitted_to_finance',
                     GeneralManagerStatus = 'approved_by_general_manager',
-                    ManagerComment = @comment
-                WHERE ReportId = @reportId AND Status = 'submitted_to_general_manager'
+                    ManagerComment       = @comment
+                WHERE ReportId = @reportId
+                  AND Status = 'submitted_to_general_manager'
             `);
         res.send('Approved and submitted to finance');
     } catch (err) {
@@ -302,10 +305,11 @@ router.put('/:reportId/approve-finance', checkRole(['finance_manager']), async (
             .input('comment', sql.NVarChar, comment)
             .query(`
                 UPDATE MonthlyReports
-                SET Status = 'approved',
+                SET Status         = 'approved',
                     FinanceComment = @comment,
-                    ApprovedAt = GETDATE()
-                WHERE ReportId = @reportId AND Status = 'submitted_to_finance'
+                    ApprovedAt     = GETDATE()
+                WHERE ReportId = @reportId
+                  AND Status = 'submitted_to_finance'
             `);
         res.send('Final approved');
     } catch (err) {
@@ -362,7 +366,7 @@ router.get('/:reportId', async (req, res) => {
  * @swagger
  * /monthly-reports/group/{year}/{month}:
  *   get:
- *     summary: Get reports for group manager or general manager
+ *     summary: Get reports for group manager, general manager, or finance manager
  *     tags: [MonthlyReports]
  *     parameters:
  *       - in: path
@@ -390,11 +394,100 @@ router.get('/group/:year/:month', checkRole(['group_manager', 'general_manager',
         if (role === 'group_manager') {
             query += ' AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
         }
-        // general_manager و finance_manager می‌توانند همه گزارش‌ها را ببینند
 
         const result = await pool.request()
             .input('year', sql.Int, year)
             .input('month', sql.Int, month)
+            .input('userId', sql.Int, userId)
+            .query(query);
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+/**
+ * @swagger
+ * /monthly-reports/group/range/{startYear}/{startMonth}/{endYear}/{endMonth}:
+ *   get:
+ *     summary: Get reports for group manager, general manager, or finance manager within a year-month range
+ *     tags: [MonthlyReports]
+ *     parameters:
+ *       - in: path
+ *         name: startYear
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Start year of the range
+ *       - in: path
+ *         name: startMonth
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Start month of the range (1-12)
+ *       - in: path
+ *         name: endYear
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: End year of the range
+ *       - in: path
+ *         name: endMonth
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: End month of the range (1-12)
+ *     responses:
+ *       200:
+ *         description: List of reports
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/MonthlyReport'
+ *       400: { description: Invalid input (e.g., invalid year or month) }
+ *       403: { description: Access denied }
+ *       500: { description: Server error }
+ */
+router.get('/group/range/:startYear/:startMonth/:endYear/:endMonth', checkRole(['group_manager', 'general_manager', 'finance_manager']), async (req, res) => {
+    const {startYear, startMonth, endYear, endMonth} = req.params;
+    const userId = req.user.userId;
+    const role = req.user.role;
+    try {
+        // اعتبارسنجی ورودی‌ها
+        const sYear = parseInt(startYear);
+        const sMonth = parseInt(startMonth);
+        const eYear = parseInt(endYear);
+        const eMonth = parseInt(endMonth);
+
+        if (isNaN(sYear) || isNaN(sMonth) || isNaN(eYear) || isNaN(eMonth) ||
+            sMonth < 1 || sMonth > 12 || eMonth < 1 || eMonth > 12) {
+            return res.status(400).send('Invalid year or month');
+        }
+
+        // اطمینان از اینکه بازه معتبر است
+        if (sYear > eYear || (sYear === eYear && sMonth > eMonth)) {
+            return res.status(400).send('Start date must be before or equal to end date');
+        }
+
+        const pool = await poolPromise;
+        let query = `
+            SELECT mr.*, u.Username
+            FROM MonthlyReports mr
+                     JOIN Users u ON mr.UserId = u.UserId
+            WHERE (Year > @startYear OR (Year = @startYear AND Month >= @startMonth))
+              AND (Year < @endYear OR (Year = @endYear AND Month <= @endMonth))
+        `;
+        if (role === 'group_manager') {
+            query += ' AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
+        }
+
+        const result = await pool.request()
+            .input('startYear', sql.Int, sYear)
+            .input('startMonth', sql.Int, sMonth)
+            .input('endYear', sql.Int, eYear)
+            .input('endMonth', sql.Int, eMonth)
             .input('userId', sql.Int, userId)
             .query(query);
         res.json(result.recordset);
