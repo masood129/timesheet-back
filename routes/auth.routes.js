@@ -70,10 +70,16 @@ router.post('/login', async (req, res) => {
         const token = jwt.sign(
             {userId: user.UserId, role: user.Role},
             process.env.JWT_SECRET,
-            {expiresIn: '1h'}
+            {expiresIn: '24h'} // افزایش زمان انقضا
         );
 
-        res.json({token, userId: user.UserId, Username: user.Username, Role: user.Role});
+        res.json({
+            token,
+            userId: user.UserId,
+            Username: user.Username,
+            Role: user.Role,
+            message: 'Login successful'
+        });
     } catch (err) {
         console.error('Error in POST /auth/login:', err.message);
         res.status(500).send('Server error');

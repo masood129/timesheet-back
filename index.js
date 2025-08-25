@@ -7,10 +7,35 @@ const projectRoutes = require('./routes/project.routes');
 const dailyDetailsRoutes = require('./routes/dailyDetails.routes');
 const monthlyReportsRoutes = require('./routes/monthlyReports.routes');
 const authRoutes = require('./routes/auth.routes');
+const {getJalaliMonthRange} = require('./utils/dateConverter');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+
+app.get('/test/jalali/:year/:month', (req, res) => {
+    const {year, month} = req.params;
+    const jalaliYear = parseInt(year);
+    const jalaliMonth = parseInt(month);
+
+    if (isNaN(jalaliYear) || isNaN(jalaliMonth) || jalaliMonth < 1 || jalaliMonth > 12) {
+        return res.status(400).send('Invalid Jalali year or month');
+    }
+
+    try {
+        const monthRange = getJalaliMonthRange(jalaliYear, jalaliMonth);
+        res.json({
+            jalaliYear,
+            jalaliMonth,
+            gregorianStart: monthRange.start,
+            gregorianEnd: monthRange.end
+        });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
 
 // Middleware برای اعتبارسنجی توکن JWT
 const authMiddleware = (req, res, next) => {
@@ -49,7 +74,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// مسیرهای API
+
 app.use('/auth', authRoutes);
 app.use('/projects', authMiddleware, projectRoutes);
 app.use('/daily-details', authMiddleware, dailyDetailsRoutes);

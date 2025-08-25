@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {sql, poolPromise} = require('../config/db.config');
+const {getJalaliMonthRange} = require('../utils/dateConverter');
 
 const checkRole = (roles) => (req, res, next) => {
     if (!roles.includes(req.user?.role)) return res.status(403).send('Access denied');
@@ -57,7 +58,7 @@ router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
  * @swagger
  * /monthly-reports/{year}/{month}:
  *   post:
- *     summary: Create monthly report (by user)
+ *     summary: Create monthly report (by user) using Gregorian calendar
  *     tags: [MonthlyReports]
  *     parameters:
  *       - in: path
@@ -108,6 +109,91 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
             .input('groupId', sql.Int, groupId)
             .query('INSERT INTO MonthlyReports (UserId, Year, Month, TotalHours, GymCost, Status, GroupId) VALUES (@userId, @year, @month, @totalHours, @gymCost, \'draft\', @groupId)');
         res.status(201).send('Report created');
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+/**
+ * @swagger
+ * /monthly-reports/jalali/{year}/{month}:
+ *   post:
+ *     summary: Create monthly report using Jalali calendar (by user)
+ *     tags: [MonthlyReports]
+ *     parameters:
+ *       - in: path
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: month
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       201: { description: Report created }
+ *       400: { description: Invalid input }
+ *       500: { description: Server error }
+ */
+router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general_manager']), async (req, res) => {
+    const {year, month} = req.params;
+    const userId = req.user.userId;
+
+    try {
+        // تبدیل تاریخ شمسی به میلادی
+        const jalaliYear = parseInt(year);
+        const jalaliMonth = parseInt(month);
+
+        if (isNaN(jalaliYear) || isNaN(jalaliMonth) || jalaliMonth < 1 || jalaliMonth > 12) {
+            return res.status(400).send('Invalid Jalali year or month');
+        }
+
+        const monthRange = getJalaliMonthRange(jalaliYear, jalaliMonth);
+        const startDate = monthRange.start;
+        const endDate = monthRange.end;
+
+        const pool = await poolPromise;
+        const groupResult = await pool.request()
+            .input('userId', sql.Int, userId)
+            .query('SELECT GroupId FROM UserGroup WHERE UserId = @userId');
+        const groupId = groupResult.recordset[0]?.GroupId || null;
+
+        // محاسبه ساعات بر اساس محدوده تاریخ میلادی
+        const hoursResult = await pool.request()
+            .input('userId', sql.Int, userId)
+            .input('startDate', sql.Date, startDate)
+            .input('endDate', sql.Date, endDate)
+            .query('SELECT SUM(Duration) AS TotalHours FROM DailyProjectTasks WHERE UserId = @userId AND Date >= @startDate AND Date <= @endDate');
+
+        const totalHours = hoursResult.recordset[0].TotalHours || 0;
+
+        // گرفتن هزینه ورزش برای ماه میلادی مربوطه
+        const gregorianYear = startDate.getFullYear();
+        const gregorianMonth = startDate.getMonth() + 1;
+
+        const gymResult = await pool.request()
+            .input('userId', sql.Int, userId)
+            .input('year', sql.Int, gregorianYear)
+            .input('month', sql.Int, gregorianMonth)
+            .query('SELECT Cost FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @year AND Month = @month');
+        const gymCost = gymResult.recordset[0]?.Cost || 0;
+
+        await pool.request()
+            .input('userId', sql.Int, userId)
+            .input('year', sql.Int, gregorianYear)
+            .input('month', sql.Int, gregorianMonth)
+            .input('jalaliYear', sql.Int, jalaliYear)
+            .input('jalaliMonth', sql.Int, jalaliMonth)
+            .input('totalHours', sql.Int, totalHours)
+            .input('gymCost', sql.Int, gymCost)
+            .input('groupId', sql.Int, groupId)
+            .query(`
+                INSERT INTO MonthlyReports (UserId, Year, Month, JalaliYear, JalaliMonth, TotalHours, GymCost, Status,
+                                            GroupId)
+                VALUES (@userId, @year, @month, @jalaliYear, @jalaliMonth, @totalHours, @gymCost, 'draft', @groupId)
+            `);
+        res.status(201).send('Report created with Jalali date');
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -366,7 +452,7 @@ router.get('/:reportId', async (req, res) => {
  * @swagger
  * /monthly-reports/group/{year}/{month}:
  *   get:
- *     summary: Get reports for group manager, general manager, or finance manager
+ *     summary: Get reports for group manager, general manager, or finance manager using Gregorian calendar
  *     tags: [MonthlyReports]
  *     parameters:
  *       - in: path
@@ -408,9 +494,69 @@ router.get('/group/:year/:month', checkRole(['group_manager', 'general_manager',
 
 /**
  * @swagger
+ * /monthly-reports/jalali/group/{year}/{month}:
+ *   get:
+ *     summary: Get reports for group manager, general manager, or finance manager using Jalali calendar
+ *     tags: [MonthlyReports]
+ *     parameters:
+ *       - in: path
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: month
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200: { description: List of reports }
+ *       403: { description: Access denied }
+ *       500: { description: Server error }
+ */
+router.get('/jalali/group/:year/:month', checkRole(['group_manager', 'general_manager', 'finance_manager']), async (req, res) => {
+    const {year, month} = req.params;
+    const userId = req.user.userId;
+    const role = req.user.role;
+
+    try {
+        const jalaliYear = parseInt(year);
+        const jalaliMonth = parseInt(month);
+
+        if (isNaN(jalaliYear) || isNaN(jalaliMonth) || jalaliMonth < 1 || jalaliMonth > 12) {
+            return res.status(400).send('Invalid Jalali year or month');
+        }
+
+        const pool = await poolPromise;
+        let query = `
+            SELECT mr.*, u.Username
+            FROM MonthlyReports mr
+                     JOIN Users u ON mr.UserId = u.UserId
+            WHERE JalaliYear = @jalaliYear
+              AND JalaliMonth = @jalaliMonth
+        `;
+
+        if (role === 'group_manager') {
+            query += ' AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
+        }
+
+        const result = await pool.request()
+            .input('jalaliYear', sql.Int, jalaliYear)
+            .input('jalaliMonth', sql.Int, jalaliMonth)
+            .input('userId', sql.Int, userId)
+            .query(query);
+
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+/**
+ * @swagger
  * /monthly-reports/group/range/{startYear}/{startMonth}/{endYear}/{endMonth}:
  *   get:
- *     summary: Get reports for group manager, general manager, or finance manager within a year-month range
+ *     summary: Get reports for group manager, general manager, or finance manager within a year-month range (Gregorian)
  *     tags: [MonthlyReports]
  *     parameters:
  *       - in: path

@@ -496,7 +496,7 @@
     },
     "/daily-details/month/{year}/{month}": {
       "get": {
-        "summary": "Get monthly details",
+        "summary": "Get monthly details using Gregorian calendar",
         "tags": [
           "DailyDetails"
         ],
@@ -523,6 +523,60 @@
               "type": "integer"
             },
             "description": "Month of the monthly details (1-12)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monthly details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DailyDetail"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input (e.g., invalid year or month)"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/daily-details/jalali/month/{year}/{month}": {
+      "get": {
+        "summary": "Get monthly details using Jalali calendar",
+        "tags": [
+          "DailyDetails"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year of the monthly details"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali month of the monthly details (1-12)"
           }
         ],
         "responses": {
@@ -608,7 +662,7 @@
     },
     "/monthly-reports/{year}/{month}": {
       "post": {
-        "summary": "Create monthly report (by user, group_manager, or general_manager)",
+        "summary": "Create monthly report using Gregorian calendar (by user, group_manager, or general_manager)",
         "tags": [
           "MonthlyReports"
         ],
@@ -624,7 +678,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Gregorian year"
           },
           {
             "in": "path",
@@ -632,12 +687,57 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Gregorian month (1-12)"
           }
         ],
         "responses": {
           "201": {
             "description": "Report created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/jalali/{year}/{month}": {
+      "post": {
+        "summary": "Create monthly report using Jalali calendar (by user, group_manager, or general_manager)",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali month (1-12)"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Report created with Jalali date"
           },
           "400": {
             "description": "Invalid input"
@@ -879,7 +979,7 @@
     },
     "/monthly-reports/group/{year}/{month}": {
       "get": {
-        "summary": "Get reports for group manager, general manager, or finance manager",
+        "summary": "Get reports for group manager, general manager, or finance manager using Gregorian calendar",
         "tags": [
           "MonthlyReports"
         ],
@@ -895,7 +995,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Gregorian year"
           },
           {
             "in": "path",
@@ -903,7 +1004,62 @@
             "required": true,
             "schema": {
               "type": "integer"
+            },
+            "description": "Gregorian month (1-12)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MonthlyReport"
+                  }
+                }
+              }
             }
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/jalali/group/{year}/{month}": {
+      "get": {
+        "summary": "Get reports for group manager, general manager, or finance manager using Jalali calendar",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali month (1-12)"
           }
         ],
         "responses": {
@@ -997,6 +1153,72 @@
           },
           "403": {
             "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/test/jalali/{year}/{month}": {
+      "get": {
+        "summary": "Test Jalali to Gregorian date conversion",
+        "tags": [
+          "Test"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali month (1-12)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Date conversion result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jalaliYear": {
+                      "type": "integer",
+                      "description": "Jalali year"
+                    },
+                    "jalaliMonth": {
+                      "type": "integer",
+                      "description": "Jalali month"
+                    },
+                    "gregorianStart": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Start date in Gregorian calendar"
+                    },
+                    "gregorianEnd": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "End date in Gregorian calendar"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input (e.g., invalid year or month)"
           },
           "500": {
             "description": "Server error"
@@ -1174,11 +1396,19 @@
           },
           "Year": {
             "type": "integer",
-            "description": "Year of the report"
+            "description": "Gregorian year of the report"
           },
           "Month": {
             "type": "integer",
-            "description": "Month of the report (1-12)"
+            "description": "Gregorian month of the report (1-12)"
+          },
+          "JalaliYear": {
+            "type": "integer",
+            "description": "Jalali year of the report"
+          },
+          "JalaliMonth": {
+            "type": "integer",
+            "description": "Jalali month of the report (1-12)"
           },
           "TotalHours": {
             "type": "integer",
