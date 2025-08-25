@@ -141,7 +141,6 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
     const userId = req.user.userId;
 
     try {
-        // تبدیل تاریخ شمسی به میلادی
         const jalaliYear = parseInt(year);
         const jalaliMonth = parseInt(month);
 
@@ -149,9 +148,13 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
             return res.status(400).send('Invalid Jalali year or month');
         }
 
+        // تبدیل تاریخ شمسی به میلادی
         const monthRange = getJalaliMonthRange(jalaliYear, jalaliMonth);
         const startDate = monthRange.start;
         const endDate = monthRange.end;
+
+        const gregorianYear = startDate.getFullYear();
+        const gregorianMonth = startDate.getMonth() + 1;
 
         const pool = await poolPromise;
         const groupResult = await pool.request()
@@ -169,9 +172,6 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
         const totalHours = hoursResult.recordset[0].TotalHours || 0;
 
         // گرفتن هزینه ورزش برای ماه میلادی مربوطه
-        const gregorianYear = startDate.getFullYear();
-        const gregorianMonth = startDate.getMonth() + 1;
-
         const gymResult = await pool.request()
             .input('userId', sql.Int, userId)
             .input('year', sql.Int, gregorianYear)
@@ -532,12 +532,12 @@ router.get('/jalali/group/:year/:month', checkRole(['group_manager', 'general_ma
             SELECT mr.*, u.Username
             FROM MonthlyReports mr
                      JOIN Users u ON mr.UserId = u.UserId
-            WHERE JalaliYear = @jalaliYear
-              AND JalaliMonth = @jalaliMonth
+            WHERE mr.JalaliYear = @jalaliYear
+              AND mr.JalaliMonth = @jalaliMonth
         `;
 
         if (role === 'group_manager') {
-            query += ' AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
+            query += ' AND mr.GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
         }
 
         const result = await pool.request()

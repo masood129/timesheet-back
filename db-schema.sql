@@ -384,3 +384,7 @@ FROM Groups g
          LEFT JOIN UserGroup ug ON g.GroupId = ug.GroupId
 GROUP BY g.GroupId, g.GroupName
 ORDER BY g.GroupName;
+
+
+ALTER TABLE MonthlyReports ADD JalaliYear INT NULL;
+ALTER TABLE MonthlyReports ADD JalaliMonth INT NULL;
