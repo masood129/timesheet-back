@@ -107,8 +107,16 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
             .input('totalHours', sql.Int, totalHours)
             .input('gymCost', sql.Int, gymCost)
             .input('groupId', sql.Int, groupId)
-            .query('INSERT INTO MonthlyReports (UserId, Year, Month, TotalHours, GymCost, Status, GroupId) VALUES (@userId, @year, @month, @totalHours, @gymCost, \'draft\', @groupId)');
-        res.status(201).send('Report created');
+            .query(`
+                IF EXISTS (SELECT 1 FROM MonthlyReports WHERE UserId = @userId AND Year = @year AND Month = @month)
+                    UPDATE MonthlyReports 
+                    SET TotalHours = @totalHours, GymCost = @gymCost, Status = 'draft', GroupId = @groupId 
+                    WHERE UserId = @userId AND Year = @year AND Month = @month
+                ELSE
+                    INSERT INTO MonthlyReports (UserId, Year, Month, TotalHours, GymCost, Status, GroupId) 
+                    VALUES (@userId, @year, @month, @totalHours, @gymCost, 'draft', @groupId)
+            `);
+        res.status(201).send('Report created or updated');
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -148,7 +156,6 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
             return res.status(400).send('Invalid Jalali year or month');
         }
 
-        // تبدیل تاریخ شمسی به میلادی
         const monthRange = getJalaliMonthRange(jalaliYear, jalaliMonth);
         const startDate = monthRange.start;
         const endDate = monthRange.end;
@@ -162,7 +169,6 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
             .query('SELECT GroupId FROM UserGroup WHERE UserId = @userId');
         const groupId = groupResult.recordset[0]?.GroupId || null;
 
-        // محاسبه ساعات بر اساس محدوده تاریخ میلادی
         const hoursResult = await pool.request()
             .input('userId', sql.Int, userId)
             .input('startDate', sql.Date, startDate)
@@ -171,7 +177,6 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
 
         const totalHours = hoursResult.recordset[0].TotalHours || 0;
 
-        // گرفتن هزینه ورزش برای ماه میلادی مربوطه
         const gymResult = await pool.request()
             .input('userId', sql.Int, userId)
             .input('year', sql.Int, gregorianYear)
@@ -179,6 +184,7 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
             .query('SELECT Cost FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @year AND Month = @month');
         const gymCost = gymResult.recordset[0]?.Cost || 0;
 
+        // تغییر: چک وجود رکورد و آپدیت اگر وجود داشت (بر اساس سال/ماه جلالی یا میلادی، بسته به نیاز - اینجا بر اساس میلادی چک کردم)
         await pool.request()
             .input('userId', sql.Int, userId)
             .input('year', sql.Int, gregorianYear)
@@ -189,11 +195,15 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
             .input('gymCost', sql.Int, gymCost)
             .input('groupId', sql.Int, groupId)
             .query(`
-                INSERT INTO MonthlyReports (UserId, Year, Month, JalaliYear, JalaliMonth, TotalHours, GymCost, Status,
-                                            GroupId)
-                VALUES (@userId, @year, @month, @jalaliYear, @jalaliMonth, @totalHours, @gymCost, 'draft', @groupId)
+                IF EXISTS (SELECT 1 FROM MonthlyReports WHERE UserId = @userId AND Year = @year AND Month = @month)
+                    UPDATE MonthlyReports 
+                    SET JalaliYear = @jalaliYear, JalaliMonth = @jalaliMonth, TotalHours = @totalHours, GymCost = @gymCost, Status = 'draft', GroupId = @groupId 
+                    WHERE UserId = @userId AND Year = @year AND Month = @month
+                ELSE
+                    INSERT INTO MonthlyReports (UserId, Year, Month, JalaliYear, JalaliMonth, TotalHours, GymCost, Status, GroupId) 
+                    VALUES (@userId, @year, @month, @jalaliYear, @jalaliMonth, @totalHours, @gymCost, 'draft', @groupId)
             `);
-        res.status(201).send('Report created with Jalali date');
+        res.status(201).send('Report created or updated with Jalali date');
     } catch (err) {
         res.status(500).send(err.message);
     }
