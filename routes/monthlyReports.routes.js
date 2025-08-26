@@ -25,14 +25,15 @@ const checkRole = (roles) => (req, res, next) => {
  *               year: { type: integer }
  *               month: { type: integer }
  *               cost: { type: integer }
+ *               hours: { type: integer }
  *     responses:
  *       201: { description: Gym cost saved }
  *       400: { description: Invalid input }
  *       500: { description: Server error }
  */
 router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
-    const {userId, year, month, cost} = req.body;
-    if (!userId || !year || !month || !cost) {
+    const {userId, year, month, cost, hours} = req.body;  // hours اضافه شد
+    if (!userId || !year || !month || !cost) {  // hours optional فرض شده
         return res.status(400).send('Missing required fields');
     }
     try {
@@ -42,17 +43,106 @@ router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
             .input('year', sql.Int, year)
             .input('month', sql.Int, month)
             .input('cost', sql.Int, cost)
+            .input('hours', sql.Int, hours || null)  // hours اضافه شد
             .query(`
                 IF EXISTS (SELECT 1 FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @year AND Month = @month)
-                    UPDATE MonthlyGymCosts SET Cost = @cost WHERE UserId = @userId AND Year = @year AND Month = @month
+                    UPDATE MonthlyGymCosts SET Cost = @cost, GymHours = @hours WHERE UserId = @userId AND Year = @year AND Month = @month
                 ELSE
-                    INSERT INTO MonthlyGymCosts (UserId, Year, Month, Cost) VALUES (@userId, @year, @month, @cost)
+                    INSERT INTO MonthlyGymCosts (UserId, Year, Month, Cost, GymHours) VALUES (@userId, @year, @month, @cost, @hours)
             `);
         res.status(201).send('Gym cost saved');
     } catch (err) {
         res.status(500).send(err.message);
     }
 });
+
+/**
+ * @swagger
+ * /monthly-gym-costs/jalali:
+ *   post:
+ *     summary: Save monthly gym cost using Jalali calendar
+ *     tags: [MonthlyReports]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId: { type: integer, description: "User ID" }
+ *               year: { type: integer, description: "Jalali year of the gym cost" }
+ *               month: { type: integer, description: "Jalali month of the gym cost (1-12)" }
+ *               cost: { type: integer, description: "Gym cost amount" }
+ *               hours: { type: integer, description: "Gym hours" }
+ *             required:
+ *               - userId
+ *               - year
+ *               - month
+ *               - cost
+ *               - hours
+ *     responses:
+ *       201:
+ *         description: Gym cost saved with Jalali date
+ *       400:
+ *         description: Invalid input
+ *       500:
+ *         description: Server error
+ */
+
+
+/*
+          1	فروردین	3	مارس (March)
+          2	 4اردیبهشت	آوریل (April)
+          3	خرداد	5	مه (May)
+          4	تیر	    6	    ژوئن (June)
+          5	مرداد	7	ژوئیه (July)
+          6	شهریور	8	اوت (August)
+          7	مهر	    9	سپتامبر (September)
+          8	آبان	10	اکتبر (October)
+          9	آذر	    11	نوامبر (November)
+          10	دی	    12	دسامبر (December)
+          11	بهمن	1	ژانویه (January)
+          12	اسفند	2	فوریه (February)
+*/
+router.post('/monthly-gym-costs/jalali', checkRole(['user']), async (req, res) => {
+    const { userId, year, month, cost, hours } = req.body;  // hours اضافه شد
+
+    // اعتبارسنجی ورودی‌ها
+    if (!userId || !year || !month || !cost || isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+        return res.status(400).send('Invalid input');
+    }
+
+    try {
+        // تبدیل تاریخ جلالی به میلادی
+        const monthRange = getJalaliMonthRange(year, month);
+        const gregorianYear = monthRange.start.getFullYear();
+        const gregorianMonth = monthRange.start.getMonth() + 1;
+
+        const pool = await poolPromise;
+        await pool.request()
+            .input('userId', sql.Int, userId)
+            .input('gregorianYear', sql.Int, gregorianYear)
+            .input('gregorianMonth', sql.Int, gregorianMonth)
+            .input('cost', sql.Int, cost)
+            .input('hours', sql.Int, hours || null)  // hours اضافه شد
+            .query(`
+                IF EXISTS (SELECT 1 FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @gregorianYear AND Month = @gregorianMonth)
+                    UPDATE MonthlyGymCosts 
+                    SET Cost = @cost, GymHours = @hours 
+                    WHERE UserId = @userId AND Year = @gregorianYear AND Month = @gregorianMonth
+                ELSE
+                    INSERT INTO MonthlyGymCosts (UserId, Year, Month, Cost, GymHours) 
+                    VALUES (@userId, @gregorianYear, @gregorianMonth, @cost, @hours)
+            `);
+
+        res.status(201).send('Gym cost saved with Jalali date');
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
 
 /**
  * @swagger
@@ -97,8 +187,9 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
             .input('userId', sql.Int, userId)
             .input('year', sql.Int, year)
             .input('month', sql.Int, month)
-            .query('SELECT Cost FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @year AND Month = @month');
+            .query('SELECT Cost, GymHours FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @year AND Month = @month');
         const gymCost = gymResult.recordset[0]?.Cost || 0;
+        const gymHours = gymResult.recordset[0]?.GymHours || 0;  // مثال: اگر در گزارش نیاز باشه
 
         await pool.request()
             .input('userId', sql.Int, userId)
@@ -180,9 +271,11 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
         const gymResult = await pool.request()
             .input('userId', sql.Int, userId)
             .input('year', sql.Int, gregorianYear)
+
             .input('month', sql.Int, gregorianMonth)
-            .query('SELECT Cost FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @year AND Month = @month');
+            .query('SELECT Cost, GymHours FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @year AND Month = @month');
         const gymCost = gymResult.recordset[0]?.Cost || 0;
+        const gymHours = gymResult.recordset[0]?.GymHours || 0;  // مثال: اگر در گزارش نیاز باشه
 
         // تغییر: چک وجود رکورد و آپدیت اگر وجود داشت (بر اساس سال/ماه جلالی یا میلادی، بسته به نیاز - اینجا بر اساس میلادی چک کردم)
         await pool.request()

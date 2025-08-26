@@ -32,9 +32,26 @@ function formatJalaliDate(gregorianDate) {
     return `${jalali.jy}/${jalali.jm}/${jalali.jd}`;
 }
 
+        /*
+            1	فروردین	3	مارس (March)
+            2	 4اردیبهشت	آوریل (April)
+            3	خرداد	5	مه (May)
+            4	تیر	    6	    ژوئن (June)
+            5	مرداد	7	ژوئیه (July)
+            6	شهریور	8	اوت (August)
+            7	مهر	    9	سپتامبر (September)
+            8	آبان	10	اکتبر (October)
+            9	آذر	    11	نوامبر (November)
+            10	دی	    12	دسامبر (December)
+            11	بهمن	1	ژانویه (January)
+            12	اسفند	2	فوریه (February)
+        */
+
 module.exports = {
     jalaliToGregorian,
     gregorianToJalali,
     getJalaliMonthRange,
     formatJalaliDate
 };
+
+

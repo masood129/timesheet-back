@@ -92,6 +92,7 @@ CREATE TABLE MonthlyGymCosts (
                                  Year INT NOT NULL,
                                  Month INT NOT NULL CHECK (Month BETWEEN 1 AND 12),
                                  Cost INT NOT NULL,
+                                 GymHours INT NULL,  -- تعداد ساعات ورزش در ماه (جدید)
                                  Description NVARCHAR(500) NULL,
                                  FOREIGN KEY (UserId) REFERENCES Users(UserId)
 );
@@ -249,18 +250,17 @@ INSERT INTO DailyPersonalCarCosts (Date, UserId, Cost, Description) VALUES
                                                                         ('2025-08-02', 20, 50000, N'هزینه سوخت رفت و برگشت');
 
 -- هزینه‌های ورزش ماهیانه
-INSERT INTO MonthlyGymCosts (UserId, Year, Month, Cost, Description) VALUES
-                                                                         (11, 2025, 8, 500000, N'هزینه باشگاه مرداد'),
-                                                                         (12, 2025, 8, 600000, N'هزینه استخر مرداد'),
-                                                                         (13, 2025, 8, 550000, N'هزینه باشگاه مرداد'),
-                                                                         (14, 2025, 8, 580000, N'هزینه استخر مرداد'),
-                                                                         (15, 2025, 8, 520000, N'هزینه باشگاه مرداد'),
-                                                                         (16, 2025, 8, 590000, N'هزینه استخر مرداد'),
-                                                                         (17, 2025, 8, 510000, N'هزینه باشگاه مرداد'),
-                                                                         (18, 2025, 8, 600000, N'هزینه استخر مرداد'),
-                                                                         (19, 2025, 8, 540000, N'هزینه باشگاه مرداد'),
-                                                                         (20, 2025, 8, 570000, N'هزینه استخر مرداد');
-
+INSERT INTO MonthlyGymCosts (UserId, Year, Month, Cost, GymHours, Description) VALUES
+                                                                                   (11, 2025, 8, 500000, 20, N'هزینه باشگاه مرداد'),
+                                                                                   (12, 2025, 8, 600000, 15, N'هزینه استخر مرداد'),
+                                                                                   (13, 2025, 8, 550000, 25, N'هزینه باشگاه مرداد'),
+                                                                                   (14, 2025, 8, 580000, 18, N'هزینه استخر مرداد'),
+                                                                                   (15, 2025, 8, 520000, 22, N'هزینه باشگاه مرداد'),
+                                                                                   (16, 2025, 8, 590000, 16, N'هزینه استخر مرداد'),
+                                                                                   (17, 2025, 8, 510000, 19, N'هزینه باشگاه مرداد'),
+                                                                                   (18, 2025, 8, 600000, 24, N'هزینه استخر مرداد'),
+                                                                                   (19, 2025, 8, 540000, 21, N'هزینه باشگاه مرداد'),
+                                                                                   (20, 2025, 8, 570000, 17, N'هزینه استخر مرداد');
 -- گزارش‌های ماهیانه
 INSERT INTO MonthlyReports (UserId, Year, Month, TotalHours, GymCost, Status, GroupId, GeneralManagerStatus, ManagerComment, FinanceComment, SubmittedAt, ApprovedAt) VALUES
                                                                                                                                                                           (11, 2025, 8, 900, 500000, 'draft', 1, 'pending', NULL, NULL, NULL, NULL),
