@@ -170,7 +170,7 @@ router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_ma
  * @swagger
  * /monthly-reports/check-submitted/jalali/{year}/{month}:
  *   get:
- *     summary: Get the general manager status for the monthly report of the current user in the specified Jalali month
+ *     summary: Get the status for the monthly report of the current user in the specified Jalali month
  *     tags: [MonthlyReports]
  *     security:
  *       - bearerAuth: []
@@ -189,16 +189,16 @@ router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_ma
  *           description: Jalali month (1-12, e.g., 6 for Shahrivar)
  *     responses:
  *       200:
- *         description: General manager status of the report
+ *         description: Status of the report
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 generalManagerStatus:
+ *                 status:
  *                   type: string
  *                   nullable: true
- *                   description: The general manager status (e.g., 'approved_by_general_manager') or null if no report exists
+ *                   description: The overall status (e.g., 'draft', 'approved', 'submitted_to_group_manager') or null if no report exists
  *       400:
  *         description: Invalid Jalali year or month
  *       403:
@@ -223,17 +223,16 @@ router.get('/check-submitted/jalali/:year/:month', checkRole(['user']), async (r
             .input('userId', sql.Int, userId)
             .input('jalaliYear', sql.Int, jy)
             .input('jalaliMonth', sql.Int, jm)
-            .query('SELECT TOP 1 GeneralManagerStatus FROM MonthlyReports WHERE UserId = @userId AND JalaliYear = @jalaliYear AND JalaliMonth = @jalaliMonth');
+            .query('SELECT TOP 1 Status FROM MonthlyReports WHERE UserId = @userId AND JalaliYear = @jalaliYear AND JalaliMonth = @jalaliMonth');
 
-        const generalManagerStatus = result.recordset.length > 0 ? result.recordset[0].GeneralManagerStatus : null;
+        const status = result.recordset.length > 0 ? result.recordset[0].Status : null;
 
-        res.json({ generalManagerStatus });
+        res.json({ status });
     } catch (err) {
         console.error('Error in GET /monthly-reports/check-submitted/jalali/:year/:month:', err.message);
         res.status(500).send('Server error');
     }
 });
-
 
 /**
  * @swagger
