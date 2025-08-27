@@ -10,6 +10,74 @@ const checkRole = (roles) => (req, res, next) => {
 
 /**
  * @swagger
+ * /monthly-reports/check-submitted/jalali/{year}/{month}:
+ *   get:
+ *     summary: Check if monthly report is submitted for the current user in the specified Jalali month
+ *     tags: [MonthlyReports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           description: Jalali year (e.g., 1404)
+ *       - in: path
+ *         name: month
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           description: Jalali month (1-12, e.g., 6 for Shahrivar)
+ *     responses:
+ *       200:
+ *         description: Status of submission
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 isSubmitted:
+ *                   type: boolean
+ *                   description: True if report is submitted for this user and month
+ *       400:
+ *         description: Invalid Jalali year or month
+ *       403:
+ *         description: Access denied (not user role)
+ *       500:
+ *         description: Server error
+ */
+router.get('/check-submitted/jalali/:year/:month', checkRole(['user']), async (req, res) => {
+    try {
+        const { year, month } = req.params;
+        const userId = req.user.userId;
+
+        const jy = parseInt(year);
+        const jm = parseInt(month);
+
+        if (isNaN(jy) || isNaN(jm) || jm < 1 || jm > 12) {
+            return res.status(400).send('Invalid Jalali year or month');
+        }
+
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('userId', sql.Int, userId)
+            .input('jalaliYear', sql.Int, jy)
+            .input('jalaliMonth', sql.Int, jm)
+            .query('SELECT COUNT(*) as count FROM MonthlyReports WHERE UserId = @userId AND JalaliYear = @jalaliYear AND JalaliMonth = @jalaliMonth');
+
+        const isSubmitted = result.recordset[0].count > 0;
+
+        res.json({ isSubmitted });
+    } catch (err) {
+        console.error('Error in GET /monthly-reports/check-submitted/jalali/:year/:month:', err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+
+/**
+ * @swagger
  * /monthly-gym-costs:
  *   post:
  *     summary: Save monthly gym cost
