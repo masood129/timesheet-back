@@ -10,9 +10,167 @@ const checkRole = (roles) => (req, res, next) => {
 
 /**
  * @swagger
+ * /monthly-reports/{reportId}/exit-draft:
+ *   delete:
+ *     summary: Exit from draft state by deleting the draft monthly report (by user)
+ *     tags: [MonthlyReports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the report to exit from draft
+ *     responses:
+ *       200:
+ *         description: Exited from draft state successfully
+ *       400:
+ *         description: Only draft reports can be exited
+ *       403:
+ *         description: Access denied (not the owner or invalid role)
+ *       404:
+ *         description: Report not found
+ *       500:
+ *         description: Server error
+ */
+router.delete('/:reportId/exit-draft', checkRole(['user']), async (req, res) => {
+    const { reportId } = req.params;
+    const userId = req.user.userId;
+
+    try {
+        const pool = await poolPromise;
+
+        // چک کردن وجود گزارش و اینکه متعلق به کاربر باشد و در وضعیت draft باشد
+        const reportResult = await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('userId', sql.Int, userId)
+            .query(`
+                SELECT Status
+                FROM MonthlyReports
+                WHERE ReportId = @reportId AND UserId = @userId
+            `);
+
+        if (reportResult.recordset.length === 0) {
+            return res.status(404).send('Report not found or access denied');
+        }
+
+        const status = reportResult.recordset[0].Status;
+        if (status !== 'draft') {
+            return res.status(400).send('Only draft reports can be exited');
+        }
+
+        // حذف گزارش برای خروج از حالت draft، با شرط اضافی Status = 'draft' برای امنیت بیشتر
+        await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .query('DELETE FROM MonthlyReports WHERE ReportId = @reportId AND Status = \'draft\'');
+
+        res.send('Exited from draft state and returned to normal');
+    } catch (err) {
+        console.error('Error in DELETE /monthly-reports/:reportId/exit-draft:', err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+/**
+ * @swagger
+ * /monthly-reports/{reportId}/reject-to-draft:
+ *   put:
+ *     summary: Reject report and revert to draft (by managers)
+ *     tags: [MonthlyReports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               comment: { type: string, description: "Reason for rejection" }
+ *     responses:
+ *       200: { description: Report rejected and reverted to draft }
+ *       400: { description: Report cannot be rejected; invalid status }
+ *       403: { description: Access denied }
+ *       404: { description: Report not found }
+ *       500: { description: Server error }
+ */
+router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_manager', 'finance_manager']), async (req, res) => {
+    const { reportId } = req.params;
+    const { comment } = req.body;
+    const userId = req.user.userId;
+    const role = req.user.role;
+
+    try {
+        const pool = await poolPromise;
+        let query = `
+            SELECT mr.*, g.ManagerId
+            FROM MonthlyReports mr
+            LEFT JOIN Groups g ON mr.GroupId = g.GroupId
+            WHERE mr.ReportId = @reportId
+        `;
+
+        // محدود کردن دسترسی بر اساس نقش
+        if (role === 'group_manager') {
+            query += ' AND g.ManagerId = @userId';
+        }
+        // برای general_manager و finance_manager، دسترسی به همه (بدون شرط اضافی)
+
+        const reportResult = await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('userId', sql.Int, userId)
+            .query(query);
+
+        if (reportResult.recordset.length === 0) {
+            return res.status(404).send('Report not found or access denied');
+        }
+
+        const report = reportResult.recordset[0];
+        if (report.Status === 'draft') {
+            return res.status(400).send('Report is already in draft status');
+        }
+        if (report.Status === 'approved') {
+            return res.status(400).send('Approved reports cannot be rejected');
+        }
+
+        // بروزرسانی وضعیت به draft و اضافه کردن کامنت
+        let updateQuery = `
+            UPDATE MonthlyReports
+            SET Status = 'draft',
+                GeneralManagerStatus = 'pending',
+                SubmittedAt = NULL,
+                ApprovedAt = NULL
+        `;
+        if (role === 'finance_manager') {
+            updateQuery += `, FinanceComment = ISNULL(FinanceComment + '\n', '') + @comment`;
+        } else {
+            updateQuery += `, ManagerComment = ISNULL(ManagerComment + '\n', '') + @comment`;
+        }
+        updateQuery += ` WHERE ReportId = @reportId`;
+
+        await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('comment', sql.NVarChar, comment || 'Rejected without comment')
+            .query(updateQuery);
+
+        res.send('Report rejected and reverted to draft');
+    } catch (err) {
+        console.error('Error in PUT /monthly-reports/:reportId/reject-to-draft:', err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+/**
+ * @swagger
  * /monthly-reports/check-submitted/jalali/{year}/{month}:
  *   get:
- *     summary: Check if monthly report is submitted for the current user in the specified Jalali month
+ *     summary: Get the general manager status for the monthly report of the current user in the specified Jalali month
  *     tags: [MonthlyReports]
  *     security:
  *       - bearerAuth: []
@@ -31,15 +189,16 @@ const checkRole = (roles) => (req, res, next) => {
  *           description: Jalali month (1-12, e.g., 6 for Shahrivar)
  *     responses:
  *       200:
- *         description: Status of submission
+ *         description: General manager status of the report
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 isSubmitted:
- *                   type: boolean
- *                   description: True if report is submitted for this user and month
+ *                 generalManagerStatus:
+ *                   type: string
+ *                   nullable: true
+ *                   description: The general manager status (e.g., 'approved_by_general_manager') or null if no report exists
  *       400:
  *         description: Invalid Jalali year or month
  *       403:
@@ -64,11 +223,11 @@ router.get('/check-submitted/jalali/:year/:month', checkRole(['user']), async (r
             .input('userId', sql.Int, userId)
             .input('jalaliYear', sql.Int, jy)
             .input('jalaliMonth', sql.Int, jm)
-            .query('SELECT COUNT(*) as count FROM MonthlyReports WHERE UserId = @userId AND JalaliYear = @jalaliYear AND JalaliMonth = @jalaliMonth');
+            .query('SELECT TOP 1 GeneralManagerStatus FROM MonthlyReports WHERE UserId = @userId AND JalaliYear = @jalaliYear AND JalaliMonth = @jalaliMonth');
 
-        const isSubmitted = result.recordset[0].count > 0;
+        const generalManagerStatus = result.recordset.length > 0 ? result.recordset[0].GeneralManagerStatus : null;
 
-        res.json({ isSubmitted });
+        res.json({ generalManagerStatus });
     } catch (err) {
         console.error('Error in GET /monthly-reports/check-submitted/jalali/:year/:month:', err.message);
         res.status(500).send('Server error');

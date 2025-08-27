@@ -1160,6 +1160,61 @@
         }
       }
     },
+    "/monthly-reports/{reportId}/reject-to-draft": {
+      "put": {
+        "summary": "Reject report and revert to draft (by managers)",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": {
+                    "type": "string",
+                    "description": "Reason for rejection"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Report rejected and reverted to draft"
+          },
+          "400": {
+            "description": "Report cannot be rejected; invalid status"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
     "/test/jalali/{year}/{month}": {
       "get": {
         "summary": "Test Jalali to Gregorian date conversion",
