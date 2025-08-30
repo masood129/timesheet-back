@@ -8,161 +8,56 @@ const checkRole = (roles) => (req, res, next) => {
     next();
 };
 
+// Middleware for validating reportId as integer
+const validateReportId = (req, res, next) => {
+    const reportId = parseInt(req.params.reportId);
+    if (isNaN(reportId)) {
+        return res.status(400).send('Invalid reportId: must be an integer');
+    }
+    req.params.reportId = reportId; // Normalize to number
+    next();
+};
+
 /**
  * @swagger
- * /monthly-reports/{reportId}/exit-draft:
- *   delete:
- *     summary: Exit from draft state by deleting the draft monthly report (by user)
+ * /monthly-reports/my-drafts:
+ *   get:
+ *     summary: Get list of draft reports for the current user
  *     tags: [MonthlyReports]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: reportId
- *         required: true
- *         schema:
- *           type: integer
- *         description: The ID of the report to exit from draft
  *     responses:
  *       200:
- *         description: Exited from draft state successfully
- *       400:
- *         description: Only draft reports can be exited
+ *         description: List of draft reports
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/MonthlyReport'
  *       403:
- *         description: Access denied (not the owner or invalid role)
- *       404:
- *         description: Report not found
+ *         description: Access denied
  *       500:
  *         description: Server error
  */
-router.delete('/:reportId/exit-draft', checkRole(['user']), async (req, res) => {
-    const {reportId} = req.params;
+router.get('/my-drafts', checkRole(['user']), async (req, res) => {
     const userId = req.user.userId;
 
     try {
         const pool = await poolPromise;
-
-        // Check if the report exists, belongs to the user, and is in draft status
-        const reportResult = await pool.request()
-            .input('reportId', sql.Int, reportId)
+        const result = await pool.request()
             .input('userId', sql.Int, userId)
             .query(`
-                SELECT Status
-                FROM MonthlyReports
-                WHERE ReportId = @reportId
-                  AND UserId = @userId
+                SELECT mr.*, u.Username
+                FROM MonthlyReports mr
+                         JOIN Users u ON mr.UserId = u.UserId
+                WHERE mr.UserId = @userId
+                  AND mr.Status = 'draft'
             `);
 
-        if (reportResult.recordset.length === 0) {
-            return res.status(404).send('Report not found or access denied');
-        }
-
-        const status = reportResult.recordset[0].Status;
-        if (status !== 'draft') {
-            return res.status(400).send('Only draft reports can be exited');
-        }
-
-        // Delete the report to exit draft state, with additional Status = 'draft' condition for security
-        await pool.request()
-            .input('reportId', sql.Int, reportId)
-            .query('DELETE FROM MonthlyReports WHERE ReportId = @reportId AND Status = \'draft\'');
-
-        res.send('Exited from draft state and returned to normal');
+        res.json(result.recordset);
     } catch (err) {
-        console.error('Error in DELETE /monthly-reports/:reportId/exit-draft:', err.message);
-        res.status(500).send('Server error');
-    }
-});
-
-/**
- * @swagger
- * /monthly-reports/{reportId}/reject-to-draft:
- *   put:
- *     summary: Reject report and revert to draft (by managers)
- *     tags: [MonthlyReports]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: reportId
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               comment: { type: string, description: "Reason for rejection" }
- *     responses:
- *       200: { description: Report rejected and reverted to draft }
- *       400: { description: Report cannot be rejected; invalid status }
- *       403: { description: Access denied }
- *       404: { description: Report not found }
- *       500: { description: Server error }
- */
-router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_manager', 'finance_manager']), async (req, res) => {
-    const {reportId} = req.params;
-    const {comment} = req.body;
-    const userId = req.user.userId;
-    const role = req.user.role;
-
-    try {
-        const pool = await poolPromise;
-
-        // Check existence and access based on role
-        let query = `
-            SELECT Status, GroupId, GeneralManagerStatus
-            FROM MonthlyReports
-            WHERE ReportId = @reportId
-        `;
-        if (role === 'group_manager') {
-            query += ' AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
-        }
-
-        const reportResult = await pool.request()
-            .input('reportId', sql.Int, reportId)
-            .input('userId', sql.Int, userId)
-            .query(query);
-
-        if (reportResult.recordset.length === 0) {
-            return res.status(404).send('Report not found or access denied');
-        }
-
-        const report = reportResult.recordset[0];
-        const currentStatus = report.Status;
-        const generalStatus = report.GeneralManagerStatus;
-
-        // Check current status based on role
-        let canReject = false;
-        if (role === 'group_manager' && currentStatus === 'submitted_to_group_manager') {
-            canReject = true;
-        } else if (role === 'general_manager' && currentStatus === 'submitted_to_general_manager' && generalStatus === 'pending') {
-            canReject = true;
-        } else if (role === 'finance_manager' && currentStatus === 'submitted_to_finance') {
-            canReject = true;
-        }
-
-        if (!canReject) {
-            return res.status(400).send('Report cannot be rejected from current status');
-        }
-
-        // Update status to draft and add comment
-        await pool.request()
-            .input('reportId', sql.Int, reportId)
-            .input('comment', sql.NVarChar, comment)
-            .query(`
-                UPDATE MonthlyReports
-                SET Status               = 'draft',
-                    ManagerComment       = COALESCE(ManagerComment + ' | ', '') + @comment,
-                    GeneralManagerStatus = NULL
-                WHERE ReportId = @reportId
-            `);
-
-        res.send('Report rejected and reverted to draft');
-    } catch (err) {
-        console.error('Error in PUT /monthly-reports/:reportId/reject-to-draft:', err.message);
+        console.error('Error in GET /monthly-reports/my-drafts:', err.message);
         res.status(500).send('Server error');
     }
 });
@@ -208,521 +103,29 @@ router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_ma
  *         description: Server error
  */
 router.get('/check-submitted/jalali/:year/:month', checkRole(['user']), async (req, res) => {
-    const {year, month} = req.params;
-    const userId = req.user.userId;
-
-    const jalaliYear = parseInt(year);
-    const jalaliMonth = parseInt(month);
-
-    if (isNaN(jalaliYear) || isNaN(jalaliMonth) || jalaliMonth < 1 || jalaliMonth > 12) {
-        return res.status(400).send('Invalid Jalali year or month');
-    }
-
     try {
-        const pool = await poolPromise;
-        const monthRange = getJalaliMonthRange(jalaliYear, jalaliMonth);
-        const startDate = monthRange.start;
-        const endDate = monthRange.end;
+        const {year, month} = req.params;
+        const userId = req.user.userId;
 
+        const jy = parseInt(year);
+        const jm = parseInt(month);
+
+        if (isNaN(jy) || isNaN(jm) || jm < 1 || jm > 12) {
+            return res.status(400).send('Invalid Jalali year or month');
+        }
+
+        const pool = await poolPromise;
         const result = await pool.request()
             .input('userId', sql.Int, userId)
-            .input('startDate', sql.Date, startDate)
-            .input('endDate', sql.Date, endDate)
-            .query(`
-                SELECT Status
-                FROM MonthlyReports
-                WHERE UserId = @userId
-                  AND SubmittedAt BETWEEN @startDate AND @endDate
-            `);
+            .input('jalaliYear', sql.Int, jy)
+            .input('jalaliMonth', sql.Int, jm)
+            .query('SELECT TOP 1 Status FROM MonthlyReports WHERE UserId = @userId AND JalaliYear = @jalaliYear AND JalaliMonth = @jalaliMonth');
 
-        if (result.recordset.length > 0) {
-            res.json({status: result.recordset[0].Status});
-        } else {
-            res.json({status: null});
-        }
+        const status = result.recordset.length > 0 ? result.recordset[0].Status : null;
+
+        res.json({status});
     } catch (err) {
         console.error('Error in GET /monthly-reports/check-submitted/jalali/:year/:month:', err.message);
-        res.status(500).send('Server error');
-    }
-});
-
-/**
- * @swagger
- * /monthly-reports/jalali/{year}/{month}:
- *   post:
- *     summary: Create or update a draft monthly report for a Jalali month
- *     tags: [MonthlyReports]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: year
- *         required: true
- *         schema:
- *           type: integer
- *         description: Jalali year (e.g., 1404)
- *       - in: path
- *         name: month
- *         required: true
- *         schema:
- *           type: integer
- *         description: Jalali month (1-12, e.g., 6 for Shahrivar)
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               totalHours:
- *                 type: integer
- *                 description: Total hours worked in the month
- *               gymCost:
- *                 type: integer
- *                 description: Gym cost for the month
- *     responses:
- *       201:
- *         description: Report created or updated in draft status
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/MonthlyReport'
- *       400:
- *         description: Invalid input or report already submitted
- *       403:
- *         description: Access denied
- *       500:
- *         description: Server error
- */
-router.post('/jalali/:year/:month', checkRole(['user']), async (req, res) => {
-    const {year, month} = req.params;
-    const {totalHours, gymCost} = req.body;
-    const userId = req.user.userId;
-
-    const jalaliYear = parseInt(year);
-    const jalaliMonth = parseInt(month);
-
-    if (isNaN(jalaliYear) || isNaN(jalaliMonth) || jalaliMonth < 1 || jalaliMonth > 12 || totalHours == null || gymCost == null) {
-        return res.status(400).send('Invalid input');
-    }
-
-    try {
-        const pool = await poolPromise;
-        const monthRange = getJalaliMonthRange(jalaliYear, jalaliMonth);
-        const startDate = monthRange.start;
-        const endDate = monthRange.end;
-
-        const gregorianStart = new Date(startDate);
-        const gregorianYear = gregorianStart.getFullYear();
-        const gregorianMonth = gregorianStart.getMonth() + 1;
-
-        // Check for existing report
-        const existingReport = await pool.request()
-            .input('userId', sql.Int, userId)
-            .input('jalaliYear', sql.Int, jalaliYear)
-            .input('jalaliMonth', sql.Int, jalaliMonth)
-            .query(`
-                SELECT ReportId, Status
-                FROM MonthlyReports
-                WHERE UserId = @userId
-                  AND JalaliYear = @jalaliYear
-                  AND JalaliMonth = @jalaliMonth
-            `);
-
-        if (existingReport.recordset.length > 0) {
-            const report = existingReport.recordset[0];
-            if (report.Status !== 'draft') {
-                return res.status(400).send('Report already submitted and cannot be updated');
-            }
-            // Update existing report
-            const updateResult = await pool.request()
-                .input('reportId', sql.Int, report.ReportId)
-                .input('totalHours', sql.Int, totalHours)
-                .input('gymCost', sql.Int, gymCost)
-                .query(`
-                    UPDATE MonthlyReports
-                    SET TotalHours = @totalHours,
-                        GymCost    = @gymCost
-                    OUTPUT INSERTED.*
-                    WHERE ReportId = @reportId
-                `);
-            res.status(201).json(updateResult.recordset[0]);
-        } else {
-            // Create new report
-            const insertResult = await pool.request()
-                .input('userId', sql.Int, userId)
-                .input('year', sql.Int, gregorianYear)
-                .input('month', sql.Int, gregorianMonth)
-                .input('jalaliYear', sql.Int, jalaliYear)
-                .input('jalaliMonth', sql.Int, jalaliMonth)
-                .input('totalHours', sql.Int, totalHours)
-                .input('gymCost', sql.Int, gymCost)
-                .query(`
-                    INSERT INTO MonthlyReports (UserId, Year, Month, JalaliYear, JalaliMonth, TotalHours, GymCost,
-                                                Status)
-                    OUTPUT INSERTED.*
-                    VALUES (@userId, @year, @month, @jalaliYear, @jalaliMonth, @totalHours, @gymCost, 'draft')
-                `);
-            res.status(201).json(insertResult.recordset[0]);
-        }
-    } catch (err) {
-        console.error('Error in POST /monthly-reports/jalali/:year/:month:', err.message);
-        res.status(500).send('Server error');
-    }
-});
-
-/**
- * @swagger
- * /monthly-reports/{reportId}/submit-to-manager:
- *   put:
- *     summary: Submit report to group manager (by user)
- *     tags: [MonthlyReports]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: reportId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Report submitted to manager
- *       400:
- *         description: Report cannot be submitted; invalid status
- *       403:
- *         description: Access denied
- *       404:
- *         description: Report not found
- *       500:
- *         description: Server error
- */
-router.put('/:reportId/submit-to-manager', checkRole(['user']), async (req, res) => {
-    const {reportId} = req.params;
-    const userId = req.user.userId;
-
-    try {
-        const pool = await poolPromise;
-
-        const reportResult = await pool.request()
-            .input('reportId', sql.Int, reportId)
-            .input('userId', sql.Int, userId)
-            .query(`
-                SELECT Status
-                FROM MonthlyReports
-                WHERE ReportId = @reportId
-                  AND UserId = @userId
-            `);
-
-        if (reportResult.recordset.length === 0) {
-            return res.status(404).send('Report not found or access denied');
-        }
-
-        if (reportResult.recordset[0].Status !== 'draft') {
-            return res.status(400).send('Only draft reports can be submitted');
-        }
-
-        await pool.request()
-            .input('reportId', sql.Int, reportId)
-            .query(`
-                UPDATE MonthlyReports
-                SET Status      = 'submitted_to_group_manager',
-                    SubmittedAt = GETDATE()
-                WHERE ReportId = @reportId
-            `);
-
-        res.send('Report submitted to group manager');
-    } catch (err) {
-        console.error('Error in PUT /monthly-reports/:reportId/submit-to-manager:', err.message);
-        res.status(500).send('Server error');
-    }
-});
-
-/**
- * @swagger
- * /monthly-reports/{reportId}/approve-by-manager:
- *   put:
- *     summary: Approve report by group manager
- *     tags: [MonthlyReports]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: reportId
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               comment: { type: string, description: "Optional comment" }
- *     responses:
- *       200:
- *         description: Report approved by group manager
- *       400:
- *         description: Report cannot be approved; invalid status
- *       403:
- *         description: Access denied
- *       404:
- *         description: Report not found
- *       500:
- *         description: Server error
- */
-router.put('/:reportId/approve-by-manager', checkRole(['group_manager']), async (req, res) => {
-    const {reportId} = req.params;
-    const {comment} = req.body;
-    const userId = req.user.userId;
-
-    try {
-        const pool = await poolPromise;
-
-        const reportResult = await pool.request()
-            .input('reportId', sql.Int, reportId)
-            .input('userId', sql.Int, userId)
-            .query(`
-                SELECT Status, GroupId
-                FROM MonthlyReports
-                WHERE ReportId = @reportId
-                  AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)
-            `);
-
-        if (reportResult.recordset.length === 0) {
-            return res.status(404).send('Report not found or access denied');
-        }
-
-        if (reportResult.recordset[0].Status !== 'submitted_to_group_manager') {
-            return res.status(400).send('Report cannot be approved from current status');
-        }
-
-        await pool.request()
-            .input('reportId', sql.Int, reportId)
-            .input('comment', sql.NVarChar, comment || null)
-            .query(`
-                UPDATE MonthlyReports
-                SET Status               = 'submitted_to_general_manager',
-                    ManagerComment       = @comment,
-                    GeneralManagerStatus = 'pending'
-                WHERE ReportId = @reportId
-            `);
-
-        res.send('Report approved by group manager and submitted to general manager');
-    } catch (err) {
-        console.error('Error in PUT /monthly-reports/:reportId/approve-by-manager:', err.message);
-        res.status(500).send('Server error');
-    }
-});
-
-/**
- * @swagger
- * /monthly-reports/{reportId}/approve-by-general-manager:
- *   put:
- *     summary: Approve report by general manager
- *     tags: [MonthlyReports]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: reportId
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               comment: { type: string, description: "Optional comment" }
- *     responses:
- *       200:
- *         description: Report approved by general manager
- *       400:
- *         description: Report cannot be approved; invalid status
- *       403:
- *         description: Access denied
- *       404:
- *         description: Report not found
- *       500:
- *         description: Server error
- */
-router.put('/:reportId/approve-by-general-manager', checkRole(['general_manager']), async (req, res) => {
-    const {reportId} = req.params;
-    const {comment} = req.body;
-
-    try {
-        const pool = await poolPromise;
-
-        const reportResult = await pool.request()
-            .input('reportId', sql.Int, reportId)
-            .query(`
-                SELECT Status, GeneralManagerStatus
-                FROM MonthlyReports
-                WHERE ReportId = @reportId
-            `);
-
-        if (reportResult.recordset.length === 0) {
-            return res.status(404).send('Report not found');
-        }
-
-        const report = reportResult.recordset[0];
-        if (report.Status !== 'submitted_to_general_manager' || report.GeneralManagerStatus !== 'pending') {
-            return res.status(400).send('Report cannot be approved from current status');
-        }
-
-        await pool.request()
-            .input('reportId', sql.Int, reportId)
-            .input('comment', sql.NVarChar, comment || null)
-            .query(`
-                UPDATE MonthlyReports
-                SET Status               = 'submitted_to_finance',
-                    ManagerComment       = COALESCE(ManagerComment + ' | ', '') + @comment,
-                    GeneralManagerStatus = 'approved_by_general_manager'
-                WHERE ReportId = @reportId
-            `);
-
-        res.send('Report approved by general manager and submitted to finance');
-    } catch (err) {
-        console.error('Error in PUT /monthly-reports/:reportId/approve-by-general-manager:', err.message);
-        res.status(500).send('Server error');
-    }
-});
-
-/**
- * @swagger
- * /monthly-reports/{reportId}/approve-by-finance:
- *   put:
- *     summary: Approve report by finance manager
- *     tags: [MonthlyReports]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: reportId
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               comment: { type: string, description: "Optional comment" }
- *     responses:
- *       200:
- *         description: Report approved by finance
- *       400:
- *         description: Report cannot be approved; invalid status
- *       403:
- *         description: Access denied
- *       404:
- *         description: Report not found
- *       500:
- *         description: Server error
- */
-router.put('/:reportId/approve-by-finance', checkRole(['finance_manager']), async (req, res) => {
-    const {reportId} = req.params;
-    const {comment} = req.body;
-
-    try {
-        const pool = await poolPromise;
-
-        const reportResult = await pool.request()
-            .input('reportId', sql.Int, reportId)
-            .query(`
-                SELECT Status
-                FROM MonthlyReports
-                WHERE ReportId = @reportId
-            `);
-
-        if (reportResult.recordset.length === 0) {
-            return res.status(404).send('Report not found');
-        }
-
-        if (reportResult.recordset[0].Status !== 'submitted_to_finance') {
-            return res.status(400).send('Report cannot be approved from current status');
-        }
-
-        await pool.request()
-            .input('reportId', sql.Int, reportId)
-            .input('comment', sql.NVarChar, comment || null)
-            .query(`
-                UPDATE MonthlyReports
-                SET Status         = 'approved',
-                    FinanceComment = @comment,
-                    ApprovedAt     = GETDATE()
-                WHERE ReportId = @reportId
-            `);
-
-        res.send('Report approved by finance');
-    } catch (err) {
-        console.error('Error in PUT /monthly-reports/:reportId/approve-by-finance:', err.message);
-        res.status(500).send('Server error');
-    }
-});
-
-/**
- * @swagger
- * /monthly-reports/{reportId}:
- *   get:
- *     summary: Get report by ID
- *     tags: [MonthlyReports]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: reportId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Report details
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/MonthlyReport'
- *       403:
- *         description: Access denied
- *       404:
- *         description: Report not found
- *       500:
- *         description: Server error
- */
-router.get('/:reportId', async (req, res) => {
-    const {reportId} = req.params;
-    const userId = req.user.userId;
-    const role = req.user.role;
-
-    try {
-        const pool = await poolPromise;
-        let query = `
-            SELECT mr.*, u.Username
-            FROM MonthlyReports mr
-                     JOIN Users u ON mr.UserId = u.UserId
-            WHERE mr.ReportId = @reportId
-        `;
-        if (role === 'user') {
-            query += ' AND mr.UserId = @userId';
-        } else if (role === 'group_manager') {
-            query += ' AND mr.GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
-        }
-
-        const result = await pool.request()
-            .input('reportId', sql.Int, reportId)
-            .input('userId', sql.Int, userId)
-            .query(query);
-
-        if (result.recordset.length === 0) {
-            return res.status(404).send('Report not found or access denied');
-        }
-
-        res.json(result.recordset[0]);
-    } catch (err) {
-        console.error('Error in GET /monthly-reports/:reportId:', err.message);
         res.status(500).send('Server error');
     }
 });
@@ -1029,44 +432,640 @@ router.get('/report-ids/jalali/:year/:month', checkRole(['user', 'group_manager'
 
 /**
  * @swagger
- * /monthly-reports/my-drafts:
- *   get:
- *     summary: Get list of draft reports for the current user
+ * /monthly-reports/jalali/{year}/{month}:
+ *   post:
+ *     summary: Create or update a draft monthly report for a Jalali month
  *     tags: [MonthlyReports]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Jalali year (e.g., 1404)
+ *       - in: path
+ *         name: month
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Jalali month (1-12, e.g., 6 for Shahrivar)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               totalHours:
+ *                 type: integer
+ *                 description: Total hours worked in the month
+ *               gymCost:
+ *                 type: integer
+ *                 description: Gym cost for the month
  *     responses:
- *       200:
- *         description: List of draft reports
+ *       201:
+ *         description: Report created or updated in draft status
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/MonthlyReport'
+ *               $ref: '#/components/schemas/MonthlyReport'
+ *       400:
+ *         description: Invalid input or report already submitted
  *       403:
  *         description: Access denied
  *       500:
  *         description: Server error
  */
-router.get('/my-drafts', checkRole(['user']), async (req, res) => {
+router.post('/jalali/:year/:month', checkRole(['user']), async (req, res) => {
+    const {year, month} = req.params;
+    const {totalHours, gymCost} = req.body;
+    const userId = req.user.userId;
+
+    const jalaliYear = parseInt(year);
+    const jalaliMonth = parseInt(month);
+
+    if (isNaN(jalaliYear) || isNaN(jalaliMonth) || jalaliMonth < 1 || jalaliMonth > 12 || totalHours == null || gymCost == null) {
+        return res.status(400).send('Invalid input');
+    }
+
+    try {
+        const pool = await poolPromise;
+        const monthRange = getJalaliMonthRange(jalaliYear, jalaliMonth);
+        const startDate = monthRange.start;
+        const endDate = monthRange.end;
+
+        const gregorianStart = new Date(startDate);
+        const gregorianYear = gregorianStart.getFullYear();
+        const gregorianMonth = gregorianStart.getMonth() + 1;
+
+        // Check for existing report
+        const existingReport = await pool.request()
+            .input('userId', sql.Int, userId)
+            .input('jalaliYear', sql.Int, jalaliYear)
+            .input('jalaliMonth', sql.Int, jalaliMonth)
+            .query(`
+                SELECT ReportId, Status
+                FROM MonthlyReports
+                WHERE UserId = @userId
+                  AND JalaliYear = @jalaliYear
+                  AND JalaliMonth = @jalaliMonth
+            `);
+
+        if (existingReport.recordset.length > 0) {
+            const report = existingReport.recordset[0];
+            if (report.Status !== 'draft') {
+                return res.status(400).send('Report already submitted and cannot be updated');
+            }
+            // Update existing report
+            const updateResult = await pool.request()
+                .input('reportId', sql.Int, report.ReportId)
+                .input('totalHours', sql.Int, totalHours)
+                .input('gymCost', sql.Int, gymCost)
+                .query(`
+                    UPDATE MonthlyReports
+                    SET TotalHours = @totalHours,
+                        GymCost    = @gymCost
+                    OUTPUT INSERTED.*
+                    WHERE ReportId = @reportId
+                `);
+            res.status(201).json(updateResult.recordset[0]);
+        } else {
+            // Create new report
+            const insertResult = await pool.request()
+                .input('userId', sql.Int, userId)
+                .input('year', sql.Int, gregorianYear)
+                .input('month', sql.Int, gregorianMonth)
+                .input('jalaliYear', sql.Int, jalaliYear)
+                .input('jalaliMonth', sql.Int, jalaliMonth)
+                .input('totalHours', sql.Int, totalHours)
+                .input('gymCost', sql.Int, gymCost)
+                .query(`
+                    INSERT INTO MonthlyReports (UserId, Year, Month, JalaliYear, JalaliMonth, TotalHours, GymCost,
+                                                Status)
+                    OUTPUT INSERTED.*
+                    VALUES (@userId, @year, @month, @jalaliYear, @jalaliMonth, @totalHours, @gymCost, 'draft')
+                `);
+            res.status(201).json(insertResult.recordset[0]);
+        }
+    } catch (err) {
+        console.error('Error in POST /monthly-reports/jalali/:year/:month:', err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+/**
+ * @swagger
+ * /monthly-reports/exit-draft/{reportId}:
+ *   delete:
+ *     summary: Exit from draft state by deleting the draft monthly report (by user)
+ *     tags: [MonthlyReports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the report to exit from draft
+ *     responses:
+ *       200:
+ *         description: Exited from draft state successfully
+ *       400:
+ *         description: Only draft reports can be exited
+ *       403:
+ *         description: Access denied (not the owner or invalid role)
+ *       404:
+ *         description: Report not found
+ *       500:
+ *         description: Server error
+ */
+router.delete('/exit-draft/:reportId', checkRole(['user']), validateReportId, async (req, res) => {
+    const {reportId} = req.params;
     const userId = req.user.userId;
 
     try {
         const pool = await poolPromise;
-        const result = await pool.request()
+
+        // Check if the report exists, belongs to the user, and is in draft status
+        const reportResult = await pool.request()
+            .input('reportId', sql.Int, reportId)
             .input('userId', sql.Int, userId)
             .query(`
-                SELECT mr.*, u.Username
-                FROM MonthlyReports mr
-                         JOIN Users u ON mr.UserId = u.UserId
-                WHERE mr.UserId = @userId
-                  AND mr.Status = 'draft'
+                SELECT Status
+                FROM MonthlyReports
+                WHERE ReportId = @reportId
+                  AND UserId = @userId
             `);
 
-        res.json(result.recordset);
+        if (reportResult.recordset.length === 0) {
+            return res.status(404).send('Report not found or access denied');
+        }
+
+        const status = reportResult.recordset[0].Status;
+        if (status !== 'draft') {
+            return res.status(400).send('Only draft reports can be exited');
+        }
+
+        // Delete the report to exit draft state, with additional Status = 'draft' condition for security
+        await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .query('DELETE FROM MonthlyReports WHERE ReportId = @reportId AND Status = \'draft\'');
+
+        res.send('Exited from draft state and returned to normal');
     } catch (err) {
-        console.error('Error in GET /monthly-reports/my-drafts:', err.message);
+        console.error('Error in DELETE /monthly-reports/:reportId/exit-draft:', err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+/**
+ * @swagger
+ * /monthly-reports/{reportId}/reject-to-draft:
+ *   put:
+ *     summary: Reject report and revert to draft (by managers)
+ *     tags: [MonthlyReports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               comment: { type: string, description: "Reason for rejection" }
+ *     responses:
+ *       200: { description: Report rejected and reverted to draft }
+ *       400: { description: Report cannot be rejected; invalid status }
+ *       403: { description: Access denied }
+ *       404: { description: Report not found }
+ *       500: { description: Server error }
+ */
+router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_manager', 'finance_manager']), validateReportId, async (req, res) => {
+    const {reportId} = req.params;
+    const {comment} = req.body;
+    const userId = req.user.userId;
+    const role = req.user.role;
+
+    try {
+        const pool = await poolPromise;
+
+        // Check existence and access based on role
+        let query = `
+            SELECT Status, GroupId, GeneralManagerStatus
+            FROM MonthlyReports
+            WHERE ReportId = @reportId
+        `;
+        if (role === 'group_manager') {
+            query += ' AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
+        }
+
+        const reportResult = await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('userId', sql.Int, userId)
+            .query(query);
+
+        if (reportResult.recordset.length === 0) {
+            return res.status(404).send('Report not found or access denied');
+        }
+
+        const report = reportResult.recordset[0];
+        const currentStatus = report.Status;
+        const generalStatus = report.GeneralManagerStatus;
+
+        // Check current status based on role
+        let canReject = false;
+        if (role === 'group_manager' && currentStatus === 'submitted_to_group_manager') {
+            canReject = true;
+        } else if (role === 'general_manager' && currentStatus === 'submitted_to_general_manager' && generalStatus === 'pending') {
+            canReject = true;
+        } else if (role === 'finance_manager' && currentStatus === 'submitted_to_finance') {
+            canReject = true;
+        }
+
+        if (!canReject) {
+            return res.status(400).send('Report cannot be rejected from current status');
+        }
+
+        // Update status to draft and add comment
+        await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('comment', sql.NVarChar, comment)
+            .query(`
+                UPDATE MonthlyReports
+                SET Status               = 'draft',
+                    ManagerComment       = COALESCE(ManagerComment + ' | ', '') + @comment,
+                    GeneralManagerStatus = NULL
+                WHERE ReportId = @reportId
+            `);
+
+        res.send('Report rejected and reverted to draft');
+    } catch (err) {
+        console.error('Error in PUT /monthly-reports/:reportId/reject-to-draft:', err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+/**
+ * @swagger
+ * /monthly-reports/{reportId}/submit-to-manager:
+ *   put:
+ *     summary: Submit report to group manager (by user)
+ *     tags: [MonthlyReports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Report submitted to manager
+ *       400:
+ *         description: Report cannot be submitted; invalid status
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: Report not found
+ *       500:
+ *         description: Server error
+ */
+router.put('/:reportId/submit-to-manager', checkRole(['user']), validateReportId, async (req, res) => {
+    const {reportId} = req.params;
+    const userId = req.user.userId;
+
+    try {
+        const pool = await poolPromise;
+
+        const reportResult = await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('userId', sql.Int, userId)
+            .query(`
+                SELECT Status
+                FROM MonthlyReports
+                WHERE ReportId = @reportId
+                  AND UserId = @userId
+            `);
+
+        if (reportResult.recordset.length === 0) {
+            return res.status(404).send('Report not found or access denied');
+        }
+
+        if (reportResult.recordset[0].Status !== 'draft') {
+            return res.status(400).send('Only draft reports can be submitted');
+        }
+
+        await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .query(`
+                UPDATE MonthlyReports
+                SET Status      = 'submitted_to_group_manager',
+                    SubmittedAt = GETDATE()
+                WHERE ReportId = @reportId
+            `);
+
+        res.send('Report submitted to group manager');
+    } catch (err) {
+        console.error('Error in PUT /monthly-reports/:reportId/submit-to-manager:', err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+/**
+ * @swagger
+ * /monthly-reports/{reportId}/approve-by-manager:
+ *   put:
+ *     summary: Approve report by group manager
+ *     tags: [MonthlyReports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               comment: { type: string, description: "Optional comment" }
+ *     responses:
+ *       200:
+ *         description: Report approved by group manager
+ *       400:
+ *         description: Report cannot be approved; invalid status
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: Report not found
+ *       500:
+ *         description: Server error
+ */
+router.put('/:reportId/approve-by-manager', checkRole(['group_manager']), validateReportId, async (req, res) => {
+    const {reportId} = req.params;
+    const {comment} = req.body;
+    const userId = req.user.userId;
+
+    try {
+        const pool = await poolPromise;
+
+        const reportResult = await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('userId', sql.Int, userId)
+            .query(`
+                SELECT Status, GroupId
+                FROM MonthlyReports
+                WHERE ReportId = @reportId
+                  AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)
+            `);
+
+        if (reportResult.recordset.length === 0) {
+            return res.status(404).send('Report not found or access denied');
+        }
+
+        if (reportResult.recordset[0].Status !== 'submitted_to_group_manager') {
+            return res.status(400).send('Report cannot be approved from current status');
+        }
+
+        await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('comment', sql.NVarChar, comment || null)
+            .query(`
+                UPDATE MonthlyReports
+                SET Status               = 'submitted_to_general_manager',
+                    ManagerComment       = @comment,
+                    GeneralManagerStatus = 'pending'
+                WHERE ReportId = @reportId
+            `);
+
+        res.send('Report approved by group manager and submitted to general manager');
+    } catch (err) {
+        console.error('Error in PUT /monthly-reports/:reportId/approve-by-manager:', err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+/**
+ * @swagger
+ * /monthly-reports/{reportId}/approve-by-general-manager:
+ *   put:
+ *     summary: Approve report by general manager
+ *     tags: [MonthlyReports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               comment: { type: string, description: "Optional comment" }
+ *     responses:
+ *       200:
+ *         description: Report approved by general manager
+ *       400:
+ *         description: Report cannot be approved; invalid status
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: Report not found
+ *       500:
+ *         description: Server error
+ */
+router.put('/:reportId/approve-by-general-manager', checkRole(['general_manager']), validateReportId, async (req, res) => {
+    const {reportId} = req.params;
+    const {comment} = req.body;
+
+    try {
+        const pool = await poolPromise;
+
+        const reportResult = await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .query(`
+                SELECT Status, GeneralManagerStatus
+                FROM MonthlyReports
+                WHERE ReportId = @reportId
+            `);
+
+        if (reportResult.recordset.length === 0) {
+            return res.status(404).send('Report not found');
+        }
+
+        const report = reportResult.recordset[0];
+        if (report.Status !== 'submitted_to_general_manager' || report.GeneralManagerStatus !== 'pending') {
+            return res.status(400).send('Report cannot be approved from current status');
+        }
+
+        await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('comment', sql.NVarChar, comment || null)
+            .query(`
+                UPDATE MonthlyReports
+                SET Status               = 'submitted_to_finance',
+                    ManagerComment       = COALESCE(ManagerComment + ' | ', '') + @comment,
+                    GeneralManagerStatus = 'approved_by_general_manager'
+                WHERE ReportId = @reportId
+            `);
+
+        res.send('Report approved by general manager and submitted to finance');
+    } catch (err) {
+        console.error('Error in PUT /monthly-reports/:reportId/approve-by-general-manager:', err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+/**
+ * @swagger
+ * /monthly-reports/{reportId}/approve-by-finance:
+ *   put:
+ *     summary: Approve report by finance manager
+ *     tags: [MonthlyReports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               comment: { type: string, description: "Optional comment" }
+ *     responses:
+ *       200:
+ *         description: Report approved by finance
+ *       400:
+ *         description: Report cannot be approved; invalid status
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: Report not found
+ *       500:
+ *         description: Server error
+ */
+router.put('/:reportId/approve-by-finance', checkRole(['finance_manager']), validateReportId, async (req, res) => {
+    const {reportId} = req.params;
+    const {comment} = req.body;
+
+    try {
+        const pool = await poolPromise;
+
+        const reportResult = await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .query(`
+                SELECT Status
+                FROM MonthlyReports
+                WHERE ReportId = @reportId
+            `);
+
+        if (reportResult.recordset.length === 0) {
+            return res.status(404).send('Report not found');
+        }
+
+        if (reportResult.recordset[0].Status !== 'submitted_to_finance') {
+            return res.status(400).send('Report cannot be approved from current status');
+        }
+
+        await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('comment', sql.NVarChar, comment || null)
+            .query(`
+                UPDATE MonthlyReports
+                SET Status         = 'approved',
+                    FinanceComment = @comment,
+                    ApprovedAt     = GETDATE()
+                WHERE ReportId = @reportId
+            `);
+
+        res.send('Report approved by finance');
+    } catch (err) {
+        console.error('Error in PUT /monthly-reports/:reportId/approve-by-finance:', err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+/**
+ * @swagger
+ * /monthly-reports/{reportId}:
+ *   get:
+ *     summary: Get report by ID
+ *     tags: [MonthlyReports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Report details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/MonthlyReport'
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: Report not found
+ *       500:
+ *         description: Server error
+ */
+router.get('/:reportId', validateReportId, async (req, res) => {
+    const {reportId} = req.params;
+    const userId = req.user.userId;
+    const role = req.user.role;
+
+    try {
+        const pool = await poolPromise;
+        let query = `
+            SELECT mr.*, u.Username
+            FROM MonthlyReports mr
+                     JOIN Users u ON mr.UserId = u.UserId
+            WHERE mr.ReportId = @reportId
+        `;
+        if (role === 'user') {
+            query += ' AND mr.UserId = @userId';
+        } else if (role === 'group_manager') {
+            query += ' AND mr.GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
+        }
+
+        const result = await pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('userId', sql.Int, userId)
+            .query(query);
+
+        if (result.recordset.length === 0) {
+            return res.status(404).send('Report not found or access denied');
+        }
+
+        res.json(result.recordset[0]);
+    } catch (err) {
+        console.error('Error in GET /monthly-reports/:reportId:', err.message);
         res.status(500).send('Server error');
     }
 });
