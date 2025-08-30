@@ -415,7 +415,7 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
             .input('month', sql.Int, month)
             .query('SELECT Cost, GymHours FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @year AND Month = @month');
         const gymCost = gymResult.recordset[0]?.Cost || 0;
-        const gymHours = gymResult.recordset[0]?.GymHours || 0;  // مثال: اگر در گزارش نیاز باشه
+        // const gymHours = gymResult.recordset[0]?.GymHours || 0;  // مثال: اگر در گزارش نیاز باشه
 
         await pool.request()
             .input('userId', sql.Int, userId)
@@ -501,7 +501,7 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
             .input('month', sql.Int, gregorianMonth)
             .query('SELECT Cost, GymHours FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @year AND Month = @month');
         const gymCost = gymResult.recordset[0]?.Cost || 0;
-        const gymHours = gymResult.recordset[0]?.GymHours || 0;  // مثال: اگر در گزارش نیاز باشه
+        // const gymHours = gymResult.recordset[0]?.GymHours || 0;  // مثال: اگر در گزارش نیاز باشه
 
         // تغییر: چک وجود رکورد و آپدیت اگر وجود داشت (بر اساس سال/ماه جلالی یا میلادی، بسته به نیاز - اینجا بر اساس میلادی چک کردم)
         await pool.request()
