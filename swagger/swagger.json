@@ -39,7 +39,7 @@
         },
         "responses": {
           "200": {
-            "description": "Successful login, returns JWT token and userId",
+            "description": "Successful login, returns JWT token and user details",
             "content": {
               "application/json": {
                 "schema": {
@@ -59,7 +59,7 @@
                     },
                     "Role": {
                       "type": "string",
-                      "description": "User's role"
+                      "description": "User's role (user, group_manager, general_manager, finance_manager)"
                     }
                   }
                 }
@@ -166,7 +166,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Project ID"
           }
         ],
         "responses": {
@@ -208,7 +209,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Project ID"
           }
         ],
         "requestBody": {
@@ -268,7 +270,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Project ID"
           }
         ],
         "responses": {
@@ -394,92 +397,9 @@
         }
       }
     },
-    "/daily-details/{date}": {
-      "get": {
-        "summary": "Get daily details for a specific date",
-        "tags": [
-          "DailyDetails"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "date",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            },
-            "description": "Date of the daily details (YYYY-MM-DD)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Daily details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DailyDetail"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Daily details not found"
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      },
-      "delete": {
-        "summary": "Delete daily details for a specific date",
-        "tags": [
-          "DailyDetails"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "date",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            },
-            "description": "Date of the daily details to delete (YYYY-MM-DD)"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Daily details deleted"
-          },
-          "404": {
-            "description": "Daily details not found"
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
     "/daily-details": {
       "post": {
-        "summary": "Create or update daily details",
+        "summary": "Create or update daily details for a specific date",
         "tags": [
           "DailyDetails"
         ],
@@ -494,6 +414,9 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "date"
+                ],
                 "properties": {
                   "date": {
                     "type": "string",
@@ -502,31 +425,31 @@
                   },
                   "leaveType": {
                     "type": "string",
-                    "description": "Type of leave (optional)"
+                    "description": "Type of leave"
                   },
                   "arrivalTime": {
                     "type": "string",
-                    "description": "Arrival time (HH:MM)"
+                    "description": "Arrival time (HH:mm)"
                   },
                   "leaveTime": {
                     "type": "string",
-                    "description": "Leave time (HH:MM)"
+                    "description": "Leave time (HH:mm)"
                   },
                   "personalTime": {
                     "type": "integer",
-                    "description": "Personal time in minutes (optional)"
+                    "description": "Personal time in minutes"
                   },
                   "description": {
                     "type": "string",
-                    "description": "Description (optional)"
+                    "description": "Description"
                   },
                   "goCost": {
                     "type": "integer",
-                    "description": "Go cost (optional)"
+                    "description": "Cost of going"
                   },
                   "returnCost": {
                     "type": "integer",
-                    "description": "Return cost (optional)"
+                    "description": "Cost of returning"
                   },
                   "tasks": {
                     "type": "array",
@@ -543,7 +466,8 @@
                           "type": "string"
                         }
                       }
-                    }
+                    },
+                    "description": "List of tasks for the day"
                   },
                   "personalCarCosts": {
                     "type": "array",
@@ -563,7 +487,8 @@
                           "type": "string"
                         }
                       }
-                    }
+                    },
+                    "description": "List of personal car costs for the day"
                   }
                 }
               }
@@ -582,7 +507,7 @@
             }
           },
           "400": {
-            "description": "Invalid input"
+            "description": "Invalid input (e.g., invalid date format)"
           },
           "500": {
             "description": "Server error"
@@ -703,7 +628,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "The ID of the report"
           }
         ],
         "requestBody": {
@@ -893,7 +819,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "The ID of the report"
           }
         ],
         "responses": {
@@ -933,7 +860,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "The ID of the report"
           }
         ],
         "requestBody": {
@@ -988,7 +916,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "The ID of the report"
           }
         ],
         "requestBody": {
@@ -1043,7 +972,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "The ID of the report"
           }
         ],
         "requestBody": {
@@ -1098,7 +1028,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "The ID of the report"
           }
         ],
         "responses": {
@@ -1142,7 +1073,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Gregorian year"
           },
           {
             "in": "path",
@@ -1150,7 +1082,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Gregorian month (1-12)"
           }
         ],
         "responses": {
@@ -1194,7 +1127,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Jalali year (e.g., 1404)"
           },
           {
             "in": "path",
@@ -1202,7 +1136,8 @@
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Jalali month (1-12, e.g., 6 for Shahrivar)"
           }
         ],
         "responses": {
@@ -1218,6 +1153,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid Jalali year or month"
           },
           "403": {
             "description": "Access denied"
@@ -1293,6 +1231,105 @@
           },
           "400": {
             "description": "Invalid input (e.g., invalid year or month)"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/report-ids/jalali/{year}/{month}": {
+      "get": {
+        "summary": "Get report IDs and user IDs for the specified Jalali month (for authorized users)",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year (e.g., 1404)"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali month (1-12, e.g., 6 for Shahrivar)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of report IDs and user IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "reportId": {
+                        "type": "integer"
+                      },
+                      "userId": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Jalali year or month"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/my-drafts": {
+      "get": {
+        "summary": "Get list of draft reports for the current user",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of draft reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MonthlyReport"
+                  }
+                }
+              }
+            }
           },
           "403": {
             "description": "Access denied"
@@ -1441,23 +1478,25 @@
           },
           "GoCost": {
             "type": "integer",
-            "description": "Go cost"
+            "description": "Cost of going"
           },
           "ReturnCost": {
             "type": "integer",
-            "description": "Return cost"
+            "description": "Cost of returning"
           },
           "tasks": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DailyProjectTask"
-            }
+            },
+            "description": "List of tasks for the day"
           },
           "personalCarCosts": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DailyPersonalCarCost"
-            }
+            },
+            "description": "List of personal car costs for the day"
           }
         }
       },
@@ -1466,19 +1505,24 @@
         "properties": {
           "Date": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Date of the task"
           },
           "UserId": {
-            "type": "integer"
+            "type": "integer",
+            "description": "User ID"
           },
           "ProjectId": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Project ID"
           },
           "Duration": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Duration of the task in minutes"
           },
           "Description": {
-            "type": "string"
+            "type": "string",
+            "description": "Description of the task"
           }
         }
       },
@@ -1487,22 +1531,24 @@
         "properties": {
           "Date": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Date of the cost"
           },
           "UserId": {
-            "type": "integer"
+            "type": "integer",
+            "description": "User ID"
           },
-          "ProjectID": {
-            "type": "integer"
-          },
-          "Kilometers": {
-            "type": "integer"
+          "ProjectId": {
+            "type": "integer",
+            "description": "Project ID"
           },
           "Cost": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Cost amount"
           },
           "Description": {
-            "type": "string"
+            "type": "string",
+            "description": "Description of the cost"
           }
         }
       },
