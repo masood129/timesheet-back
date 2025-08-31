@@ -169,7 +169,7 @@ router.get('/report-ids/jalali/:year/:month', checkRole(['user', 'group_manager'
  *         description: Server error
  */
 router.delete('/:reportId/exit-draft', checkRole(['user']), validateReportId, async (req, res) => {
-    const {reportId} = req.params;
+    const { reportId } = req.params;
     const userId = req.user.userId;
 
     try {
@@ -182,8 +182,7 @@ router.delete('/:reportId/exit-draft', checkRole(['user']), validateReportId, as
             .query(`
                 SELECT Status
                 FROM MonthlyReports
-                WHERE ReportId = @reportId
-                  AND UserId = @userId
+                WHERE ReportId = @reportId AND UserId = @userId
             `);
 
         if (reportResult.recordset.length === 0) {
@@ -236,8 +235,8 @@ router.delete('/:reportId/exit-draft', checkRole(['user']), validateReportId, as
  *       500: { description: Server error }
  */
 router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_manager', 'finance_manager']), validateReportId, async (req, res) => {
-    const {reportId} = req.params;
-    const {comment} = req.body;
+    const { reportId } = req.params;
+    const { comment } = req.body;
     const userId = req.user.userId;
     const role = req.user.role;
 
@@ -276,10 +275,10 @@ router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_ma
         // بروزرسانی وضعیت به draft و اضافه کردن کامنت
         let updateQuery = `
             UPDATE MonthlyReports
-            SET Status               = 'draft',
+            SET Status = 'draft',
                 GeneralManagerStatus = 'pending',
-                SubmittedAt          = NULL,
-                ApprovedAt           = NULL
+                SubmittedAt = NULL,
+                ApprovedAt = NULL
         `;
         if (role === 'finance_manager') {
             updateQuery += `, FinanceComment = ISNULL(FinanceComment + '\n', '') + @comment`;
@@ -342,7 +341,7 @@ router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_ma
  */
 router.get('/check-submitted/jalali/:year/:month', checkRole(['user']), async (req, res) => {
     try {
-        const {year, month} = req.params;
+        const { year, month } = req.params;
         const userId = req.user.userId;
 
         const jy = parseInt(year);
@@ -361,7 +360,7 @@ router.get('/check-submitted/jalali/:year/:month', checkRole(['user']), async (r
 
         const status = result.recordset.length > 0 ? result.recordset[0].Status : null;
 
-        res.json({status});
+        res.json({ status });
     } catch (err) {
         console.error('Error in GET /monthly-reports/check-submitted/jalali/:year/:month:', err.message);
         res.status(500).send('Server error');
@@ -392,7 +391,7 @@ router.get('/check-submitted/jalali/:year/:month', checkRole(['user']), async (r
  */
 router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
     const userId = req.user.userId; // Changed: Use authenticated userId instead of body
-    const {year, month, cost, hours} = req.body;
+    const { year, month, cost, hours } = req.body;
     if (!year || !month || !cost) {
         return res.status(400).send('Missing required fields');
     }
@@ -414,7 +413,7 @@ router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
                     OUTPUT INSERTED.*
                     VALUES (@userId, @year, @month, @cost, @hours)
             `);
-        res.status(201).json(result.recordset[0] || {message: 'Gym cost saved'});
+        res.status(201).json(result.recordset[0] || { message: 'Gym cost saved' });
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -454,7 +453,7 @@ router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
  */
 router.post('/monthly-gym-costs/jalali', checkRole(['user']), async (req, res) => {
     const userId = req.user.userId; // Changed: Use authenticated userId instead of body
-    const {year, month, cost, hours} = req.body;
+    const { year, month, cost, hours } = req.body;
 
     // اعتبارسنجی ورودی‌ها
     if (!year || !month || !cost || isNaN(year) || isNaN(month) || month < 1 || month > 12) {
@@ -486,7 +485,7 @@ router.post('/monthly-gym-costs/jalali', checkRole(['user']), async (req, res) =
                     VALUES (@userId, @gregorianYear, @gregorianMonth, @cost, @hours)
             `);
 
-        res.status(201).json(result.recordset[0] || {message: 'Gym cost saved with Jalali date'});
+        res.status(201).json(result.recordset[0] || { message: 'Gym cost saved with Jalali date' });
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -539,25 +538,53 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
         const gymCost = gymResult.recordset[0]?.Cost || 0;
         // const gymHours = gymResult.recordset[0]?.GymHours || 0;  // مثال: اگر در گزارش نیاز باشه
 
-        const result = await pool.request()
+        // Check for existing report
+        const existingReport = await pool.request()
             .input('userId', sql.Int, userId)
             .input('year', sql.Int, year)
             .input('month', sql.Int, month)
-            .input('totalHours', sql.Int, totalHours)
-            .input('gymCost', sql.Int, gymCost)
-            .input('groupId', sql.Int, groupId)
             .query(`
-                IF EXISTS (SELECT 1 FROM MonthlyReports WHERE UserId = @userId AND Year = @year AND Month = @month)
+                SELECT Status
+                FROM MonthlyReports
+                WHERE UserId = @userId AND Year = @year AND Month = @month
+            `);
+
+        if (existingReport.recordset.length > 0) {
+            const status = existingReport.recordset[0].Status;
+            if (status !== 'draft') {
+                return res.status(400).send('Report already submitted and cannot be updated');
+            }
+            // Update if draft
+            const updateResult = await pool.request()
+                .input('userId', sql.Int, userId)
+                .input('year', sql.Int, year)
+                .input('month', sql.Int, month)
+                .input('totalHours', sql.Int, totalHours)
+                .input('gymCost', sql.Int, gymCost)
+                .input('groupId', sql.Int, groupId)
+                .query(`
                     UPDATE MonthlyReports 
                     SET TotalHours = @totalHours, GymCost = @gymCost, Status = 'draft', GroupId = @groupId 
                     OUTPUT INSERTED.*
-                    WHERE UserId = @userId AND Year = @year AND Month = @month
-                ELSE
+                    WHERE UserId = @userId AND Year = @year AND Month = @month AND Status = 'draft'
+                `);
+            res.status(201).json(updateResult.recordset[0]);
+        } else {
+            // Insert new
+            const insertResult = await pool.request()
+                .input('userId', sql.Int, userId)
+                .input('year', sql.Int, year)
+                .input('month', sql.Int, month)
+                .input('totalHours', sql.Int, totalHours)
+                .input('gymCost', sql.Int, gymCost)
+                .input('groupId', sql.Int, groupId)
+                .query(`
                     INSERT INTO MonthlyReports (UserId, Year, Month, TotalHours, GymCost, Status, GroupId) 
                     OUTPUT INSERTED.*
                     VALUES (@userId, @year, @month, @totalHours, @gymCost, 'draft', @groupId)
-            `);
-        res.status(201).json(result.recordset[0] || {message: 'Report created or updated'});
+                `);
+            res.status(201).json(insertResult.recordset[0]);
+        }
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -626,28 +653,57 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
         const gymCost = gymResult.recordset[0]?.Cost || 0;
         // const gymHours = gymResult.recordset[0]?.GymHours || 0;  // مثال: اگر در گزارش نیاز باشه
 
-        // تغییر: چک وجود رکورد و آپدیت اگر وجود داشت (بر اساس سال/ماه جلالی یا میلادی، بسته به نیاز - اینجا بر اساس میلادی چک کردم)
-        const result = await pool.request()
+        // Check for existing report
+        const existingReport = await pool.request()
             .input('userId', sql.Int, userId)
             .input('year', sql.Int, gregorianYear)
             .input('month', sql.Int, gregorianMonth)
-            .input('jalaliYear', sql.Int, jalaliYear)
-            .input('jalaliMonth', sql.Int, jalaliMonth)
-            .input('totalHours', sql.Int, totalHours)
-            .input('gymCost', sql.Int, gymCost)
-            .input('groupId', sql.Int, groupId)
             .query(`
-                IF EXISTS (SELECT 1 FROM MonthlyReports WHERE UserId = @userId AND Year = @year AND Month = @month)
+                SELECT Status
+                FROM MonthlyReports
+                WHERE UserId = @userId AND Year = @year AND Month = @month
+            `);
+
+        if (existingReport.recordset.length > 0) {
+            const status = existingReport.recordset[0].Status;
+            if (status !== 'draft') {
+                return res.status(400).send('Report already submitted and cannot be updated');
+            }
+            // Update if draft
+            const updateResult = await pool.request()
+                .input('userId', sql.Int, userId)
+                .input('year', sql.Int, gregorianYear)
+                .input('month', sql.Int, gregorianMonth)
+                .input('jalaliYear', sql.Int, jalaliYear)
+                .input('jalaliMonth', sql.Int, jalaliMonth)
+                .input('totalHours', sql.Int, totalHours)
+                .input('gymCost', sql.Int, gymCost)
+                .input('groupId', sql.Int, groupId)
+                .query(`
                     UPDATE MonthlyReports 
                     SET JalaliYear = @jalaliYear, JalaliMonth = @jalaliMonth, TotalHours = @totalHours, GymCost = @gymCost, Status = 'draft', GroupId = @groupId 
                     OUTPUT INSERTED.*
-                    WHERE UserId = @userId AND Year = @year AND Month = @month
-                ELSE
+                    WHERE UserId = @userId AND Year = @year AND Month = @month AND Status = 'draft'
+                `);
+            res.status(201).json(updateResult.recordset[0]);
+        } else {
+            // Insert new
+            const insertResult = await pool.request()
+                .input('userId', sql.Int, userId)
+                .input('year', sql.Int, gregorianYear)
+                .input('month', sql.Int, gregorianMonth)
+                .input('jalaliYear', sql.Int, jalaliYear)
+                .input('jalaliMonth', sql.Int, jalaliMonth)
+                .input('totalHours', sql.Int, totalHours)
+                .input('gymCost', sql.Int, gymCost)
+                .input('groupId', sql.Int, groupId)
+                .query(`
                     INSERT INTO MonthlyReports (UserId, Year, Month, JalaliYear, JalaliMonth, TotalHours, GymCost, Status, GroupId) 
                     OUTPUT INSERTED.*
                     VALUES (@userId, @year, @month, @jalaliYear, @jalaliMonth, @totalHours, @gymCost, 'draft', @groupId)
-            `);
-        res.status(201).json(result.recordset[0] || {message: 'Report created or updated with Jalali date'});
+                `);
+            res.status(201).json(insertResult.recordset[0]);
+        }
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -1061,7 +1117,8 @@ router.get('/group/range/:startYear/:startMonth/:endYear/:endMonth', checkRole([
         const eYear = parseInt(endYear);
         const eMonth = parseInt(endMonth);
 
-        if (isNaN(sYear) || isNaN(sMonth) || isNaN(eYear) || isNaN(eMonth) || sMonth < 1 || sMonth > 12 || eMonth < 1 || eMonth > 12) {
+        if (isNaN(sYear) || isNaN(sMonth) || isNaN(eYear) || isNaN(eMonth) ||
+            sMonth < 1 || sMonth > 12 || eMonth < 1 || eMonth > 12) {
             return res.status(400).send('Invalid year or month');
         }
 
