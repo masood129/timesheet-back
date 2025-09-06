@@ -176,7 +176,7 @@ router.get('/jalali/month/:year/:month', async (req, res) => {
  *         description: End date of the range (YYYY-MM-DD)
  *     responses:
  *       200:
- *         description: Daily details for the date range
+ *         description: Daily details for the range
  *         content:
  *           application/json:
  *             schema:
@@ -184,30 +184,60 @@ router.get('/jalali/month/:year/:month', async (req, res) => {
  *               items:
  *                 $ref: '#/components/schemas/DailyDetail'
  *       400:
- *         description: Invalid input (e.g., invalid dates)
+ *         description: Invalid input (e.g., missing or invalid parameters)
  *       500:
  *         description: Server error
  */
 router.get('/range', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const {startDate: startDateStr, endDate: endDateStr} = req.query;
+        const {startDate, endDate} = req.query;
         const userId = req.user.userId;
 
-        const startDate = parseDate(startDateStr);
-        const endDate = parseDate(endDateStr);
-
         if (!startDate || !endDate) {
-            return res.status(400).send('Invalid startDate or endDate');
+            return res.status(400).send('startDate and endDate are required');
         }
+
+        if (startDate === 'range' || endDate === 'range') {
+            return res.status(400).send('Invalid input: "range" detected in date parameters');
+        }
+
+        if (!isValidDate(startDate) || !isValidDate(endDate)) {
+            return res.status(400).send('Invalid date format. Use YYYY-MM-DD or ISO 8601');
+        }
+
+        const parsedStartDate = parseDate(startDate);
+        const parsedEndDate = parseDate(endDate);
+
+        if (!parsedStartDate || !parsedEndDate) {
+            return res.status(400).send('Invalid date parameters');
+        }
+
+        if (parsedStartDate > parsedEndDate) {
+            return res.status(400).send('startDate must be before endDate');
+        }
+
+        const adjustedEndDate = DateTime.fromJSDate(parsedEndDate, {zone: 'Asia/Tehran'})
+            .plus({days: 1})
+            .startOf('day')
+            .toJSDate();
 
         const detailResult = await pool
             .request()
-            .input('startDate', sql.Date, startDate)
-            .input('endDate', sql.Date, endDate)
+            .input('startDate', sql.Date, parsedStartDate)
+            .input('endDate', sql.Date, adjustedEndDate)
             .input('userId', sql.Int, userId)
             .query(`
-                SELECT *
+                SELECT Date,
+                    CAST(Date AS DATE) AS DateOnly,
+                    UserId,
+                    LeaveType,
+                    ArrivalTime,
+                    LeaveTime,
+                    PersonalTime,
+                    Description,
+                    GoCost,
+                    ReturnCost
                 FROM DailyDetails
                 WHERE CAST(Date AS DATE) >= @startDate
                   AND CAST(Date AS DATE) <= @endDate
@@ -221,6 +251,7 @@ router.get('/range', async (req, res) => {
                 console.warn(`Skipping record with invalid date: ${detail.Date}`);
                 continue;
             }
+
             const tasksResult = await pool
                 .request()
                 .input('date', sql.Date, detail.Date)
@@ -272,9 +303,113 @@ router.get('/range', async (req, res) => {
 
 /**
  * @swagger
+ * /daily-details/{date}:
+ *   get:
+ *     summary: Get daily details for a specific date
+ *     tags: [DailyDetails]
+ *     parameters:
+ *       - in: path
+ *         name: date
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Date for the daily details (YYYY-MM-DD)
+ *     responses:
+ *       200:
+ *         description: Daily details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DailyDetail'
+ *       400:
+ *         description: Invalid date format
+ *       404:
+ *         description: Daily details not found
+ *       500:
+ *         description: Server error
+ */
+router.get('/:date', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const {date} = req.params;
+        const userId = req.user.userId;
+
+        if (!isValidDate(date)) {
+            return res.status(400).send('Invalid date format. Use YYYY-MM-DD or ISO 8601');
+        }
+
+        const parsedDate = parseDate(date);
+
+        if (!parsedDate) {
+            return res.status(400).send('Invalid date parameter');
+        }
+
+        const detailResult = await pool
+            .request()
+            .input('date', sql.Date, parsedDate)
+            .input('userId', sql.Int, userId)
+            .query('SELECT * FROM DailyDetails WHERE Date = @date AND UserId = @userId');
+
+        if (detailResult.recordset.length === 0) {
+            return res.status(404).send('Daily details not found');
+        }
+
+        const detail = detailResult.recordset[0];
+
+        const tasksResult = await pool
+            .request()
+            .input('date', sql.Date, parsedDate)
+            .input('userId', sql.Int, userId)
+            .query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
+
+        const carCostsResult = await pool
+            .request()
+            .input('date', sql.Date, parsedDate)
+            .input('userId', sql.Int, userId)
+            .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
+
+        const detailDate = DateTime.fromJSDate(parsedDate, {zone: 'Asia/Tehran'});
+
+        if (detail.ArrivalTime) {
+            const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
+            detail.ArrivalTime = DateTime.fromObject({
+                year: detailDate.year,
+                month: detailDate.month,
+                day: detailDate.day,
+                hour: hours,
+                minute: minutes,
+                second: seconds,
+            }, {zone: 'Asia/Tehran'}).toISO();
+        }
+        if (detail.LeaveTime) {
+            const [hours, minutes, seconds = '00'] = detail.LeaveTime.split(':').map(Number);
+            detail.LeaveTime = DateTime.fromObject({
+                year: detailDate.year,
+                month: detailDate.month,
+                day: detailDate.day,
+                hour: hours,
+                minute: minutes,
+                second: seconds,
+            }, {zone: 'Asia/Tehran'}).toISO();
+        }
+
+        const response = {
+            ...detail, tasks: tasksResult.recordset, personalCarCosts: carCostsResult.recordset,
+        };
+
+        res.json(response);
+    } catch (err) {
+        console.error(`Error in GET /daily-details/:date: ${err.message}`);
+        res.status(500).send(`Server error: ${err.message}`);
+    }
+});
+
+/**
+ * @swagger
  * /daily-details:
  *   post:
- *     summary: Create or update daily details, including tasks and personal car costs
+ *     summary: Create or update daily details
  *     tags: [DailyDetails]
  *     requestBody:
  *       required: true
@@ -290,33 +425,11 @@ router.get('/range', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/DailyDetail'
  *       400:
- *         description: Invalid input (e.g., invalid date or leaveType)
+ *         description: Invalid input
  *       500:
  *         description: Server error
  */
 router.post('/', async (req, res) => {
-    const userId = req.user.userId;
-    const {
-        date: dateStr,
-        arrivalTime,
-        leaveTime,
-        goCost,
-        returnCost,
-        leaveType,
-        tasks = [],
-        personalCarCosts = []
-    } = req.body;
-
-    const allowedLeaveTypes = ['work', 'annual_leave', 'sick_leave', 'gift_leave'];
-    if (leaveType && !allowedLeaveTypes.includes(leaveType)) {
-        return res.status(400).send('Invalid LeaveType');
-    }
-
-    const date = parseDate(dateStr);
-    if (!date) {
-        return res.status(400).send('Invalid date format');
-    }
-
     let transaction;
     let transactionBegun = false;
     try {
@@ -325,88 +438,149 @@ router.post('/', async (req, res) => {
         await transaction.begin();
         transactionBegun = true;
 
-        const request = new sql.Request(transaction);
+        const {
+            date,
+            arrivalTime,
+            leaveTime,
+            leaveType,
+            personalTime,
+            description,
+            goCost,
+            returnCost,
+            tasks = [],
+            personalCarCosts = [],
+        } = req.body;
+        const userId = req.user.userId;
 
-        // Insert or update DailyDetails
-        let detailResult = await request
-            .input('userId', sql.Int, userId)
-            .input('date', sql.Date, date)
-            .input('arrivalTime', sql.NVarChar, arrivalTime || null)
-            .input('leaveTime', sql.NVarChar, leaveTime || null)
-            .input('goCost', sql.Int, goCost || null)
-            .input('returnCost', sql.Int, returnCost || null)
-            .input('leaveType', sql.NVarChar, leaveType || null)
-            .query(`
-                IF EXISTS (SELECT 1 FROM DailyDetails WHERE UserId = @userId AND Date = @date)
-                    UPDATE DailyDetails
-                    SET ArrivalTime = @arrivalTime,
-                        LeaveTime = @leaveTime,
-                        GoCost = @goCost,
-                        ReturnCost = @returnCost,
-                        LeaveType = @leaveType
-                    OUTPUT INSERTED.*
-                    WHERE UserId = @userId AND Date = @date
-                ELSE
-                    INSERT INTO DailyDetails (UserId, Date, ArrivalTime, LeaveTime, GoCost, ReturnCost, LeaveType)
-                    OUTPUT INSERTED.*
-                    VALUES (@userId, @date, @arrivalTime, @leaveTime, @goCost, @returnCost, @leaveType)
-            `);
-
-        const detail = detailResult.recordset[0];
-
-        // Delete existing tasks and personal car costs for this date
-        await request
-            .input('date', sql.Date, date)
-            .input('userId', sql.Int, userId)
-            .query('DELETE FROM DailyProjectTasks WHERE UserId = @userId AND Date = @date');
-
-        await request
-            .input('date', sql.Date, date)
-            .input('userId', sql.Int, userId)
-            .query('DELETE FROM DailyPersonalCarCosts WHERE UserId = @userId AND Date = @date');
-
-        // Insert new tasks
-        for (const task of tasks) {
-            await request
-                .input('userId', sql.Int, userId)
-                .input('date', sql.Date, date)
-                .input('projectId', sql.Int, task.projectId)
-                .input('duration', sql.Int, task.duration)
-                .input('description', sql.NVarChar, task.description || null)
-                .query(`
-                    INSERT INTO DailyProjectTasks (UserId, Date, ProjectId, Duration, Description)
-                    VALUES (@userId, @date, @projectId, @duration, @description)
-                `);
+        const allowedLeaveTypes = ['work', 'annual_leave', 'sick_leave', 'gift_leave']; // اضافه از new
+        if (leaveType && !allowedLeaveTypes.includes(leaveType)) {
+            return res.status(400).send('Invalid LeaveType');
         }
 
-        // Insert new personal car costs
-        for (const carCost of personalCarCosts) {
-            await request
-                .input('userId', sql.Int, userId)
-                .input('date', sql.Date, date)
-                .input('projectId', sql.Int, carCost.projectId)
-                .input('cost', sql.Int, carCost.cost)
-                .input('description', sql.NVarChar, carCost.description || null)
-                .query(`
-                    INSERT INTO DailyPersonalCarCosts (UserId, Date, ProjectId, Cost, Description)
-                    VALUES (@userId, @date, @projectId, @cost, @description)
-                `);
+        if (!date || !isValidDate(date)) {
+            return res.status(400).send('Valid date is required');
+        }
+
+        const parsedDate = parseDate(date);
+        if (!parsedDate) {
+            return res.status(400).send('Invalid date format');
+        }
+
+        // تبدیل فرمت زمان به HH:mm:ss
+        const formatTime = (isoTime) => {
+            if (!isoTime) return null;
+            const dt = DateTime.fromISO(isoTime, {zone: 'Asia/Tehran'});
+            if (!dt.isValid) return null;
+            return dt.toFormat('HH:mm:ss');
+        };
+
+        const formattedArrivalTime = formatTime(arrivalTime);
+        const formattedLeaveTime = formatTime(leaveTime);
+
+        if (arrivalTime && !formattedArrivalTime) {
+            return res.status(400).send('Invalid arrivalTime format. Use ISO 8601');
+        }
+        if (leaveTime && !formattedLeaveTime) {
+            return res.status(400).send('Invalid leaveTime format. Use ISO 8601');
+        }
+
+        if (tasks.length > 0) {
+            for (const task of tasks) {
+                if (!task.projectId || !task.duration) {
+                    return res.status(400).send('Each task must have projectId and duration');
+                }
+            }
+        }
+
+        if (personalCarCosts.length > 0) {
+            for (const cost of personalCarCosts) {
+                if (!cost.projectId || !cost.cost || !cost.kilometers) { // kilometers برگردانده شد
+                    return res.status(400).send('Each personal car cost must have projectId, cost, and kilometers');
+                }
+            }
+        }
+
+        // ترکیب UPDATE/INSERT با IF EXISTS از new
+        const request = new sql.Request(transaction);
+        request.input('date', sql.Date, parsedDate);
+        request.input('userId', sql.Int, userId);
+        request.input('arrivalTime', sql.NVarChar, formattedArrivalTime || null);
+        request.input('leaveTime', sql.NVarChar, formattedLeaveTime || null);
+        request.input('leaveType', sql.NVarChar, leaveType || null);
+        request.input('personalTime', sql.Int, personalTime || null); // برگردانده شد
+        request.input('description', sql.NVarChar, description || null); // برگردانده شد
+        request.input('goCost', sql.Int, goCost || null);
+        request.input('returnCost', sql.Int, returnCost || null);
+
+        const detailResult = await request.query(`
+            IF EXISTS (SELECT 1 FROM DailyDetails WHERE Date = @date AND UserId = @userId)
+                UPDATE DailyDetails
+                SET ArrivalTime = @arrivalTime,
+                    LeaveTime = @leaveTime,
+                    LeaveType = @leaveType,
+                    PersonalTime = @personalTime,
+                    Description = @description,
+                    GoCost = @goCost,
+                    ReturnCost = @returnCost
+                OUTPUT INSERTED.*
+                WHERE Date = @date AND UserId = @userId
+            ELSE
+                INSERT INTO DailyDetails (Date, UserId, ArrivalTime, LeaveTime, LeaveType,
+                                          PersonalTime, Description, GoCost, ReturnCost)
+                OUTPUT INSERTED.*
+                VALUES (@date, @userId, @arrivalTime, @leaveTime, @leaveType,
+                        @personalTime, @description, @goCost, @returnCost)
+        `);
+
+        const deleteTasksRequest = transaction.request();
+        deleteTasksRequest.input('date', sql.Date, parsedDate);
+        deleteTasksRequest.input('userId', sql.Int, userId);
+        await deleteTasksRequest.query('DELETE FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
+
+        const deleteCarCostsRequest = transaction.request();
+        deleteCarCostsRequest.input('date', sql.Date, parsedDate);
+        deleteCarCostsRequest.input('userId', sql.Int, userId);
+        await deleteCarCostsRequest.query('DELETE FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
+
+        for (const task of tasks) {
+            const taskRequest = transaction.request();
+            taskRequest.input('date', sql.Date, parsedDate);
+            taskRequest.input('userId', sql.Int, userId);
+            taskRequest.input('projectId', sql.Int, task.projectId);
+            taskRequest.input('duration', sql.Int, task.duration);
+            taskRequest.input('description', sql.NVarChar, task.description || null);
+            await taskRequest.query(`
+                INSERT INTO DailyProjectTasks (Date, UserId, ProjectId, Duration, Description)
+                VALUES (@date, @userId, @projectId, @duration, @description)
+            `);
+        }
+
+        for (const cost of personalCarCosts) {
+            const costRequest = transaction.request();
+            costRequest.input('date', sql.Date, parsedDate);
+            costRequest.input('userId', sql.Int, userId);
+            costRequest.input('projectId', sql.Int, cost.projectId);
+            costRequest.input('kilometers', sql.Int, cost.kilometers || null); // برگردانده شد
+            costRequest.input('cost', sql.Int, cost.cost);
+            costRequest.input('description', sql.NVarChar, cost.description || null);
+            await costRequest.query(`
+                INSERT INTO DailyPersonalCarCosts (Date, UserId, ProjectID, Kilometers, Cost, Description)
+                VALUES (@date, @userId, @projectId, @kilometers, @cost, @description)
+            `);
         }
 
         await transaction.commit();
 
-        // Fetch updated data to return
-        const tasksResult = await pool.request()
-            .input('date', sql.Date, date)
-            .input('userId', sql.Int, userId)
-            .query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
+        const fetchRequest = pool.request();
+        fetchRequest.input('date', sql.Date, parsedDate);
+        fetchRequest.input('userId', sql.Int, userId);
+        const detailResultFetch = await fetchRequest.query('SELECT * FROM DailyDetails WHERE Date = @date AND UserId = @userId');
+        const detail = detailResultFetch.recordset[0];
 
-        const carCostsResult = await pool.request()
-            .input('date', sql.Date, date)
-            .input('userId', sql.Int, userId)
-            .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
+        const tasksResult = await fetchRequest.query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
+        const carCostsResult = await fetchRequest.query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
-        const detailDate = DateTime.fromJSDate(detail.Date, {zone: 'Asia/Tehran'});
+        const detailDate = DateTime.fromJSDate(parsedDate, {zone: 'Asia/Tehran'});
 
         if (detail.ArrivalTime) {
             const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);

@@ -186,7 +186,7 @@ router.get('/report-ids/jalali/:year/:month', checkRole(['user', 'group_manager'
 
 /**
  * @swagger
- * /monthly-reports/{reportId}/exit-draft:
+ * /monthly-reports/exit-draft/{reportId}:
  *   delete:
  *     summary: Exit from draft state by deleting the draft monthly report (by user)
  *     tags: [MonthlyReports]
@@ -211,7 +211,7 @@ router.get('/report-ids/jalali/:year/:month', checkRole(['user', 'group_manager'
  *       500:
  *         description: Server error
  */
-router.delete('/:reportId/exit-draft', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), validateReportId, async (req, res) => {
+router.delete('/exit-draft/:reportId', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), validateReportId, async (req, res) => {
     const {reportId} = req.params;
     const userId = req.user.userId;
 
@@ -433,7 +433,7 @@ router.get('/check-submitted/jalali/:year/:month', checkRole(['user', 'group_man
  *       400: { description: Invalid input }
  *       500: { description: Server error }
  */
-router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
+router.post('/monthly-gym-costs', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), async (req, res) => {
     const userId = req.user.userId; // Changed: Use authenticated userId instead of body
     const {year, month, cost, hours} = req.body;
     if (!year || !month || !cost) {
@@ -507,7 +507,7 @@ router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.post('/monthly-gym-costs/jalali', checkRole(['user']), async (req, res) => {
+router.post('/monthly-gym-costs/jalali', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), async (req, res) => {
     const userId = req.user.userId; // Changed: Use authenticated userId instead of body
     const {year, month, cost, hours} = req.body;
 
