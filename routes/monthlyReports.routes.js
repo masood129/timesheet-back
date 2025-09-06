@@ -40,7 +40,7 @@ const validateReportId = (req, res, next) => {
  *       500:
  *         description: Server error
  */
-router.get('/my-drafts', checkRole(['user']), async (req, res) => {
+router.get('/my-drafts', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), async (req, res) => {
     const userId = req.user.userId;
 
     try {
@@ -168,8 +168,8 @@ router.get('/report-ids/jalali/:year/:month', checkRole(['user', 'group_manager'
  *       500:
  *         description: Server error
  */
-router.delete('/:reportId/exit-draft', checkRole(['user']), validateReportId, async (req, res) => {
-    const { reportId } = req.params;
+router.delete('/exit-draft/:reportId', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), validateReportId, async (req, res) => {
+    const {reportId} = req.params;
     const userId = req.user.userId;
 
     try {
@@ -182,7 +182,8 @@ router.delete('/:reportId/exit-draft', checkRole(['user']), validateReportId, as
             .query(`
                 SELECT Status
                 FROM MonthlyReports
-                WHERE ReportId = @reportId AND UserId = @userId
+                WHERE ReportId = @reportId
+                  AND UserId = @userId
             `);
 
         if (reportResult.recordset.length === 0) {
@@ -235,8 +236,8 @@ router.delete('/:reportId/exit-draft', checkRole(['user']), validateReportId, as
  *       500: { description: Server error }
  */
 router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_manager', 'finance_manager']), validateReportId, async (req, res) => {
-    const { reportId } = req.params;
-    const { comment } = req.body;
+    const {reportId} = req.params;
+    const {comment} = req.body;
     const userId = req.user.userId;
     const role = req.user.role;
 
@@ -275,10 +276,10 @@ router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_ma
         // بروزرسانی وضعیت به draft و اضافه کردن کامنت
         let updateQuery = `
             UPDATE MonthlyReports
-            SET Status = 'draft',
+            SET Status               = 'draft',
                 GeneralManagerStatus = 'pending',
-                SubmittedAt = NULL,
-                ApprovedAt = NULL
+                SubmittedAt          = NULL,
+                ApprovedAt           = NULL
         `;
         if (role === 'finance_manager') {
             updateQuery += `, FinanceComment = ISNULL(FinanceComment + '\n', '') + @comment`;
@@ -339,9 +340,9 @@ router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_ma
  *       500:
  *         description: Server error
  */
-router.get('/check-submitted/jalali/:year/:month', checkRole(['user']), async (req, res) => {
+router.get('/check-submitted/jalali/:year/:month', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), async (req, res) => {
     try {
-        const { year, month } = req.params;
+        const {year, month} = req.params;
         const userId = req.user.userId;
 
         const jy = parseInt(year);
@@ -360,7 +361,7 @@ router.get('/check-submitted/jalali/:year/:month', checkRole(['user']), async (r
 
         const status = result.recordset.length > 0 ? result.recordset[0].Status : null;
 
-        res.json({ status });
+        res.json({status});
     } catch (err) {
         console.error('Error in GET /monthly-reports/check-submitted/jalali/:year/:month:', err.message);
         res.status(500).send('Server error');
@@ -391,7 +392,7 @@ router.get('/check-submitted/jalali/:year/:month', checkRole(['user']), async (r
  */
 router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
     const userId = req.user.userId; // Changed: Use authenticated userId instead of body
-    const { year, month, cost, hours } = req.body;
+    const {year, month, cost, hours} = req.body;
     if (!year || !month || !cost) {
         return res.status(400).send('Missing required fields');
     }
@@ -413,7 +414,7 @@ router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
                     OUTPUT INSERTED.*
                     VALUES (@userId, @year, @month, @cost, @hours)
             `);
-        res.status(201).json(result.recordset[0] || { message: 'Gym cost saved' });
+        res.status(201).json(result.recordset[0] || {message: 'Gym cost saved'});
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -453,7 +454,7 @@ router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
  */
 router.post('/monthly-gym-costs/jalali', checkRole(['user']), async (req, res) => {
     const userId = req.user.userId; // Changed: Use authenticated userId instead of body
-    const { year, month, cost, hours } = req.body;
+    const {year, month, cost, hours} = req.body;
 
     // اعتبارسنجی ورودی‌ها
     if (!year || !month || !cost || isNaN(year) || isNaN(month) || month < 1 || month > 12) {
@@ -485,7 +486,7 @@ router.post('/monthly-gym-costs/jalali', checkRole(['user']), async (req, res) =
                     VALUES (@userId, @gregorianYear, @gregorianMonth, @cost, @hours)
             `);
 
-        res.status(201).json(result.recordset[0] || { message: 'Gym cost saved with Jalali date' });
+        res.status(201).json(result.recordset[0] || {message: 'Gym cost saved with Jalali date'});
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -546,7 +547,9 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
             .query(`
                 SELECT Status
                 FROM MonthlyReports
-                WHERE UserId = @userId AND Year = @year AND Month = @month
+                WHERE UserId = @userId
+                  AND Year = @year
+                  AND Month = @month
             `);
 
         if (existingReport.recordset.length > 0) {
@@ -563,10 +566,16 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
                 .input('gymCost', sql.Int, gymCost)
                 .input('groupId', sql.Int, groupId)
                 .query(`
-                    UPDATE MonthlyReports 
-                    SET TotalHours = @totalHours, GymCost = @gymCost, Status = 'draft', GroupId = @groupId 
+                    UPDATE MonthlyReports
+                    SET TotalHours = @totalHours,
+                        GymCost    = @gymCost,
+                        Status     = 'draft',
+                        GroupId    = @groupId
                     OUTPUT INSERTED.*
-                    WHERE UserId = @userId AND Year = @year AND Month = @month AND Status = 'draft'
+                    WHERE UserId = @userId
+                      AND Year = @year
+                      AND Month = @month
+                      AND Status = 'draft'
                 `);
             res.status(201).json(updateResult.recordset[0]);
         } else {
@@ -579,7 +588,7 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
                 .input('gymCost', sql.Int, gymCost)
                 .input('groupId', sql.Int, groupId)
                 .query(`
-                    INSERT INTO MonthlyReports (UserId, Year, Month, TotalHours, GymCost, Status, GroupId) 
+                    INSERT INTO MonthlyReports (UserId, Year, Month, TotalHours, GymCost, Status, GroupId)
                     OUTPUT INSERTED.*
                     VALUES (@userId, @year, @month, @totalHours, @gymCost, 'draft', @groupId)
                 `);
@@ -612,8 +621,7 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
  *       400: { description: Invalid input }
  *       500: { description: Server error }
  */
-router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general_manager']), async (req, res) => {
-    const {year, month} = req.params;
+router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), async (req, res) => {    const {year, month} = req.params;
     const userId = req.user.userId;
 
     try {
@@ -661,7 +669,9 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
             .query(`
                 SELECT Status
                 FROM MonthlyReports
-                WHERE UserId = @userId AND Year = @year AND Month = @month
+                WHERE UserId = @userId
+                  AND Year = @year
+                  AND Month = @month
             `);
 
         if (existingReport.recordset.length > 0) {
@@ -680,10 +690,18 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
                 .input('gymCost', sql.Int, gymCost)
                 .input('groupId', sql.Int, groupId)
                 .query(`
-                    UPDATE MonthlyReports 
-                    SET JalaliYear = @jalaliYear, JalaliMonth = @jalaliMonth, TotalHours = @totalHours, GymCost = @gymCost, Status = 'draft', GroupId = @groupId 
+                    UPDATE MonthlyReports
+                    SET JalaliYear  = @jalaliYear,
+                        JalaliMonth = @jalaliMonth,
+                        TotalHours  = @totalHours,
+                        GymCost     = @gymCost,
+                        Status      = 'draft',
+                        GroupId     = @groupId
                     OUTPUT INSERTED.*
-                    WHERE UserId = @userId AND Year = @year AND Month = @month AND Status = 'draft'
+                    WHERE UserId = @userId
+                      AND Year = @year
+                      AND Month = @month
+                      AND Status = 'draft'
                 `);
             res.status(201).json(updateResult.recordset[0]);
         } else {
@@ -698,7 +716,8 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
                 .input('gymCost', sql.Int, gymCost)
                 .input('groupId', sql.Int, groupId)
                 .query(`
-                    INSERT INTO MonthlyReports (UserId, Year, Month, JalaliYear, JalaliMonth, TotalHours, GymCost, Status, GroupId) 
+                    INSERT INTO MonthlyReports (UserId, Year, Month, JalaliYear, JalaliMonth, TotalHours, GymCost,
+                                                Status, GroupId)
                     OUTPUT INSERTED.*
                     VALUES (@userId, @year, @month, @jalaliYear, @jalaliMonth, @totalHours, @gymCost, 'draft', @groupId)
                 `);
@@ -726,7 +745,7 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
  *       403: { description: Access denied }
  *       500: { description: Server error }
  */
-router.put('/:reportId/submit-to-group-manager', checkRole(['user', 'group_manager']), validateReportId, async (req, res) => {
+router.put('/:reportId/submit-to-group-manager', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), validateReportId, async (req, res) => {
     const {reportId} = req.params;
     const userId = req.user.userId;
     try {
