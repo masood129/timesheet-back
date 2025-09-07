@@ -48,14 +48,57 @@ router.get('/my-drafts', checkRole(['user', 'group_manager', 'general_manager', 
         const result = await pool.request()
             .input('userId', sql.Int, userId)
             .query(`
-                SELECT mr.*, u.Username
+                SELECT mr.*, u.Username, g.GroupName, m.Username AS ManagerUsername
                 FROM MonthlyReports mr
                          JOIN Users u ON mr.UserId = u.UserId
+                         LEFT JOIN Groups g ON mr.GroupId = g.GroupId
+                         LEFT JOIN Users m ON g.ManagerId = m.UserId
                 WHERE mr.UserId = @userId
                   AND mr.Status = 'draft'
             `);
 
-        res.json(result.recordset);
+        const drafts = result.recordset;
+
+        for (let report of drafts) {
+            // Get date range for the month using Jalali
+            const monthRange = getJalaliMonthRange(report.JalaliYear, report.JalaliMonth);
+            const startDate = monthRange.start;
+            const endDate = monthRange.end;
+
+            // Calculate commute costs (GoCost + ReturnCost) only for work days
+            const commuteResult = await pool.request()
+                .input('userId', sql.Int, userId)
+                .input('startDate', sql.Date, startDate)
+                .input('endDate', sql.Date, endDate)
+                .query(`
+                    SELECT SUM(ISNULL(GoCost, 0) + ISNULL(ReturnCost, 0)) AS TotalCommuteCost
+                    FROM DailyDetails
+                    WHERE UserId = @userId
+                      AND Date >= @startDate
+                      AND Date <= @endDate
+                      AND LeaveType = 'work'
+                `);
+            report.totalCommuteCost = commuteResult.recordset[0].TotalCommuteCost || 0;
+
+            // Calculate personal car costs per project only for work days
+            const carCostsResult = await pool.request()
+                .input('userId', sql.Int, userId)
+                .input('startDate', sql.Date, startDate)
+                .input('endDate', sql.Date, endDate)
+                .query(`
+                    SELECT dpc.ProjectID, SUM(ISNULL(dpc.Cost, 0)) AS TotalCost
+                    FROM DailyPersonalCarCosts dpc
+                             INNER JOIN DailyDetails dd ON dpc.Date = dd.Date AND dpc.UserId = dd.UserId
+                    WHERE dpc.UserId = @userId
+                      AND dpc.Date >= @startDate
+                      AND dpc.Date <= @endDate
+                      AND dd.LeaveType = 'work'
+                    GROUP BY dpc.ProjectID
+                `);
+            report.personalCarCostsByProject = carCostsResult.recordset;
+        }
+
+        res.json(drafts);
     } catch (err) {
         console.error('Error in GET /monthly-reports/my-drafts:', err.message);
         res.status(500).send('Server error');
@@ -168,14 +211,14 @@ router.get('/report-ids/jalali/:year/:month', checkRole(['user', 'group_manager'
  *       500:
  *         description: Server error
  */
-router.delete('/exit-draft/:reportId', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), validateReportId, async (req, res) => {
+router.delete('/:reportId/exit-draft', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), validateReportId, async (req, res) => {
     const {reportId} = req.params;
     const userId = req.user.userId;
 
     try {
         const pool = await poolPromise;
 
-        // چک کردن وجود گزارش و اینکه متعلق به کاربر باشد و در وضعیت draft باشد
+        // Check if the report exists and belongs to the user and is in draft status
         const reportResult = await pool.request()
             .input('reportId', sql.Int, reportId)
             .input('userId', sql.Int, userId)
@@ -195,7 +238,7 @@ router.delete('/exit-draft/:reportId', checkRole(['user', 'group_manager', 'gene
             return res.status(400).send('Only draft reports can be exited');
         }
 
-        // حذف گزارش برای خروج از حالت draft، با شرط اضافی Status = 'draft' برای امنیت بیشتر
+        // Delete the report to exit draft mode, with additional Status = 'draft' condition for extra security
         await pool.request()
             .input('reportId', sql.Int, reportId)
             .query('DELETE FROM MonthlyReports WHERE ReportId = @reportId AND Status = \'draft\'');
@@ -250,11 +293,11 @@ router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_ma
             WHERE mr.ReportId = @reportId
         `;
 
-        // محدود کردن دسترسی بر اساس نقش
+        // Limit access based on role
         if (role === 'group_manager') {
             query += ' AND g.ManagerId = @userId';
         }
-        // برای general_manager و finance_manager، دسترسی به همه (بدون شرط اضافی)
+        // For general_manager and finance_manager, access to all (no additional condition)
 
         const reportResult = await pool.request()
             .input('reportId', sql.Int, reportId)
@@ -273,7 +316,7 @@ router.put('/:reportId/reject-to-draft', checkRole(['group_manager', 'general_ma
             return res.status(400).send('Approved reports cannot be rejected');
         }
 
-        // بروزرسانی وضعیت به draft و اضافه کردن کامنت
+        // Update status to draft and add comment
         let updateQuery = `
             UPDATE MonthlyReports
             SET Status               = 'draft',
@@ -398,6 +441,18 @@ router.post('/monthly-gym-costs', checkRole(['user']), async (req, res) => {
     }
     try {
         const pool = await poolPromise;
+
+        // Check if a monthly report exists for this year/month
+        const existingReport = await pool.request()
+            .input('userId', sql.Int, userId)
+            .input('year', sql.Int, year)
+            .input('month', sql.Int, month)
+            .query('SELECT 1 FROM MonthlyReports WHERE UserId = @userId AND Year = @year AND Month = @month');
+
+        if (existingReport.recordset.length > 0) {
+            return res.status(400).send('گزارش ساعات ماهیانه برای این ماه وجود دارد');
+        }
+
         const result = await pool.request()
             .input('userId', sql.Int, userId)
             .input('year', sql.Int, year)
@@ -456,18 +511,30 @@ router.post('/monthly-gym-costs/jalali', checkRole(['user']), async (req, res) =
     const userId = req.user.userId; // Changed: Use authenticated userId instead of body
     const {year, month, cost, hours} = req.body;
 
-    // اعتبارسنجی ورودی‌ها
+    // Input validation
     if (!year || !month || !cost || isNaN(year) || isNaN(month) || month < 1 || month > 12) {
         return res.status(400).send('Invalid input');
     }
 
     try {
-        // تبدیل تاریخ جلالی به میلادی
+        // Convert Jalali date to Gregorian
         const monthRange = getJalaliMonthRange(year, month);
         const gregorianYear = monthRange.start.getFullYear();
         const gregorianMonth = monthRange.start.getMonth() + 1;
 
         const pool = await poolPromise;
+
+        // Check if a monthly report exists for this year/month
+        const existingReport = await pool.request()
+            .input('userId', sql.Int, userId)
+            .input('year', sql.Int, gregorianYear)
+            .input('month', sql.Int, gregorianMonth)
+            .query('SELECT 1 FROM MonthlyReports WHERE UserId = @userId AND Year = @year AND Month = @month');
+
+        if (existingReport.recordset.length > 0) {
+            return res.status(400).send('گزارش ساعات ماهیانه برای این ماه وجود دارد');
+        }
+
         const result = await pool.request()
             .input('userId', sql.Int, userId)
             .input('gregorianYear', sql.Int, gregorianYear)
@@ -528,7 +595,15 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
             .input('userId', sql.Int, userId)
             .input('year', sql.Int, year)
             .input('month', sql.Int, month)
-            .query('SELECT SUM(Duration) AS TotalHours FROM DailyProjectTasks WHERE UserId = @userId AND YEAR(Date) = @year AND MONTH(Date) = @month');
+            .query(`
+                SELECT SUM(dpt.Duration) AS TotalHours
+                FROM DailyProjectTasks dpt
+                         INNER JOIN DailyDetails dd ON dpt.Date = dd.Date AND dpt.UserId = dd.UserId
+                WHERE dpt.UserId = @userId
+                  AND YEAR(dpt.Date) = @year
+                  AND MONTH(dpt.Date) = @month
+                  AND dd.LeaveType = 'work'
+            `);
         const totalHours = hoursResult.recordset[0].TotalHours || 0;
 
         const gymResult = await pool.request()
@@ -537,7 +612,7 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
             .input('month', sql.Int, month)
             .query('SELECT Cost, GymHours FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @year AND Month = @month');
         const gymCost = gymResult.recordset[0]?.Cost || 0;
-        // const gymHours = gymResult.recordset[0]?.GymHours || 0;  // مثال: اگر در گزارش نیاز باشه
+        // const gymHours = gymResult.recordset[0]?.GymHours || 0;  // Example: if needed in the report
 
         // Check for existing report
         const existingReport = await pool.request()
@@ -555,7 +630,7 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
         if (existingReport.recordset.length > 0) {
             const status = existingReport.recordset[0].Status;
             if (status !== 'draft') {
-                return res.status(400).send('Report already submitted and cannot be updated');
+                return res.status(400).send('گزارش وجود دارد');
             }
             // Update if draft
             const updateResult = await pool.request()
@@ -621,7 +696,8 @@ router.post('/:year/:month', checkRole(['user', 'group_manager', 'general_manage
  *       400: { description: Invalid input }
  *       500: { description: Server error }
  */
-router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), async (req, res) => {    const {year, month} = req.params;
+router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), async (req, res) => {
+    const {year, month} = req.params;
     const userId = req.user.userId;
 
     try {
@@ -649,7 +725,15 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
             .input('userId', sql.Int, userId)
             .input('startDate', sql.Date, startDate)
             .input('endDate', sql.Date, endDate)
-            .query('SELECT SUM(Duration) AS TotalHours FROM DailyProjectTasks WHERE UserId = @userId AND Date >= @startDate AND Date <= @endDate');
+            .query(`
+                SELECT SUM(dpt.Duration) AS TotalHours
+                FROM DailyProjectTasks dpt
+                         INNER JOIN DailyDetails dd ON dpt.Date = dd.Date AND dpt.UserId = dd.UserId
+                WHERE dpt.UserId = @userId
+                  AND dpt.Date >= @startDate
+                  AND dpt.Date <= @endDate
+                  AND dd.LeaveType = 'work'
+            `);
 
         const totalHours = hoursResult.recordset[0].TotalHours || 0;
 
@@ -659,7 +743,7 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
             .input('month', sql.Int, gregorianMonth)
             .query('SELECT Cost, GymHours FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @year AND Month = @month');
         const gymCost = gymResult.recordset[0]?.Cost || 0;
-        // const gymHours = gymResult.recordset[0]?.GymHours || 0;  // مثال: اگر در گزارش نیاز باشه
+        // const gymHours = gymResult.recordset[0]?.GymHours || 0;  // Example: if needed in the report
 
         // Check for existing report
         const existingReport = await pool.request()
@@ -677,7 +761,7 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
         if (existingReport.recordset.length > 0) {
             const status = existingReport.recordset[0].Status;
             if (status !== 'draft') {
-                return res.status(400).send('Report already submitted and cannot be updated');
+                return res.status(400).send('گزارش وجود دارد');
             }
             // Update if draft
             const updateResult = await pool.request()
@@ -748,11 +832,12 @@ router.post('/jalali/:year/:month', checkRole(['user', 'group_manager', 'general
 router.put('/:reportId/submit-to-group-manager', checkRole(['user', 'group_manager', 'general_manager', 'finance_manager']), validateReportId, async (req, res) => {
     const {reportId} = req.params;
     const userId = req.user.userId;
+    const role = req.user.role;
     try {
         const pool = await poolPromise;
         const reportResult = await pool.request()
             .input('reportId', sql.Int, reportId)
-            .query('SELECT UserId, Status FROM MonthlyReports WHERE ReportId = @reportId');
+            .query('SELECT UserId, Status, GroupId FROM MonthlyReports WHERE ReportId = @reportId');
 
         if (reportResult.recordset.length === 0) {
             return res.status(404).send('Report not found');
@@ -763,16 +848,40 @@ router.put('/:reportId/submit-to-group-manager', checkRole(['user', 'group_manag
             return res.status(400).send('Report cannot be submitted; it is not in draft status');
         }
 
-        if (req.user.role === 'user' && report.UserId !== userId) {
+        if (role === 'user' && report.UserId !== userId) {
             return res.status(403).send('Access denied: Users can only submit their own reports');
         }
 
+        let newStatus = 'submitted_to_group_manager';
+
+        // Check if the submitter is the group manager submitting their own report
+        if (role === 'group_manager' && report.UserId === userId) {
+            // Verify if the user is indeed the manager of the group
+            const groupCheck = await pool.request()
+                .input('groupId', sql.Int, report.GroupId)
+                .input('userId', sql.Int, userId)
+                .query('SELECT 1 FROM Groups WHERE GroupId = @groupId AND ManagerId = @userId');
+
+            if (groupCheck.recordset.length > 0) {
+                newStatus = 'submitted_to_general_manager';
+            }
+        }
+
+        // Check if the submitter is the general manager submitting their own report
+        if (role === 'general_manager' && report.UserId === userId) {
+            newStatus = 'submitted_to_finance';
+        }
+
+        // Update the status
         await pool.request()
             .input('reportId', sql.Int, reportId)
-            .query('UPDATE MonthlyReports SET Status = \'submitted_to_group_manager\', SubmittedAt = GETDATE() WHERE ReportId = @reportId AND Status = \'draft\'');
-        res.send('Submitted to group manager');
+            .input('newStatus', sql.NVarChar, newStatus)
+            .query('UPDATE MonthlyReports SET Status = @newStatus, SubmittedAt = GETDATE() WHERE ReportId = @reportId AND Status = \'draft\'');
+
+        res.send(`Submitted to ${newStatus.replace('submitted_to_', '')}`);
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error('Error in PUT /monthly-reports/:reportId/submit-to-group-manager:', err.message);
+        res.status(500).send('Server error');
     }
 });
 
@@ -1130,7 +1239,7 @@ router.get('/group/range/:startYear/:startMonth/:endYear/:endMonth', checkRole([
     const userId = req.user.userId;
     const role = req.user.role;
     try {
-        // اعتبارسنجی ورودی‌ها
+        // Input validation
         const sYear = parseInt(startYear);
         const sMonth = parseInt(startMonth);
         const eYear = parseInt(endYear);
@@ -1141,7 +1250,7 @@ router.get('/group/range/:startYear/:startMonth/:endYear/:endMonth', checkRole([
             return res.status(400).send('Invalid year or month');
         }
 
-        // اطمینان از اینکه بازه معتبر است
+        // Ensure the range is valid
         if (sYear > eYear || (sYear === eYear && sMonth > eMonth)) {
             return res.status(400).send('Start date must be before or equal to end date');
         }
