@@ -1,87 +1,43 @@
-const express = require('express');
-const cors = require('cors');
-const jwt = require('jsonwebtoken');
-const swaggerUi = require('swagger-ui-express');
-const swaggerDocument = require('./swagger/swagger.json');
-const projectRoutes = require('./routes/project.routes');
-const dailyDetailsRoutes = require('./routes/dailyDetails.routes');
-const monthlyReportsRoutes = require('./routes/monthlyReports.routes');
-const authRoutes = require('./routes/auth.routes');
-const {getJalaliMonthRange} = require('./utils/dateConverter');
 require('dotenv').config();
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-app.get('/test/jalali/:year/:month', (req, res) => {
-    const {year, month} = req.params;
-    const jalaliYear = parseInt(year);
-    const jalaliMonth = parseInt(month);
-
-    if (isNaN(jalaliYear) || isNaN(jalaliMonth) || jalaliMonth < 1 || jalaliMonth > 12) {
-        return res.status(400).send('Invalid Jalali year or month');
-    }
-
-    try {
-        const monthRange = getJalaliMonthRange(jalaliYear, jalaliMonth);
-        res.json({
-            jalaliYear,
-            jalaliMonth,
-            gregorianStart: monthRange.start,
-            gregorianEnd: monthRange.end
-        });
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-
-// Middleware برای اعتبارسنجی توکن JWT
-const authMiddleware = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    if (!authHeader) {
-        return res.status(401).send('Access denied: No token provided');
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = {
-            userId: decoded.userId,
-            role: decoded.role
-        };
-        next();
-        console.log('Decoded user:', req.user);
-    } catch (err) {
-        console.error('JWT verification error:', err.message);
-        res.status(401).send('Access denied: Invalid token');
-    }
-};
-
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
-}));
-app.use(express.json());
-
-// لاگ‌گیری درخواست‌ها
-app.use((req, res, next) => {
-    console.log(`Incoming request: ${req.method} ${req.originalUrl}`);
-    console.log(`Query parameters: ${JSON.stringify(req.query)}`);
-    console.log(`Route parameters: ${JSON.stringify(req.params)}`);
-    next();
-});
-
-
-app.use('/auth', authRoutes);
-app.use('/projects', authMiddleware, projectRoutes);
-app.use('/daily-details', authMiddleware, dailyDetailsRoutes);
-app.use('/monthly-reports', authMiddleware, monthlyReportsRoutes);
+// Swagger
+const swaggerDocument = JSON.parse(
+    fs.readFileSync(path.join(__dirname, 'docs', 'swagger.json'), 'utf8')
+);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
-app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
-    console.log(`Swagger UI available at http://localhost:${port}/api-docs`);
+// Routes
+app.use('/api/auth', require('./routes/auth.routes'));
+app.use('/api/daily-details', require('./routes/dailyDetails.routes'));
+app.use('/api/monthly-reports', require('./routes/monthlyReports.routes'));
+app.use('/api/projects', require('./routes/project.routes'));
+
+// Health check
+app.get('/', (req, res) => {
+    res.send('✅ API is running...');
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ message: 'Something broke!' });
+});
+
+// Start server
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
