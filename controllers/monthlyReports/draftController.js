@@ -91,6 +91,22 @@ const getMyDrafts = async (req, res) => {
                         GROUP BY dpc.ProjectID
                     `);
                 report.personalCarCostsByProject = carCostsResult.recordset;
+
+                const projectHoursResult = await pool.request()
+                    .input('userId', sql.Int, userId)
+                    .input('startDate', sql.Date, startDate)
+                    .input('endDate', sql.Date, endDate)
+                    .query(`
+                        SELECT dpt.ProjectID, SUM(dpt.Duration) AS TotalHours
+                        FROM DailyProjectTasks dpt
+                                 INNER JOIN DailyDetails dd ON dpt.Date = dd.Date AND dpt.UserId = dd.UserId
+                        WHERE dpt.UserId = @userId
+                          AND dpt.Date >= @startDate
+                          AND dpt.Date <= @endDate
+                          AND dd.LeaveType = 'work'
+                        GROUP BY dpt.ProjectID
+                    `);
+                report.projectHoursByProject = projectHoursResult.recordset;
             }
 
             res.json(drafts);
@@ -100,7 +116,6 @@ const getMyDrafts = async (req, res) => {
         }
     });
 };
-
 /**
  * @swagger
  * /monthly-reports/exit-draft/{reportId}:
