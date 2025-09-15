@@ -17,7 +17,7 @@ router.put('/:reportId/approve-finance', approvalController.approveFinance);
 router.put('/:reportId/reject-to-draft', approvalController.rejectToDraft);
 
 router.post('/monthly-gym-costs', gymCostController.saveMonthlyGymCost);
-router.post('/monthly-gym-costs/jalali', gymCostController.saveMonthlyGymCostJalali);
+router.post('/jalali-monthly-gym-costs', gymCostController.saveMonthlyGymCostJalali);
 
 router.get('/report-ids/jalali/:year/:month', reportRetrievalController.getReportIdsJalali);
 router.get('/check-submitted/jalali/:year/:month', reportRetrievalController.checkSubmittedJalali);

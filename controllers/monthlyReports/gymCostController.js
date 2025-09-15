@@ -108,12 +108,15 @@ const saveMonthlyGymCostJalali = async (req, res) => {
         const userId = req.user.userId;
         const {year, month, cost, hours} = req.body;
 
-        if (!year || !month || !cost || isNaN(year) || isNaN(month) || month < 1 || month > 12) {
-            return res.status(400).send('Invalid input');
+        const jalaliYear = parseInt(year);
+        const jalaliMonth = parseInt(month);
+
+        if (isNaN(jalaliYear) || isNaN(jalaliMonth) || jalaliMonth < 1 || jalaliMonth > 12) {
+            return res.status(400).send('Invalid Jalali year or month');
         }
 
         try {
-            const monthRange = getJalaliMonthRange(year, month);
+            const monthRange = getJalaliMonthRange(jalaliYear, jalaliMonth);
             const gregorianYear = monthRange.start.getFullYear();
             const gregorianMonth = monthRange.start.getMonth() + 1;
 
@@ -137,12 +140,12 @@ const saveMonthlyGymCostJalali = async (req, res) => {
                 .input('hours', sql.Int, hours || null)
                 .query(`
                     IF EXISTS (SELECT 1 FROM MonthlyGymCosts WHERE UserId = @userId AND Year = @gregorianYear AND Month = @gregorianMonth)
-                        UPDATE MonthlyGymCosts 
-                        SET Cost = @cost, GymHours = @hours 
+                        UPDATE MonthlyGymCosts
+                        SET Cost = @cost, GymHours = @hours
                         OUTPUT INSERTED.*
                         WHERE UserId = @userId AND Year = @gregorianYear AND Month = @gregorianMonth
                     ELSE
-                        INSERT INTO MonthlyGymCosts (UserId, Year, Month, Cost, GymHours) 
+                        INSERT INTO MonthlyGymCosts (UserId, Year, Month, Cost, GymHours)
                         OUTPUT INSERTED.*
                         VALUES (@userId, @gregorianYear, @gregorianMonth, @cost, @hours)
                 `);

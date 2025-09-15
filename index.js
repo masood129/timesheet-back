@@ -28,8 +28,8 @@ app.get('/test/jalali/:year/:month', (req, res) => {
         res.json({
             jalaliYear,
             jalaliMonth,
-            gregorianStart: monthRange.start,
-            gregorianEnd: monthRange.end
+            gregorianStart: monthRange.start.getFullYear(),
+            gregorianEnd: monthRange.end.getMonth()
         });
     } catch (err) {
         res.status(500).send(err.message);
