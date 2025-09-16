@@ -419,8 +419,7 @@ const createMonthlyReportJalali = async (req, res) => {
                     .input('gymCost', sql.Int, gymCost)
                     .input('groupId', sql.Int, groupId)
                     .query(`
-                        INSERT INTO MonthlyReports (UserId, Year, Month, JalaliYear, JalaliMonth, TotalHours, GymCost,
-                                                    Status, GroupId)
+                        INSERT INTO MonthlyReports (UserId, Year, Month, JalaliYear, JalaliMonth, TotalHours, GymCost,Status, GroupId)
                         OUTPUT INSERTED.*
                         VALUES (@userId, @year, @month, @jalaliYear, @jalaliMonth, @totalHours, @gymCost, 'draft', @groupId)
                     `);
