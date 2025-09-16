@@ -49,7 +49,7 @@ const createOrUpdateDailyDetails = async (req, res) => {
         } = req.body;
         const userId = req.user.userId;
 
-        const allowedLeaveTypes = ['work', 'annual_leave', 'sick_leave', 'gift_leave'];
+        const allowedLeaveTypes = ['work', 'annual_leave', 'sick_leave', 'gift_leave', 'mission'];
         if (leaveType && !allowedLeaveTypes.includes(leaveType)) {
             return res.status(400).send('Invalid LeaveType');
         }
@@ -219,4 +219,4 @@ const createOrUpdateDailyDetails = async (req, res) => {
     }
 };
 
-module.exports = { createOrUpdateDailyDetails };
+module.exports = {createOrUpdateDailyDetails};

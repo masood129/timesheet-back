@@ -72,8 +72,8 @@ const getMyDrafts = async (req, res) => {
                         WHERE UserId = @userId
                           AND Date >= @startDate
                           AND Date <= @endDate
-                          AND LeaveType = 'work'
-                    `);
+                          AND LeaveType IN ('work'
+                            , 'mission')                    `);
                 report.totalCommuteCost = commuteResult.recordset[0].TotalCommuteCost || 0;
 
                 const carCostsResult = await pool.request()
@@ -87,7 +87,7 @@ const getMyDrafts = async (req, res) => {
                         WHERE dpc.UserId = @userId
                           AND dpc.Date >= @startDate
                           AND dpc.Date <= @endDate
-                          AND dd.LeaveType = 'work'
+                          AND dd.LeaveType IN ('work', 'mission')
                         GROUP BY dpc.ProjectID
                     `);
                 report.personalCarCostsByProject = carCostsResult.recordset;
@@ -103,7 +103,7 @@ const getMyDrafts = async (req, res) => {
                         WHERE dpt.UserId = @userId
                           AND dpt.Date >= @startDate
                           AND dpt.Date <= @endDate
-                          AND dd.LeaveType = 'work'
+                          AND dd.LeaveType IN ('work', 'mission')
                         GROUP BY dpt.ProjectID
                     `);
                 report.projectHoursByProject = projectHoursResult.recordset;
@@ -225,10 +225,11 @@ const createMonthlyReportGregorian = async (req, res) => {
                     FROM DailyProjectTasks dpt
                              INNER JOIN DailyDetails dd ON dpt.Date = dd.Date AND dpt.UserId = dd.UserId
                     WHERE dpt.UserId = @userId
-                      AND YEAR(dpt.Date) = @year
-                      AND MONTH(dpt.Date) = @month
-                      AND dd.LeaveType = 'work'
-                `);
+                        AND YEAR (
+                        dpt.Date) = @year
+                      AND MONTH (dpt.Date) = @month
+                      AND dd.LeaveType IN ('work'
+                        , 'mission')                `);
             const totalHours = hoursResult.recordset[0].TotalHours || 0;
 
             const gymResult = await pool.request()
@@ -246,8 +247,8 @@ const createMonthlyReportGregorian = async (req, res) => {
                     SELECT Status
                     FROM MonthlyReports
                     WHERE UserId = @userId
-                      AND Year = @year
-                      AND Month = @month
+                              AND Year = @year
+                              AND Month = @month
                 `);
 
             if (existingReport.recordset.length > 0) {
@@ -267,8 +268,7 @@ const createMonthlyReportGregorian = async (req, res) => {
                         SET TotalHours = @totalHours,
                             GymCost    = @gymCost,
                             Status     = 'draft',
-                            GroupId    = @groupId
-                        OUTPUT INSERTED.*
+                            GroupId    = @groupId OUTPUT INSERTED.*
                         WHERE UserId = @userId
                           AND Year = @year
                           AND Month = @month
@@ -285,7 +285,7 @@ const createMonthlyReportGregorian = async (req, res) => {
                     .input('groupId', sql.Int, groupId)
                     .query(`
                         INSERT INTO MonthlyReports (UserId, Year, Month, TotalHours, GymCost, Status, GroupId)
-                        OUTPUT INSERTED.*
+                            OUTPUT INSERTED.*
                         VALUES (@userId, @year, @month, @totalHours, @gymCost, 'draft', @groupId)
                     `);
                 res.status(201).json(insertResult.recordset[0]);
@@ -355,7 +355,7 @@ const createMonthlyReportJalali = async (req, res) => {
                     WHERE dpt.UserId = @userId
                       AND dpt.Date >= @startDate
                       AND dpt.Date <= @endDate
-                      AND dd.LeaveType = 'work'
+                      AND dd.LeaveType IN ('work', 'mission')
                 `);
 
             const totalHours = hoursResult.recordset[0].TotalHours || 0;
@@ -375,8 +375,8 @@ const createMonthlyReportJalali = async (req, res) => {
                     SELECT Status
                     FROM MonthlyReports
                     WHERE UserId = @userId
-                      AND Year = @year
-                      AND Month = @month
+                              AND Year = @year
+                              AND Month = @month
                 `);
 
             if (existingReport.recordset.length > 0) {
@@ -400,8 +400,7 @@ const createMonthlyReportJalali = async (req, res) => {
                             TotalHours  = @totalHours,
                             GymCost     = @gymCost,
                             Status      = 'draft',
-                            GroupId     = @groupId
-                        OUTPUT INSERTED.*
+                            GroupId     = @groupId OUTPUT INSERTED.*
                         WHERE UserId = @userId
                           AND Year = @year
                           AND Month = @month
@@ -419,8 +418,9 @@ const createMonthlyReportJalali = async (req, res) => {
                     .input('gymCost', sql.Int, gymCost)
                     .input('groupId', sql.Int, groupId)
                     .query(`
-                        INSERT INTO MonthlyReports (UserId, Year, Month, JalaliYear, JalaliMonth, TotalHours, GymCost,Status, GroupId)
-                        OUTPUT INSERTED.*
+                        INSERT INTO MonthlyReports (UserId, Year, Month, JalaliYear, JalaliMonth, TotalHours, GymCost,
+                                                    Status, GroupId)
+                            OUTPUT INSERTED.*
                         VALUES (@userId, @year, @month, @jalaliYear, @jalaliMonth, @totalHours, @gymCost, 'draft', @groupId)
                     `);
                 res.status(201).json(insertResult.recordset[0]);
