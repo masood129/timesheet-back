@@ -107,6 +107,24 @@ const getMyDrafts = async (req, res) => {
                         GROUP BY dpt.ProjectID
                     `);
                 report.projectHoursByProject = projectHoursResult.recordset;
+
+                const leaveTypesResult = await pool.request()
+                    .input('userId', sql.Int, userId)
+                    .input('startDate', sql.Date, startDate)
+                    .input('endDate', sql.Date, endDate)
+                    .query(`
+                        SELECT LeaveType, COUNT(*) AS Count
+                        FROM DailyDetails
+                        WHERE UserId = @userId
+                          AND Date >= @startDate
+                          AND Date <= @endDate
+                          AND LeaveType NOT IN ('work', 'mission')
+                        GROUP BY LeaveType
+                    `);
+                report.leaveTypesCount = leaveTypesResult.recordset.reduce((acc, row) => {
+                    acc[row.LeaveType] = row.Count;
+                    return acc;
+                }, {});
             }
 
             res.json(drafts);
@@ -116,6 +134,7 @@ const getMyDrafts = async (req, res) => {
         }
     });
 };
+
 /**
  * @swagger
  * /monthly-reports/exit-draft/{reportId}:

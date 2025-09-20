@@ -7,6 +7,7 @@ const projectRoutes = require('./routes/project.routes');
 const dailyDetailsRoutes = require('./routes/dailyDetails.routes');
 const monthlyReportsRoutes = require('./routes/monthlyReports.routes');
 const authRoutes = require('./routes/auth.routes');
+const userRoutes = require('./routes/user.routes'); // Adjust path if needed
 const {getJalaliMonthRange} = require('./utils/dateConverter');
 require('dotenv').config();
 
@@ -79,6 +80,7 @@ app.use('/auth', authRoutes);
 app.use('/projects', authMiddleware, projectRoutes);
 app.use('/daily-details', authMiddleware, dailyDetailsRoutes);
 app.use('/monthly-reports', authMiddleware, monthlyReportsRoutes);
+app.use('/users', authMiddleware, userRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.listen(port, () => {
