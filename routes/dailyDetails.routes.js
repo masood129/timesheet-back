@@ -7,6 +7,8 @@ router.get('/jalali/month/:year/:month', retrievalController.getJalaliMonthlyDet
 router.get('/range', retrievalController.getRangeDetails);
 router.get('/:date', retrievalController.getDailyDetails);
 router.get('/month/:year/:month', retrievalController.getMonthlyDetails);
+router.get('/user/:userId/jalali/month/:year/:month', retrievalController.getUserJalaliMonthlyDetails);
+router.get('/user/:userId/jalali/month/:year/:month/export-excel', retrievalController.exportUserJalaliMonthlyToExcel);
 router.post('/', crudController.createOrUpdateDailyDetails);
 
 module.exports = router;
