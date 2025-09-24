@@ -4,6 +4,7 @@ const draftController = require('../controllers/monthlyReports/draftController')
 const approvalController = require('../controllers/monthlyReports/approvalController');
 const gymCostController = require('../controllers/monthlyReports/gymCostController');
 const reportRetrievalController = require('../controllers/monthlyReports/reportRetrievalController');
+const managerReportControler = require('../controllers/monthlyReports/managerReportController');
 
 router.get('/my-drafts', draftController.getMyDrafts);
 router.delete('/exit-draft/:reportId', draftController.exitDraft);
@@ -15,6 +16,7 @@ router.put('/:reportId/approve-group-manager', approvalController.approveGroupMa
 router.put('/:reportId/approve-general-manager', approvalController.approveGeneralManager);
 router.put('/:reportId/approve-finance', approvalController.approveFinance);
 router.put('/:reportId/reject-to-draft', approvalController.rejectToDraft);
+router.put('/monthly-reports/report', managerReportControler.getReportById);// im here
 
 router.post('/monthly-gym-costs', gymCostController.saveMonthlyGymCost);
 router.post('/jalali-monthly-gym-costs', gymCostController.saveMonthlyGymCostJalali);
