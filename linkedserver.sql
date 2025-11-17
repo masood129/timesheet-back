@@ -15,7 +15,7 @@ CREATE TABLE UserProjectAccess (
                                    UserId INT NOT NULL,
                                    ProjectId INT NOT NULL,
                                    PRIMARY KEY (UserId, ProjectId)
-                                   -- FOREIGN KEYها حذف شده
+    -- FOREIGN KEYها حذف شده
 );
 
 CREATE TABLE UserContractHours (
@@ -23,7 +23,7 @@ CREATE TABLE UserContractHours (
                                    ContractArrivalTime NVARCHAR(8) NULL,
                                    ContractLeaveTime NVARCHAR(8) NOT NULL,
                                    MinMonthlyHours INT NOT NULL
-                                   -- FOREIGN KEY حذف شده
+    -- FOREIGN KEY حذف شده
 );
 
 CREATE TABLE DailyDetails (
@@ -37,7 +37,7 @@ CREATE TABLE DailyDetails (
                               GoCost INT NULL,
                               ReturnCost INT NULL,
                               LeaveType NVARCHAR(50) NULL
-                              -- FOREIGN KEY حذف شده
+    -- FOREIGN KEY حذف شده
 );
 
 CREATE TABLE DailyProjectTasks (
@@ -47,7 +47,7 @@ CREATE TABLE DailyProjectTasks (
                                    ProjectId INT NOT NULL,
                                    Duration INT NOT NULL, -- در دقیقه
                                    Description NVARCHAR(500) NULL
-                                   -- FOREIGN KEYها حذف شده
+    -- FOREIGN KEYها حذف شده
 );
 
 CREATE TABLE DailyPersonalCarCosts (
@@ -58,7 +58,7 @@ CREATE TABLE DailyPersonalCarCosts (
                                        Cost INT NULL,
                                        Description NVARCHAR(MAX) NULL,
                                        PRIMARY KEY (Date, UserId, ProjectId)
-                                       -- FOREIGN KEYها حذف شده
+    -- FOREIGN KEYها حذف شده
 );
 
 CREATE TABLE MonthlyGymCosts (
@@ -107,10 +107,10 @@ SELECT
     CASE
         WHEN gm.personalId IS NOT NULL THEN 'group_manager'  -- اگر در groupManagers باشد، نقش مدیر گروه
         ELSE 'user'  -- پیش‌فرض کاربر عادی (برای نقش‌های دیگر مثل general_manager, finance_manager, admin شرط اضافه کنید اگر داده‌ای دارید)
-    END AS Role
+        END AS Role
 FROM [UMD].[UMD].[dbo].[users] u
-LEFT JOIN [UMD].[UMD].[dbo].[groupManagers] gm ON u.personalid = gm.personalId
-WHERE u.IsActive = 1;  -- فقط کاربران فعال
+        LEFT JOIN [UMD].[UMD].[dbo].[groupManagers] gm ON u.personalid = gm.personalId
+        WHERE u.IsActive = 1;  -- فقط کاربران فعال
 GO
 
 -- ویو برای Groups (مستقیم از جدول groups در UMD)
@@ -128,7 +128,7 @@ SELECT
     u.personalid AS UserId,
     u.groupid AS GroupId
 FROM [UMD].[UMD].[dbo].[users] u
-WHERE u.groupid IS NOT NULL AND u.IsActive = 1;  -- فقط کاربران فعال با گروه
+        WHERE u.groupid IS NOT NULL AND u.IsActive = 1;  -- فقط کاربران فعال با گروه
 GO
 
 -- ویو برای Projects (مستقیم از جدول projects در UMD)
@@ -159,52 +159,52 @@ GO
 
 -- تریگرها برای VIEW Users
 CREATE TRIGGER trg_InsteadOfInsert_Users
-ON Users
-INSTEAD OF INSERT
+    ON Users
+    INSTEAD OF INSERT
 AS
 BEGIN
     -- INSERT به users (فیلدهای اضافی پیش‌فرض یا از inserted مپ کنید اگر دارید)
-    INSERT INTO [UMD].[UMD].[dbo].[users] (personalid, id, IsActive /* اضافه فیلدهای دیگر اگر نیاز */)
-    SELECT UserId, Username, 1 /* IsActive پیش‌فرض */ /* , farsifirstname=NULL, etc. */
-    FROM inserted;
+INSERT INTO [UMD].[UMD].[dbo].[users] (personalid, id, IsActive /* اضافه فیلدهای دیگر اگر نیاز */)
+SELECT UserId, Username, 1 /* IsActive پیش‌فرض */ /* , farsifirstname=NULL, etc. */
+FROM inserted;
 
-    -- اگر Role='group_manager'، به groupManagers اضافه کن
-    INSERT INTO [UMD].[UMD].[dbo].[groupManagers] (personalId /* , firstname, lastname, email, groupname اگر نیاز */)
-    SELECT UserId /* , NULL, NULL, NULL, NULL */
-    FROM inserted WHERE Role = 'group_manager';
+-- اگر Role='group_manager'، به groupManagers اضافه کن
+INSERT INTO [UMD].[UMD].[dbo].[groupManagers] (personalId /* , firstname, lastname, email, groupname اگر نیاز */)
+SELECT UserId /* , NULL, NULL, NULL, NULL */
+FROM inserted WHERE Role = 'group_manager';
 END;
 GO
 
 CREATE TRIGGER trg_InsteadOfUpdate_Users
-ON Users
-INSTEAD OF UPDATE
-AS
+    ON Users
+    INSTEAD OF UPDATE
+                   AS
 BEGIN
     -- UPDATE users
-    UPDATE u
-    SET u.id = i.Username /* , دیگر فیلدها اگر مپ شوند */
+UPDATE u
+SET u.id = i.Username /* , دیگر فیلدها اگر مپ شوند */
     FROM [UMD].[UMD].[dbo].[users] u
     INNER JOIN inserted i ON u.personalid = i.UserId;
 
-    -- مدیریت Role: اگر Role تغییر کرد، groupManagers را بروزرسانی کن
-    -- حذف اگر Role != 'group_manager'
-    DELETE gm
+-- مدیریت Role: اگر Role تغییر کرد، groupManagers را بروزرسانی کن
+-- حذف اگر Role != 'group_manager'
+DELETE gm
     FROM [UMD].[UMD].[dbo].[groupManagers] gm
     INNER JOIN inserted i ON gm.personalId = i.UserId
     WHERE i.Role != 'group_manager';
 
     -- اضافه اگر Role = 'group_manager' و وجود ندارد
-    INSERT INTO [UMD].[UMD].[dbo].[groupManagers] (personalId /* , دیگر فیلدها */)
-    SELECT i.UserId /* , NULL, etc. */
-    FROM inserted i
-    LEFT JOIN [UMD].[UMD].[dbo].[groupManagers] gm ON i.UserId = gm.personalId
-    WHERE i.Role = 'group_manager' AND gm.personalId IS NULL;
+INSERT INTO [UMD].[UMD].[dbo].[groupManagers] (personalId /* , دیگر فیلدها */)
+SELECT i.UserId /* , NULL, etc. */
+FROM inserted i
+         LEFT JOIN [UMD].[UMD].[dbo].[groupManagers] gm ON i.UserId = gm.personalId
+WHERE i.Role = 'group_manager' AND gm.personalId IS NULL;
 END;
 GO
 
 CREATE TRIGGER trg_InsteadOfDelete_Users
-ON Users
-INSTEAD OF DELETE
+    ON Users
+    INSTEAD OF DELETE
 AS
 BEGIN
     -- DELETE از users (و groupManagers اگر مرتبط)
@@ -220,32 +220,32 @@ GO
 
 -- تریگرها برای VIEW Groups
 CREATE TRIGGER trg_InsteadOfInsert_Groups
-ON Groups
-INSTEAD OF INSERT
+    ON Groups
+    INSTEAD OF INSERT
 AS
 BEGIN
-    INSERT INTO [UMD].[UMD].[dbo].[groups] (id, groupname, managerID)
-    SELECT GroupId, GroupName, ManagerId
-    FROM inserted;
+INSERT INTO [UMD].[UMD].[dbo].[groups] (id, groupname, managerID)
+SELECT GroupId, GroupName, ManagerId
+FROM inserted;
 END;
 GO
 
 CREATE TRIGGER trg_InsteadOfUpdate_Groups
-ON Groups
-INSTEAD OF UPDATE
-AS
+    ON Groups
+    INSTEAD OF UPDATE
+                   AS
 BEGIN
-    UPDATE g
-    SET g.groupname = i.GroupName,
-        g.managerID = i.ManagerId
+UPDATE g
+SET g.groupname = i.GroupName,
+    g.managerID = i.ManagerId
     FROM [UMD].[UMD].[dbo].[groups] g
     INNER JOIN inserted i ON g.id = i.GroupId;
 END;
 GO
 
 CREATE TRIGGER trg_InsteadOfDelete_Groups
-ON Groups
-INSTEAD OF DELETE
+    ON Groups
+    INSTEAD OF DELETE
 AS
 BEGIN
     DELETE g
@@ -256,39 +256,39 @@ GO
 
 -- تریگرها برای VIEW UserGroup (این VIEW از users استخراج می‌شود، پس UPDATE groupid در users)
 CREATE TRIGGER trg_InsteadOfInsert_UserGroup
-ON UserGroup
-INSTEAD OF INSERT
+    ON UserGroup
+    INSTEAD OF INSERT
 AS
 BEGIN
     -- UPDATE groupid در users (فرض بر یک گروه per کاربر؛ اگر چندتا، منطق تغییر دهید)
-    UPDATE u
-    SET u.groupid = i.GroupId
+UPDATE u
+SET u.groupid = i.GroupId
     FROM [UMD].[UMD].[dbo].[users] u
     INNER JOIN inserted i ON u.personalid = i.UserId;
 END;
 GO
 
 CREATE TRIGGER trg_InsteadOfUpdate_UserGroup
-ON UserGroup
-INSTEAD OF UPDATE
-AS
+    ON UserGroup
+    INSTEAD OF UPDATE
+                   AS
 BEGIN
     -- مشابه INSERT، groupid را بروزرسانی
-    UPDATE u
-    SET u.groupid = i.GroupId
+UPDATE u
+SET u.groupid = i.GroupId
     FROM [UMD].[UMD].[dbo].[users] u
     INNER JOIN inserted i ON u.personalid = i.UserId;
 END;
 GO
 
 CREATE TRIGGER trg_InsteadOfDelete_UserGroup
-ON UserGroup
-INSTEAD OF DELETE
+    ON UserGroup
+    INSTEAD OF DELETE
 AS
 BEGIN
     -- پاک کردن groupid در users
-    UPDATE u
-    SET u.groupid = NULL
+UPDATE u
+SET u.groupid = NULL
     FROM [UMD].[UMD].[dbo].[users] u
     INNER JOIN deleted d ON u.personalid = d.UserId;
 END;
@@ -296,31 +296,31 @@ GO
 
 -- تریگرها برای VIEW Projects
 CREATE TRIGGER trg_InsteadOfInsert_Projects
-ON Projects
-INSTEAD OF INSERT
+    ON Projects
+    INSTEAD OF INSERT
 AS
 BEGIN
-    INSERT INTO [UMD].[UMD].[dbo].[projects] (id, projectName /* securityLevel فیک، پس ذخیره نمی‌شود */)
-    SELECT Id, ProjectName
-    FROM inserted;
+INSERT INTO [UMD].[UMD].[dbo].[projects] (id, projectName /* securityLevel فیک، پس ذخیره نمی‌شود */)
+SELECT Id, ProjectName
+FROM inserted;
 END;
 GO
 
 CREATE TRIGGER trg_InsteadOfUpdate_Projects
-ON Projects
-INSTEAD OF UPDATE
-AS
+    ON Projects
+    INSTEAD OF UPDATE
+                   AS
 BEGIN
-    UPDATE p
-    SET p.projectName = i.ProjectName /* securityLevel فیک، بروزرسانی نمی‌شود */
+UPDATE p
+SET p.projectName = i.ProjectName /* securityLevel فیک، بروزرسانی نمی‌شود */
     FROM [UMD].[UMD].[dbo].[projects] p
     INNER JOIN inserted i ON p.id = i.Id;
 END;
 GO
 
 CREATE TRIGGER trg_InsteadOfDelete_Projects
-ON Projects
-INSTEAD OF DELETE
+    ON Projects
+    INSTEAD OF DELETE
 AS
 BEGIN
     DELETE p
