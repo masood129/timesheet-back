@@ -9,22 +9,22 @@
 -- برای عملیات INSERT/UPDATE/DELETE روی VIEWها، INSTEAD OF triggers اضافه شده تا عملیات به جدول‌های زیرین در UMD هدایت شوند.
 -- نام دیتابیس‌ها (flutter و UMD) و نام جدول‌های قدیمی (users, groups, projects, groupManagers) بدون تغییر نگه داشته شده.
 -- ساختار ستون‌ها بر اساس فایل db-schema.sql.txt است، اما فقط ستون‌های ضروری در VIEWها مپ شده (فیلدهای اضافی در جداول قدیمی حفظ می‌شوند اما در VIEW نمایش داده نمی‌شوند مگر نیاز).
+-- **تغییر مهم**: FOREIGN KEYهایی که به VIEWها (مثل Users, Projects, Groups) اشاره می‌کنند حذف شده‌اند، چون SQL Server اجازه FOREIGN KEY مستقیم به VIEWها را نمی‌دهد (مگر VIEW indexed باشد، که پیچیده است). حالا یکپارچگی داده‌ها را اپ یا تریگرها مدیریت کنند.
 
--- ابتدا جدول‌های فیزیکی اسکیمای اصلی که VIEW نیستند (بدون تغییرات، بر اساس db-schema.sql.txt)
+-- ابتدا جدول‌های فیزیکی اسکیمای اصلی که VIEW نیستند (بدون تغییرات، بر اساس db-schema.sql.txt، اما بدون FOREIGN KEY به VIEWها)
 CREATE TABLE UserProjectAccess (
                                    UserId INT NOT NULL,
                                    ProjectId INT NOT NULL,
-                                   PRIMARY KEY (UserId, ProjectId),
-                                   FOREIGN KEY (UserId) REFERENCES Users(UserId),  -- به VIEW Users اشاره می‌کند
-                                   FOREIGN KEY (ProjectId) REFERENCES Projects(Id)
+                                   PRIMARY KEY (UserId, ProjectId)
+                                   -- FOREIGN KEYها حذف شده
 );
 
 CREATE TABLE UserContractHours (
                                    UserId INT PRIMARY KEY,
                                    ContractArrivalTime NVARCHAR(8) NULL,
                                    ContractLeaveTime NVARCHAR(8) NOT NULL,
-                                   MinMonthlyHours INT NOT NULL,
-                                   FOREIGN KEY (UserId) REFERENCES Users(UserId)
+                                   MinMonthlyHours INT NOT NULL
+                                   -- FOREIGN KEY حذف شده
 );
 
 CREATE TABLE DailyDetails (
@@ -37,8 +37,8 @@ CREATE TABLE DailyDetails (
                               Description NVARCHAR(500) NULL,
                               GoCost INT NULL,
                               ReturnCost INT NULL,
-                              LeaveType NVARCHAR(50) NULL,
-                              FOREIGN KEY (UserId) REFERENCES Users(UserId)
+                              LeaveType NVARCHAR(50) NULL
+                              -- FOREIGN KEY حذف شده
 );
 
 CREATE TABLE DailyProjectTasks (
@@ -47,9 +47,8 @@ CREATE TABLE DailyProjectTasks (
                                    UserId INT NOT NULL,
                                    ProjectId INT NOT NULL,
                                    Duration INT NOT NULL, -- در دقیقه
-                                   Description NVARCHAR(500) NULL,
-                                   FOREIGN KEY (UserId) REFERENCES Users(UserId),
-                                   FOREIGN KEY (ProjectId) REFERENCES Projects(Id)
+                                   Description NVARCHAR(500) NULL
+                                   -- FOREIGN KEYها حذف شده
 );
 
 CREATE TABLE DailyPersonalCarCosts (
@@ -59,9 +58,8 @@ CREATE TABLE DailyPersonalCarCosts (
                                        Kilometers INT NULL,
                                        Cost INT NULL,
                                        Description NVARCHAR(MAX) NULL,
-                                       PRIMARY KEY (Date, UserId, ProjectId),
-                                       FOREIGN KEY (UserId) REFERENCES Users(UserId),
-                                       FOREIGN KEY (ProjectId) REFERENCES Projects(Id)
+                                       PRIMARY KEY (Date, UserId, ProjectId)
+                                       -- FOREIGN KEYها حذف شده
 );
 
 CREATE TABLE MonthlyGymCosts (
@@ -71,8 +69,8 @@ CREATE TABLE MonthlyGymCosts (
                                  Month INT NOT NULL CHECK (Month BETWEEN 1 AND 12),
                                  Cost INT NOT NULL,
                                  GymHours INT NULL, -- تعداد ساعات ورزش در ماه
-                                 Description NVARCHAR(500) NULL,
-                                 FOREIGN KEY (UserId) REFERENCES Users(UserId)
+                                 Description NVARCHAR(500) NULL
+                                 -- FOREIGN KEY حذف شده
 );
 
 CREATE TABLE MonthlyReports (
@@ -90,9 +88,8 @@ CREATE TABLE MonthlyReports (
                                 ManagerComment NVARCHAR(500) NULL,
                                 FinanceComment NVARCHAR(500) NULL,
                                 SubmittedAt DATETIME NULL,
-                                ApprovedAt DATETIME NULL,
-                                FOREIGN KEY (UserId) REFERENCES Users(UserId),
-                                FOREIGN KEY (GroupId) REFERENCES Groups(GroupId)
+                                ApprovedAt DATETIME NULL
+                                -- FOREIGN KEYها حذف شده
 );
 
 -- ایندکس‌ها برای بهینه‌سازی کوئری‌ها (بر اساس db-schema.sql.txt)
@@ -100,54 +97,60 @@ CREATE INDEX IX_DailyDetails_Date_UserId ON DailyDetails(Date, UserId);
 CREATE INDEX IX_DailyProjectTasks_Date_UserId ON DailyProjectTasks(Date, UserId);
 CREATE INDEX IX_MonthlyReports_Year_Month ON MonthlyReports(Year, Month);
 CREATE INDEX IX_MonthlyReports_JalaliYear_JalaliMonth ON MonthlyReports(JalaliYear, JalaliMonth);
+GO
 
 -- حالا VIEWها با نام‌های اصلی جدول‌ها، که از دیتابیس UMD داده می‌کشند (PasswordHash حذف شده)
 -- ویو برای Users (از جدول users در UMD و groupManagers برای تعیین Role، بدون PasswordHash)
 CREATE VIEW Users AS
-SELECT 
+SELECT
     u.personalid AS UserId,
     u.id AS Username,  -- یوزرنیم = id
-    CASE 
+    CASE
         WHEN gm.personalId IS NOT NULL THEN 'group_manager'  -- اگر در groupManagers باشد، نقش مدیر گروه
         ELSE 'user'  -- پیش‌فرض کاربر عادی (برای نقش‌های دیگر مثل general_manager, finance_manager, admin شرط اضافه کنید اگر داده‌ای دارید)
     END AS Role
 FROM UMD.dbo.users u
 LEFT JOIN UMD.dbo.groupManagers gm ON u.personalid = gm.personalId
 WHERE u.IsActive = 1;  -- فقط کاربران فعال
+GO
 
 -- ویو برای Groups (مستقیم از جدول groups در UMD)
 CREATE VIEW Groups AS
-SELECT 
+SELECT
     g.id AS GroupId,
     g.groupname AS GroupName,
     g.managerID AS ManagerId  -- مدیر = کد پرسنلی (مپ به UserId)
 FROM UMD.dbo.groups g;
+GO
 
 -- ویو برای UserGroup (از فیلدهای groupid و personalid در users در UMD)
 CREATE VIEW UserGroup AS
-SELECT 
+SELECT
     u.personalid AS UserId,
     u.groupid AS GroupId
 FROM UMD.dbo.users u
 WHERE u.groupid IS NOT NULL AND u.IsActive = 1;  -- فقط کاربران فعال با گروه
+GO
 
 -- ویو برای Projects (مستقیم از جدول projects در UMD)
 CREATE VIEW Projects AS
-SELECT 
+SELECT
     p.id AS Id,
     p.projectName AS ProjectName,
     1 AS securityLevel  -- فیک/پیش‌فرض، چون داده‌ای ندارد (می‌توان تغییر داد)
 FROM UMD.dbo.projects p;
+GO
 
 -- ویو اضافی برای groupManagers اگر نیاز باشد (اما در اسکیمای اصلی نیست؛ اختیاری)
 CREATE VIEW GroupManagers AS
-SELECT 
+SELECT
     gm.personalId,
     gm.firstname,
     gm.lastname,
     gm.email,
     gm.groupname
 FROM UMD.dbo.groupManagers gm;
+GO
 
 -- اضافه کردن INSTEAD OF triggers برای عملیات INSERT, UPDATE, DELETE روی VIEWها
 -- این تریگرها اجازه می‌دهند برنامه INSERT/UPDATE/DELETE روی VIEWها انجام دهد، و عملیات به جدول‌های زیرین در UMD هدایت شود.
@@ -167,9 +170,10 @@ BEGIN
 
     -- اگر Role='group_manager'، به groupManagers اضافه کن
     INSERT INTO UMD.dbo.groupManagers (personalId /* , firstname, lastname, email, groupname اگر نیاز */)
-    SELECT UserId /* , NULL, NULL, NULL, NULL */ 
+    SELECT UserId /* , NULL, NULL, NULL, NULL */
     FROM inserted WHERE Role = 'group_manager';
 END;
+GO
 
 CREATE TRIGGER trg_InsteadOfUpdate_Users
 ON Users
@@ -196,6 +200,7 @@ BEGIN
     LEFT JOIN UMD.dbo.groupManagers gm ON i.UserId = gm.personalId
     WHERE i.Role = 'group_manager' AND gm.personalId IS NULL;
 END;
+GO
 
 CREATE TRIGGER trg_InsteadOfDelete_Users
 ON Users
@@ -211,6 +216,7 @@ BEGIN
     FROM UMD.dbo.users u
     INNER JOIN deleted d ON u.personalid = d.UserId;
 END;
+GO
 
 -- تریگرها برای VIEW Groups
 CREATE TRIGGER trg_InsteadOfInsert_Groups
@@ -222,6 +228,7 @@ BEGIN
     SELECT GroupId, GroupName, ManagerId
     FROM inserted;
 END;
+GO
 
 CREATE TRIGGER trg_InsteadOfUpdate_Groups
 ON Groups
@@ -234,6 +241,7 @@ BEGIN
     FROM UMD.dbo.groups g
     INNER JOIN inserted i ON g.id = i.GroupId;
 END;
+GO
 
 CREATE TRIGGER trg_InsteadOfDelete_Groups
 ON Groups
@@ -244,6 +252,7 @@ BEGIN
     FROM UMD.dbo.groups g
     INNER JOIN deleted d ON g.id = d.GroupId;
 END;
+GO
 
 -- تریگرها برای VIEW UserGroup (این VIEW از users استخراج می‌شود، پس UPDATE groupid در users)
 CREATE TRIGGER trg_InsteadOfInsert_UserGroup
@@ -257,6 +266,7 @@ BEGIN
     FROM UMD.dbo.users u
     INNER JOIN inserted i ON u.personalid = i.UserId;
 END;
+GO
 
 CREATE TRIGGER trg_InsteadOfUpdate_UserGroup
 ON UserGroup
@@ -269,6 +279,7 @@ BEGIN
     FROM UMD.dbo.users u
     INNER JOIN inserted i ON u.personalid = i.UserId;
 END;
+GO
 
 CREATE TRIGGER trg_InsteadOfDelete_UserGroup
 ON UserGroup
@@ -281,6 +292,7 @@ BEGIN
     FROM UMD.dbo.users u
     INNER JOIN deleted d ON u.personalid = d.UserId;
 END;
+GO
 
 -- تریگرها برای VIEW Projects
 CREATE TRIGGER trg_InsteadOfInsert_Projects
@@ -292,6 +304,7 @@ BEGIN
     SELECT Id, ProjectName
     FROM inserted;
 END;
+GO
 
 CREATE TRIGGER trg_InsteadOfUpdate_Projects
 ON Projects
@@ -303,6 +316,7 @@ BEGIN
     FROM UMD.dbo.projects p
     INNER JOIN inserted i ON p.id = i.Id;
 END;
+GO
 
 CREATE TRIGGER trg_InsteadOfDelete_Projects
 ON Projects
@@ -313,7 +327,9 @@ BEGIN
     FROM UMD.dbo.projects p
     INNER JOIN deleted d ON p.id = d.Id;
 END;
+GO
 
 -- حالا برنامه می‌تواند بدون تغییر به Users, Groups و غیره کوئری بزند (SELECT, INSERT, UPDATE, DELETE)، اما داده‌ها از/به UMD می‌روند.
--- اگر FOREIGN KEYها مشکل ایجاد کنند (چون روی VIEW هستند)، می‌توانید CHECK CONSTRAINTها را با NOCHECK تعریف کنید یا منطق اپ را تنظیم کنید.
+-- چون FOREIGN KEYها حذف شده‌اند، یکپارچگی داده‌ها را در اپ یا با چک‌های اضافی در تریگرها مدیریت کنید (مثلاً چک کنید UserId وجود داشته باشد قبل از INSERT به جدول‌های فیزیکی).
 -- برای نقش‌های دیگر (مثل admin) در Role، شرط‌های بیشتری به VIEW و تریگرها اضافه کنید اگر داده‌ای دارید.
+GO
