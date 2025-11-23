@@ -13,7 +13,7 @@ CREATE PROCEDURE sp_GetYearMonthPeriods
     @Year INT
 AS
 BEGIN
-    SET NOCOUNT ON;
+    -- SET NOCOUNT ON;
     
     -- ایجاد جدول موقت برای نگهداری نتایج
     CREATE TABLE #MonthPeriods (
