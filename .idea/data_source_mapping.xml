@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourcePerFileMappings">
+    <file url="file://$PROJECT_DIR$/create-admin-table.sql" value="77935314-7748-42b2-866b-61e70d9cce16" />
+    <file url="file://$PROJECT_DIR$/db-schema-month-periods.sql" value="77935314-7748-42b2-866b-61e70d9cce16" />
+    <file url="file://$PROJECT_DIR$/test-month-periods.sql" value="77935314-7748-42b2-866b-61e70d9cce16" />
+  </component>
+</project>

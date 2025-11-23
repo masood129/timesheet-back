@@ -7,6 +7,7 @@ const projectManagementController = require('../controllers/admin/projectManagem
 const groupManagementController = require('../controllers/admin/groupManagementController');
 const reportManagementController = require('../controllers/admin/reportManagementController');
 const systemConfigController = require('../controllers/admin/systemConfigController');
+const monthPeriodSettingsController = require('../controllers/admin/monthPeriodSettingsController');
 
 // ============================================
 // USER MANAGEMENT ROUTES
@@ -983,5 +984,222 @@ router.delete('/config/contract-hours/:userId', systemConfigController.deleteUse
  *         description: Server error
  */
 router.get('/config/system', systemConfigController.getSystemConfig);
+
+// ============================================
+// MONTH PERIOD SETTINGS ROUTES
+// ============================================
+
+/**
+ * @swagger
+ * /admin/month-periods/{year}:
+ *   get:
+ *     summary: Get all month periods for a year (Admin only)
+ *     tags: [Admin - Month Periods]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Jalali year (e.g., 1404)
+ *     responses:
+ *       200:
+ *         description: List of month periods for the year
+ *       400:
+ *         description: Invalid year
+ *       500:
+ *         description: Server error
+ */
+router.get('/month-periods/:year', monthPeriodSettingsController.getAllMonthPeriods);
+
+/**
+ * @swagger
+ * /admin/month-periods/{year}/{month}:
+ *   get:
+ *     summary: Get month period for specific year/month (Admin only)
+ *     tags: [Admin - Month Periods]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: month
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 12
+ *     responses:
+ *       200:
+ *         description: Month period details
+ *       404:
+ *         description: Month period not found
+ *       500:
+ *         description: Server error
+ */
+router.get('/month-periods/:year/:month', monthPeriodSettingsController.getMonthPeriod);
+
+/**
+ * @swagger
+ * /admin/month-periods:
+ *   post:
+ *     summary: Create new month period (Admin only)
+ *     tags: [Admin - Month Periods]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - Year
+ *               - Month
+ *               - StartDay
+ *               - StartMonth
+ *               - EndDay
+ *               - EndMonth
+ *               - CurrentJalaliYear
+ *               - CurrentJalaliMonth
+ *             properties:
+ *               Year:
+ *                 type: integer
+ *               Month:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 12
+ *               StartDay:
+ *                 type: integer
+ *               StartMonth:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 12
+ *               EndDay:
+ *                 type: integer
+ *               EndMonth:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 12
+ *               CurrentJalaliYear:
+ *                 type: integer
+ *                 description: Current Jalali year for validation
+ *               CurrentJalaliMonth:
+ *                 type: integer
+ *                 description: Current Jalali month for validation
+ *     responses:
+ *       201:
+ *         description: Month period created
+ *       400:
+ *         description: Invalid input or month is in the past
+ *       500:
+ *         description: Server error
+ */
+router.post('/month-periods', monthPeriodSettingsController.createMonthPeriod);
+
+/**
+ * @swagger
+ * /admin/month-periods/{year}/{month}:
+ *   put:
+ *     summary: Update month period (Admin only)
+ *     tags: [Admin - Month Periods]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: month
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - StartDay
+ *               - StartMonth
+ *               - EndDay
+ *               - EndMonth
+ *               - CurrentJalaliYear
+ *               - CurrentJalaliMonth
+ *             properties:
+ *               StartDay:
+ *                 type: integer
+ *               StartMonth:
+ *                 type: integer
+ *               EndDay:
+ *                 type: integer
+ *               EndMonth:
+ *                 type: integer
+ *               CurrentJalaliYear:
+ *                 type: integer
+ *               CurrentJalaliMonth:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Month period updated
+ *       404:
+ *         description: Month period not found
+ *       400:
+ *         description: Invalid input or month is in the past
+ *       500:
+ *         description: Server error
+ */
+router.put('/month-periods/:year/:month', monthPeriodSettingsController.updateMonthPeriod);
+
+/**
+ * @swagger
+ * /admin/month-periods/{year}/{month}:
+ *   delete:
+ *     summary: Delete month period (revert to default) (Admin only)
+ *     tags: [Admin - Month Periods]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: path
+ *         name: month
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               CurrentJalaliYear:
+ *                 type: integer
+ *               CurrentJalaliMonth:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Month period deleted (reverted to default)
+ *       404:
+ *         description: Month period not found
+ *       400:
+ *         description: Month is in the past
+ *       500:
+ *         description: Server error
+ */
+router.delete('/month-periods/:year/:month', monthPeriodSettingsController.deleteMonthPeriod);
 
 module.exports = router;
