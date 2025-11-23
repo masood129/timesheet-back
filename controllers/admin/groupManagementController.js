@@ -98,49 +98,35 @@ const getGroupById = async (req, res) => {
  * Create new group
  */
 const createGroup = async (req, res) => {
-    const { GroupId, GroupName, ManagerId } = req.body;
+    const { GroupName, ManagerId } = req.body;
 
-    if (!GroupId || !GroupName) {
-        return res.status(400).send('شناسه و نام گروه الزامی است');
+    if (!GroupName || !ManagerId) {
+        return res.status(400).send('نام گروه و شناسه مدیر الزامی است');
     }
 
     try {
         const pool = await poolPromise;
 
-        // Check if group already exists
-        const checkResult = await pool
+        // Check if user exists
+        const userCheck = await pool
             .request()
-            .input('groupId', sql.Int, GroupId)
-            .query('SELECT COUNT(*) as count FROM Groups WHERE GroupId = @groupId');
+            .input('userId', sql.Int, ManagerId)
+            .query('SELECT COUNT(*) as count FROM Users WHERE UserId = @userId');
 
-        if (checkResult.recordset[0].count > 0) {
-            return res.status(400).send('گروه با این شناسه قبلاً وجود دارد');
-        }
-
-        // If ManagerId provided, check if user exists
-        if (ManagerId) {
-            const userCheck = await pool
-                .request()
-                .input('userId', sql.Int, ManagerId)
-                .query('SELECT COUNT(*) as count FROM Users WHERE UserId = @userId');
-
-            if (userCheck.recordset[0].count === 0) {
-                return res.status(404).send('مدیر مورد نظر یافت نشد');
-            }
+        if (userCheck.recordset[0].count === 0) {
+            return res.status(404).send('مدیر مورد نظر یافت نشد');
         }
 
         await pool
             .request()
-            .input('groupId', sql.Int, GroupId)
             .input('groupName', sql.NVarChar, GroupName)
-            .input('managerId', sql.Int, ManagerId || null)
+            .input('managerId', sql.Int, ManagerId)
             .query(`
-                INSERT INTO Groups (GroupId, GroupName, ManagerId)
-                VALUES (@groupId, @groupName, @managerId)
+                INSERT INTO Groups (GroupName, ManagerId)
+                VALUES (@groupName, @managerId)
             `);
 
         res.status(201).json({
-            GroupId,
             GroupName,
             ManagerId,
             message: 'گروه با موفقیت ایجاد شد'

@@ -214,25 +214,6 @@ BEGIN
 
     DELETE u
     FROM [UMD].[UMD].[dbo].[users] u
-    INNER JOIN deleted d ON u.personalid = d.UserId;
-END;
-GO
-
--- تریگرها برای VIEW Groups
-CREATE TRIGGER trg_InsteadOfInsert_Groups
-ON Groups
-INSTEAD OF INSERT
-AS
-BEGIN
-    INSERT INTO [UMD].[UMD].[dbo].[groups] (id, groupname, managerID)
-    SELECT GroupId, GroupName, ManagerId
-    FROM inserted;
-END;
-GO
-
-CREATE TRIGGER trg_InsteadOfUpdate_Groups
-ON Groups
-INSTEAD OF UPDATE
 AS
 BEGIN
     UPDATE g
