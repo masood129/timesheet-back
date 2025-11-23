@@ -177,9 +177,31 @@ BEGIN
             SET @PrevMonth = CASE WHEN @CurrentMonth = 1 THEN 12 ELSE @CurrentMonth - 1 END;
             SET @PrevYear = CASE WHEN @CurrentMonth = 1 THEN @Year - 1 ELSE @Year END;
             
-            IF EXISTS (SELECT 1 FROM MonthPeriodSettings WHERE Year = @PrevYear AND Month = @PrevMonth)
+            -- ابتدا بررسی می‌کنیم که آیا ماه قبل در جدول موقت محاسبه شده است
+            -- (برای ماه‌های همین سال که قبلاً در حلقه پردازش شده‌اند)
+            IF @PrevYear = @Year AND EXISTS (SELECT 1 FROM #MonthPeriods WHERE Month = @PrevMonth)
             BEGIN
-                -- ماه قبل تنظیم شده، شروع از X+1
+                -- استفاده از بازه محاسبه شده ماه قبل از جدول موقت
+                SELECT @PrevEndDay = EndDay, @PrevEndMonth = EndMonth
+                FROM #MonthPeriods
+                WHERE Month = @PrevMonth;
+                
+                IF @PrevEndMonth = @CurrentMonth
+                BEGIN
+                    -- ماه قبل در همین ماه تمام شده
+                    SET @StartDay = @PrevEndDay + 1;
+                    SET @StartMonth = @CurrentMonth;
+                END
+                ELSE
+                BEGIN
+                    -- ماه قبل در ماه دیگری تمام شده
+                    SET @StartDay = 1;
+                    SET @StartMonth = @CurrentMonth;
+                END
+            END
+            ELSE IF EXISTS (SELECT 1 FROM MonthPeriodSettings WHERE Year = @PrevYear AND Month = @PrevMonth)
+            BEGIN
+                -- ماه قبل تنظیم شده در دیتابیس (برای سال قبل)، شروع از X+1
                 SELECT @PrevEndDay = EndDay, @PrevEndMonth = EndMonth
                 FROM MonthPeriodSettings
                 WHERE Year = @PrevYear AND Month = @PrevMonth;
