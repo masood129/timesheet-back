@@ -7,8 +7,9 @@ const projectRoutes = require('./routes/project.routes');
 const dailyDetailsRoutes = require('./routes/dailyDetails.routes');
 const monthlyReportsRoutes = require('./routes/monthlyReports.routes');
 const authRoutes = require('./routes/auth.routes');
-const userRoutes = require('./routes/user.routes'); // Adjust path if needed
-const {getJalaliMonthRange} = require('./utils/dateConverter');
+const userRoutes = require('./routes/user.routes');
+const adminRoutes = require('./routes/admin.routes');
+const { getJalaliMonthRange } = require('./utils/dateConverter');
 require('dotenv').config();
 
 const app = express();
@@ -16,7 +17,7 @@ const port = process.env.PORT || 3000;
 
 
 app.get('/test/jalali/:year/:month', (req, res) => {
-    const {year, month} = req.params;
+    const { year, month } = req.params;
     const jalaliYear = parseInt(year);
     const jalaliMonth = parseInt(month);
 
@@ -60,6 +61,14 @@ const authMiddleware = (req, res, next) => {
     }
 };
 
+// Middleware برای بررسی نقش ادمین
+const adminMiddleware = (req, res, next) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).send('Access denied: Admin privileges required');
+    }
+    next();
+};
+
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -81,6 +90,7 @@ app.use('/projects', authMiddleware, projectRoutes);
 app.use('/daily-details', authMiddleware, dailyDetailsRoutes);
 app.use('/monthly-reports', authMiddleware, monthlyReportsRoutes);
 app.use('/users', authMiddleware, userRoutes);
+app.use('/admin', authMiddleware, adminMiddleware, adminRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.listen(port, () => {
