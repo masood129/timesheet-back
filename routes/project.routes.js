@@ -1,5 +1,21 @@
 const express = require('express');
 const router = express.Router();
+const { sql, poolPromise } = require('../config/db.config');
+
+/**
+ * @swagger
+ * /projects:
+ *   get:
+ *     summary: Retrieve all projects accessible to the current user
+ *     tags: [Projects]
+ *     responses:
+ *       200:
+ *         description: List of projects
+ *         content:
+ *           application/json:
+ *             schema:
+const express = require('express');
+const router = express.Router();
 const {sql, poolPromise} = require('../config/db.config');
 
 /**
@@ -28,8 +44,8 @@ router.get('/', async (req, res) => {
             .input('userId', sql.Int, userId)
             .query(`
                 SELECT p.*
-                FROM Projects p
-                         JOIN UserProjectAccess upa ON p.Id = upa.ProjectId
+                FROM projects p
+                         JOIN UserProjectAccess upa ON p.id = upa.ProjectId
                 WHERE upa.UserId = @userId
             `);
         res.json(result.recordset);
@@ -75,16 +91,16 @@ router.get('/:id', async (req, res) => {
             .input('userId', sql.Int, userId)
             .query(`
                 SELECT p.*
-                FROM Projects p
-                         JOIN UserProjectAccess upa ON p.Id = upa.ProjectId
-                WHERE p.Id = @id
+                FROM projects p
+                         JOIN UserProjectAccess upa ON p.id = upa.ProjectId
+                WHERE p.id = @id
                   AND upa.UserId = @userId
             `);
         if (result.recordset.length === 0) {
             const existsResult = await pool
                 .request()
                 .input('id', sql.Int, req.params.id)
-                .query('SELECT COUNT(*) as count FROM Projects WHERE Id = @id');
+                .query('SELECT COUNT(*) as count FROM projects WHERE id = @id');
             if (existsResult.recordset[0].count === 0) {
                 return res.status(404).send('پروژه یافت نشد');
             } else {
@@ -123,16 +139,16 @@ router.get('/:id', async (req, res) => {
  *         description: Server error
  */
 router.post('/', async (req, res) => {
-    const {Id, ProjectName, securityLevel} = req.body;
-    if (!Id || !ProjectName || securityLevel == null) {
-        return res.status(400).send('شناسه، نام پروژه و سطح امنیتی الزامی هستند');
+    const { Id, ProjectName } = req.body;
+    if (!Id || !ProjectName) {
+        return res.status(400).send('شناسه و نام پروژه الزامی هستند');
     }
     try {
         const pool = await poolPromise;
         const checkResult = await pool
             .request()
             .input('id', sql.Int, Id)
-            .query('SELECT COUNT(*) as count FROM Projects WHERE Id = @id');
+            .query('SELECT COUNT(*) as count FROM projects WHERE id = @id');
         if (checkResult.recordset[0].count > 0) {
             return res.status(400).send('شناسه پروژه قبلاً وجود دارد');
         }
@@ -140,9 +156,8 @@ router.post('/', async (req, res) => {
             .request()
             .input('Id', sql.Int, Id)
             .input('ProjectName', sql.NVarChar, ProjectName)
-            .input('securityLevel', sql.Int, securityLevel)
             .query(
-                'INSERT INTO Projects (Id, ProjectName, securityLevel) OUTPUT INSERTED.* VALUES (@Id, @ProjectName, @securityLevel)'
+                'INSERT INTO projects (id, projectName) OUTPUT INSERTED.* VALUES (@Id, @ProjectName)'
             );
         res.status(201).json(result.recordset[0]);
     } catch (err) {
@@ -172,8 +187,6 @@ router.post('/', async (req, res) => {
  *             properties:
  *               ProjectName:
  *                 type: string
- *               securityLevel:
- *                 type: integer
  *     responses:
  *       200:
  *         description: Project updated
@@ -189,19 +202,18 @@ router.post('/', async (req, res) => {
  *         description: Server error
  */
 router.put('/:id', async (req, res) => {
-    const {ProjectName, securityLevel} = req.body;
-    if (!ProjectName && securityLevel == null) {
-        return res.status(400).send('حداقل یکی از فیلدها الزامی است');
+    const { ProjectName } = req.body;
+    if (!ProjectName) {
+        return res.status(400).send('نام پروژه الزامی است');
     }
     try {
         const pool = await poolPromise;
         const result = await pool
             .request()
             .input('id', sql.Int, req.params.id)
-            .input('ProjectName', sql.NVarChar, ProjectName || null)
-            .input('securityLevel', sql.Int, securityLevel ?? null)
+            .input('ProjectName', sql.NVarChar, ProjectName)
             .query(
-                'UPDATE Projects SET ProjectName = COALESCE(@ProjectName, ProjectName), securityLevel = COALESCE(@securityLevel, securityLevel) OUTPUT INSERTED.* WHERE Id = @id'
+                'UPDATE projects SET projectName = @ProjectName OUTPUT INSERTED.* WHERE id = @id'
             );
         if (result.recordset.length === 0) {
             return res.status(404).send('پروژه یافت نشد');
@@ -239,7 +251,7 @@ router.delete('/:id', async (req, res) => {
         const result = await pool
             .request()
             .input('id', sql.Int, req.params.id)
-            .query('DELETE FROM Projects WHERE Id = @id');
+            .query('DELETE FROM projects WHERE id = @id');
         if (result.rowsAffected[0] === 0) {
             return res.status(404).send('پروژه یافت نشد');
         }

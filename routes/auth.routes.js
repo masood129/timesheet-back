@@ -1,6 +1,50 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const { sql, poolPromise } = require('../config/db.config');
+
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Authenticate user and generate JWT token using username only
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 description: User's username
+ *     responses:
+ *       200:
+ *         description: Successful login, returns JWT token and userId
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                   description: JWT token for authentication
+ *                 userId:
+ *                   type: integer
+ *                   description: User's ID
+ *                 Username:
+ *                   type: string
+ *                   description: User's username
+ *                 Role:
+ *                   type: string
+ *                   description: User's role
+ *       400:
+const express = require('express');
+const router = express.Router();
+const jwt = require('jsonwebtoken');
 const {sql, poolPromise} = require('../config/db.config');
 
 /**
@@ -49,7 +93,7 @@ const {sql, poolPromise} = require('../config/db.config');
  *         description: Server error
  */
 router.post('/login', async (req, res) => {
-    const {username} = req.body;
+    const { username } = req.body;
 
     if (!username) {
         return res.status(400).send('Username is required');
@@ -60,7 +104,7 @@ router.post('/login', async (req, res) => {
         const result = await pool
             .request()
             .input('username', sql.NVarChar, username)
-            .query('SELECT UserId, Username, Role FROM Users WHERE Username = @username');
+            .query('SELECT personalid as UserId, id as Username, role as Role FROM users WHERE id = @username AND IsActive = 1');
 
         if (result.recordset.length === 0) {
             return res.status(401).send('Invalid username');
@@ -68,9 +112,9 @@ router.post('/login', async (req, res) => {
 
         const user = result.recordset[0];
         const token = jwt.sign(
-            {userId: user.UserId, role: user.Role},
+            { userId: user.UserId, role: user.Role },
             process.env.JWT_SECRET,
-            {expiresIn: '24h'} // افزایش زمان انقضا
+            { expiresIn: '24h' } // افزایش زمان انقضا
         );
 
         res.json({
@@ -102,7 +146,7 @@ router.post('/login-as', async (req, res) => {
         const result = await pool
             .request()
             .input('userId', sql.Int, targetUserId)
-            .query('SELECT UserId, Username, Role FROM Users WHERE UserId = @userId');
+            .query('SELECT personalid as UserId, id as Username, role as Role FROM users WHERE personalid = @userId AND IsActive = 1');
 
         if (result.recordset.length === 0) {
             return res.status(404).send('User not found');
