@@ -1,4 +1,4 @@
-const {sql, poolPromise} = require('../../config/db.config');
+const { sql, poolPromise } = require('../../config/db.config');
 
 const checkRole = (roles) => (req, res, next) => {
     if (!roles.includes(req.user?.role)) return res.status(403).send('Access denied');
@@ -34,7 +34,7 @@ const validateReportId = (req, res, next) => {
 const submitToGroupManager = async (req, res) => {
     checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
         validateReportId(req, res, async () => {
-            const {reportId} = req.params;
+            const { reportId } = req.params;
             const userId = req.user.userId;
             const role = req.user.role;
             try {
@@ -62,7 +62,7 @@ const submitToGroupManager = async (req, res) => {
                     const groupCheck = await pool.request()
                         .input('groupId', sql.Int, report.GroupId)
                         .input('userId', sql.Int, userId)
-                        .query('SELECT 1 FROM Groups WHERE GroupId = @groupId AND ManagerId = @userId');
+                        .query('SELECT 1 FROM groups WHERE id = @groupId AND managerID = @userId');
 
                     if (groupCheck.recordset.length > 0) {
                         newStatus = 'submitted_to_general_manager';
@@ -115,8 +115,8 @@ const submitToGroupManager = async (req, res) => {
 const approveGroupManager = async (req, res) => {
     checkRole(['group_manager'])(req, res, async () => {
         validateReportId(req, res, async () => {
-            const {reportId} = req.params;
-            const {comment, toGeneralManager} = req.body;
+            const { reportId } = req.params;
+            const { comment, toGeneralManager } = req.body;
             const userId = req.user.userId;
             try {
                 const pool = await poolPromise;
@@ -126,9 +126,9 @@ const approveGroupManager = async (req, res) => {
                     .query(`
                         SELECT mr.*
                         FROM MonthlyReports mr
-                                 JOIN Groups g ON mr.GroupId = g.GroupId
+                        JOIN groups g ON mr.GroupId = g.id
                         WHERE mr.ReportId = @reportId
-                          AND g.ManagerId = @userId
+                          AND g.managerID = @userId
                     `);
 
                 if (reportResult.recordset.length === 0) {
@@ -182,8 +182,8 @@ const approveGroupManager = async (req, res) => {
 const approveGeneralManager = async (req, res) => {
     checkRole(['general_manager'])(req, res, async () => {
         validateReportId(req, res, async () => {
-            const {reportId} = req.params;
-            const {comment} = req.body;
+            const { reportId } = req.params;
+            const { comment } = req.body;
             try {
                 const pool = await poolPromise;
                 await pool.request()
@@ -232,8 +232,8 @@ const approveGeneralManager = async (req, res) => {
 const approveFinance = async (req, res) => {
     checkRole(['finance_manager'])(req, res, async () => {
         validateReportId(req, res, async () => {
-            const {reportId} = req.params;
-            const {comment} = req.body;
+            const { reportId } = req.params;
+            const { comment } = req.body;
             try {
                 const pool = await poolPromise;
                 await pool.request()
@@ -286,22 +286,22 @@ const approveFinance = async (req, res) => {
 const rejectToDraft = async (req, res) => {
     checkRole(['group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
         validateReportId(req, res, async () => {
-            const {reportId} = req.params;
-            const {comment} = req.body;
+            const { reportId } = req.params;
+            const { comment } = req.body;
             const userId = req.user.userId;
             const role = req.user.role;
 
             try {
                 const pool = await poolPromise;
                 let query = `
-                    SELECT mr.*, g.ManagerId
+                    SELECT mr.*, g.managerID
                     FROM MonthlyReports mr
-                             LEFT JOIN Groups g ON mr.GroupId = g.GroupId
+                    LEFT JOIN groups g ON mr.GroupId = g.id
                     WHERE mr.ReportId = @reportId
                 `;
 
                 if (role === 'group_manager') {
-                    query += ' AND g.ManagerId = @userId';
+                    query += ' AND g.managerID = @userId';
                 }
 
                 const reportResult = await pool.request()

@@ -10,10 +10,14 @@ const getAllMonthlyReports = async (req, res) => {
     try {
         const pool = await poolPromise;
         let query = `
-            SELECT mr.*, u.Username
+            SELECT 
+                mr.*,
+                u.id as username,
+                u.farsifirstname,
+                u.farsilastname
             FROM MonthlyReports mr
-            JOIN Users u ON mr.UserId = u.UserId
-            WHERE 1=1
+            JOIN users u ON mr.UserId = u.personalid
+            WHERE u.IsActive = 1
         `;
         const request = pool.request();
 
@@ -44,7 +48,7 @@ const getAllMonthlyReports = async (req, res) => {
         const result = await request.query(query);
 
         // Get total count
-        let countQuery = 'SELECT COUNT(*) as total FROM MonthlyReports mr WHERE 1=1';
+        let countQuery = 'SELECT COUNT(*) as total FROM MonthlyReports mr JOIN users u ON mr.UserId = u.personalid WHERE u.IsActive = 1';
         const countRequest = pool.request();
 
         if (status) {
@@ -91,10 +95,14 @@ const getAllDailyDetails = async (req, res) => {
     try {
         const pool = await poolPromise;
         let query = `
-            SELECT dd.*, u.Username
+            SELECT 
+                dd.*,
+                u.id as username,
+                u.farsifirstname,
+                u.farsilastname
             FROM DailyDetails dd
-            JOIN Users u ON dd.UserId = u.UserId
-            WHERE 1=1
+            JOIN users u ON dd.UserId = u.personalid
+            WHERE u.IsActive = 1
         `;
         const request = pool.request();
 
@@ -120,11 +128,11 @@ const getAllDailyDetails = async (req, res) => {
         const result = await request.query(query);
 
         // Get total count
-        let countQuery = 'SELECT COUNT(*) as total FROM DailyDetails dd WHERE 1=1';
+        let countQuery = 'SELECT COUNT(*) as total FROM DailyDetails dd JOIN users u ON dd.UserId = u.personalid WHERE u.IsActive = 1';
         const countRequest = pool.request();
 
         if (userId) {
-            countQuery += ' AND dd.UserId = @userId';
+            countQuery += ' AND dd.UserId =  @userId';
             countRequest.input('userId', sql.Int, userId);
         }
 
@@ -159,14 +167,14 @@ const getSystemStatistics = async (req, res) => {
     try {
         const pool = await poolPromise;
 
-        // Total users
-        const usersResult = await pool.request().query('SELECT COUNT(*) as total FROM Users');
+        // Total active users
+        const usersResult = await pool.request().query('SELECT COUNT(*) as total FROM users WHERE IsActive = 1');
 
         // Total projects
-        const projectsResult = await pool.request().query('SELECT COUNT(*) as total FROM Projects');
+        const projectsResult = await pool.request().query('SELECT COUNT(*) as total FROM projects');
 
         // Total groups
-        const groupsResult = await pool.request().query('SELECT COUNT(*) as total FROM Groups');
+        const groupsResult = await pool.request().query('SELECT COUNT(*) as total FROM groups');
 
         // Pending reports
         const pendingReportsResult = await pool.request().query(`
@@ -181,7 +189,7 @@ const getSystemStatistics = async (req, res) => {
 
         // Users by role
         const usersByRoleResult = await pool.request().query(`
-            SELECT Role, COUNT(*) as count FROM Users GROUP BY Role
+            SELECT role, COUNT(*) as count FROM users WHERE IsActive = 1 GROUP BY role
         `);
 
         // Recent activity (last 30 days)
@@ -218,8 +226,8 @@ const getUserActivitySummary = async (req, res) => {
         // Check if user exists
         const userCheck = await pool
             .request()
-            .input('userId', sql.Int, userId)
-            .query('SELECT Username, Role FROM Users WHERE UserId = @userId');
+            .input('personalId', sql.Int, userId)
+            .query('SELECT id as username, role, farsifirstname, farsilastname FROM users WHERE personalid = @personalId AND IsActive = 1');
 
         if (userCheck.recordset.length === 0) {
             return res.status(404).send('کاربر یافت نشد');
@@ -270,13 +278,13 @@ const getUserActivitySummary = async (req, res) => {
             .input('startDate', sql.Date, startDate || '1900-01-01')
             .input('endDate', sql.Date, endDate || '2100-12-31')
             .query(`
-                SELECT DISTINCT p.Id, p.ProjectName, SUM(dpt.Duration) as totalMinutes
+                SELECT DISTINCT p.id, p.projectName, SUM(dpt.Duration) as totalMinutes
                 FROM DailyProjectTasks dpt
-                JOIN Projects p ON dpt.ProjectId = p.Id
+                JOIN projects p ON dpt.ProjectId = p.id
                 WHERE dpt.UserId = @userId
                   AND dpt.Date >= @startDate
                   AND dpt.Date <= @endDate
-                GROUP BY p.Id, p.ProjectName
+                GROUP BY p.id, p.projectName
                 ORDER BY totalMinutes DESC
             `);
 
@@ -293,9 +301,10 @@ const getUserActivitySummary = async (req, res) => {
 
         res.json({
             user: {
-                UserId: userId,
-                Username: user.Username,
-                Role: user.Role
+                personalId: userId,
+                username: user.username,
+                fullName: `${user.farsifirstname} ${user.farsilastname}`,
+                role: user.role
             },
             summary: {
                 totalWorkingDays: workingDaysResult.recordset[0].total,

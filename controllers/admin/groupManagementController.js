@@ -10,30 +10,35 @@ const getAllGroups = async (req, res) => {
     try {
         const pool = await poolPromise;
         let query = `
-            SELECT g.GroupId, g.GroupName, g.ManagerId, u.Username as ManagerName
-            FROM Groups g
-            LEFT JOIN Users u ON g.ManagerId = u.UserId
+            SELECT 
+                g.id,
+                g.groupname,
+                g.managerID,
+                u.id as managerUsername,
+                u.farsifirstname + ' ' + u.farsilastname as managerName
+            FROM groups g
+            LEFT JOIN users u ON g.managerID = u.personalid
             WHERE 1=1
         `;
         const request = pool.request();
 
         if (search) {
-            query += ' AND g.GroupName LIKE @search';
+            query += ' AND g.groupname LIKE @search';
             request.input('search', sql.NVarChar, `%${search}%`);
         }
 
-        query += ' ORDER BY g.GroupId OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY';
+        query += ' ORDER BY g.id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY';
         request.input('offset', sql.Int, offset);
         request.input('limit', sql.Int, parseInt(limit));
 
         const result = await request.query(query);
 
         // Get total count
-        let countQuery = 'SELECT COUNT(*) as total FROM Groups WHERE 1=1';
+        let countQuery = 'SELECT COUNT(*) as total FROM groups WHERE 1=1';
         const countRequest = pool.request();
 
         if (search) {
-            countQuery += ' AND GroupName LIKE @search';
+            countQuery += ' AND groupname LIKE @search';
             countRequest.input('search', sql.NVarChar, `%${search}%`);
         }
 
@@ -63,10 +68,15 @@ const getGroupById = async (req, res) => {
             .request()
             .input('groupId', sql.Int, id)
             .query(`
-                SELECT g.GroupId, g.GroupName, g.ManagerId, u.Username as ManagerName
-                FROM Groups g
-                LEFT JOIN Users u ON g.ManagerId = u.UserId
-                WHERE g.GroupId = @groupId
+                SELECT 
+                    g.id,
+                    g.groupname,
+                    g.managerID,
+                    u.id as managerUsername,
+                    u.farsifirstname + ' ' + u.farsilastname as managerName
+                FROM groups g
+                LEFT JOIN users u ON g.managerID = u.personalid
+                WHERE g.id = @groupId
             `);
 
         if (result.recordset.length === 0) {
@@ -78,10 +88,15 @@ const getGroupById = async (req, res) => {
             .request()
             .input('groupId', sql.Int, id)
             .query(`
-                SELECT u.UserId, u.Username, u.Role
-                FROM Users u
-                JOIN UserGroup ug ON u.UserId = ug.UserId
-                WHERE ug.GroupId = @groupId
+                SELECT 
+                    u.personalid,
+                    u.id as username,
+                    u.farsifirstname,
+                    u.farsilastname,
+                    u.email,
+                    u.role
+                FROM users u
+                WHERE u.groupid = @groupId AND u.IsActive = 1
             `);
 
         const group = result.recordset[0];
@@ -98,20 +113,20 @@ const getGroupById = async (req, res) => {
  * Create new group
  */
 const createGroup = async (req, res) => {
-    const { GroupName, ManagerId } = req.body;
+    const { groupName, managerId } = req.body;
 
-    if (!GroupName || !ManagerId) {
+    if (!groupName || !managerId) {
         return res.status(400).send('نام گروه و شناسه مدیر الزامی است');
     }
 
     try {
         const pool = await poolPromise;
 
-        // Check if user exists
+        // Check if manager exists
         const userCheck = await pool
             .request()
-            .input('userId', sql.Int, ManagerId)
-            .query('SELECT COUNT(*) as count FROM Users WHERE UserId = @userId');
+            .input('personalId', sql.Int, managerId)
+            .query('SELECT COUNT(*) as count FROM users WHERE personalid = @personalId AND IsActive = 1');
 
         if (userCheck.recordset[0].count === 0) {
             return res.status(404).send('مدیر مورد نظر یافت نشد');
@@ -119,16 +134,16 @@ const createGroup = async (req, res) => {
 
         await pool
             .request()
-            .input('groupName', sql.NVarChar, GroupName)
-            .input('managerId', sql.Int, ManagerId)
+            .input('groupName', sql.NVarChar, groupName)
+            .input('managerId', sql.Int, managerId)
             .query(`
-                INSERT INTO Groups (GroupName, ManagerId)
+                INSERT INTO groups (groupname, managerID)
                 VALUES (@groupName, @managerId)
             `);
 
         res.status(201).json({
-            GroupName,
-            ManagerId,
+            groupName,
+            managerId,
             message: 'گروه با موفقیت ایجاد شد'
         });
     } catch (err) {
@@ -142,9 +157,9 @@ const createGroup = async (req, res) => {
  */
 const updateGroup = async (req, res) => {
     const { id } = req.params;
-    const { GroupName, ManagerId } = req.body;
+    const { groupName, managerId } = req.body;
 
-    if (!GroupName && ManagerId == null) {
+    if (!groupName && managerId == null) {
         return res.status(400).send('حداقل یکی از فیلدها الزامی است');
     }
 
@@ -155,18 +170,18 @@ const updateGroup = async (req, res) => {
         const checkResult = await pool
             .request()
             .input('groupId', sql.Int, id)
-            .query('SELECT COUNT(*) as count FROM Groups WHERE GroupId = @groupId');
+            .query('SELECT COUNT(*) as count FROM groups WHERE id = @groupId');
 
         if (checkResult.recordset[0].count === 0) {
             return res.status(404).send('گروه یافت نشد');
         }
 
-        // If ManagerId provided, check if user exists
-        if (ManagerId) {
+        // If managerId provided, check if user exists
+        if (managerId) {
             const userCheck = await pool
                 .request()
-                .input('userId', sql.Int, ManagerId)
-                .query('SELECT COUNT(*) as count FROM Users WHERE UserId = @userId');
+                .input('personalId', sql.Int, managerId)
+                .query('SELECT COUNT(*) as count FROM users WHERE personalid = @personalId AND IsActive = 1');
 
             if (userCheck.recordset[0].count === 0) {
                 return res.status(404).send('مدیر مورد نظر یافت نشد');
@@ -176,13 +191,13 @@ const updateGroup = async (req, res) => {
         await pool
             .request()
             .input('groupId', sql.Int, id)
-            .input('groupName', sql.NVarChar, GroupName || null)
-            .input('managerId', sql.Int, ManagerId ?? null)
+            .input('groupName', sql.NVarChar, groupName || null)
+            .input('managerId', sql.Int, managerId ?? null)
             .query(`
-                UPDATE Groups
-                SET GroupName = COALESCE(@groupName, GroupName),
-                    ManagerId = COALESCE(@managerId, ManagerId)
-                WHERE GroupId = @groupId
+                UPDATE groups
+                SET groupname = COALESCE(@groupName, groupname),
+                    managerID = COALESCE(@managerId, managerID)
+                WHERE id = @groupId
             `);
 
         res.json({ message: 'گروه با موفقیت بروزرسانی شد' });
@@ -201,17 +216,17 @@ const deleteGroup = async (req, res) => {
     try {
         const pool = await poolPromise;
 
-        // Remove users from group first
+        // Remove users from group first (set groupid to NULL)
         await pool
             .request()
             .input('groupId', sql.Int, id)
-            .query('DELETE FROM UserGroup WHERE GroupId = @groupId');
+            .query('UPDATE users SET groupid = NULL WHERE groupid = @groupId');
 
         // Delete group
         const result = await pool
             .request()
             .input('groupId', sql.Int, id)
-            .query('DELETE FROM Groups WHERE GroupId = @groupId');
+            .query('DELETE FROM groups WHERE id = @groupId');
 
         if (result.rowsAffected[0] === 0) {
             return res.status(404).send('گروه یافت نشد');
@@ -237,7 +252,7 @@ const getGroupMembers = async (req, res) => {
         const groupCheck = await pool
             .request()
             .input('groupId', sql.Int, id)
-            .query('SELECT COUNT(*) as count FROM Groups WHERE GroupId = @groupId');
+            .query('SELECT COUNT(*) as count FROM groups WHERE id = @groupId');
 
         if (groupCheck.recordset[0].count === 0) {
             return res.status(404).send('گروه یافت نشد');
@@ -247,10 +262,15 @@ const getGroupMembers = async (req, res) => {
             .request()
             .input('groupId', sql.Int, id)
             .query(`
-                SELECT u.UserId, u.Username, u.Role
-                FROM Users u
-                JOIN UserGroup ug ON u.UserId = ug.UserId
-                WHERE ug.GroupId = @groupId
+                SELECT 
+                    u.personalid,
+                    u.id as username,
+                    u.farsifirstname,
+                    u.farsilastname,
+                    u.email,
+                    u.role
+                FROM users u
+                WHERE u.groupid = @groupId AND u.IsActive = 1
             `);
 
         res.json(result.recordset);
@@ -265,9 +285,9 @@ const getGroupMembers = async (req, res) => {
  */
 const addUserToGroup = async (req, res) => {
     const { id } = req.params;
-    const { UserId } = req.body;
+    const { userId } = req.body;
 
-    if (!UserId) {
+    if (!userId) {
         return res.status(400).send('شناسه کاربر الزامی است');
     }
 
@@ -278,7 +298,7 @@ const addUserToGroup = async (req, res) => {
         const groupCheck = await pool
             .request()
             .input('groupId', sql.Int, id)
-            .query('SELECT COUNT(*) as count FROM Groups WHERE GroupId = @groupId');
+            .query('SELECT COUNT(*) as count FROM groups WHERE id = @groupId');
 
         if (groupCheck.recordset[0].count === 0) {
             return res.status(404).send('گروه یافت نشد');
@@ -287,33 +307,19 @@ const addUserToGroup = async (req, res) => {
         // Check if user exists
         const userCheck = await pool
             .request()
-            .input('userId', sql.Int, UserId)
-            .query('SELECT COUNT(*) as count FROM Users WHERE UserId = @userId');
+            .input('personalId', sql.Int, userId)
+            .query('SELECT COUNT(*) as count FROM users WHERE personalid = @personalId AND IsActive = 1');
 
         if (userCheck.recordset[0].count === 0) {
             return res.status(404).send('کاربر یافت نشد');
         }
 
-        // Check if user already in a group
-        const memberCheck = await pool
-            .request()
-            .input('userId', sql.Int, UserId)
-            .query('SELECT GroupId FROM UserGroup WHERE UserId = @userId');
-
-        if (memberCheck.recordset.length > 0) {
-            // Remove from old group first
-            await pool
-                .request()
-                .input('userId', sql.Int, UserId)
-                .query('DELETE FROM UserGroup WHERE UserId = @userId');
-        }
-
-        // Add to new group
+        // Add user to group (update groupid)
         await pool
             .request()
-            .input('userId', sql.Int, UserId)
+            .input('personalId', sql.Int, userId)
             .input('groupId', sql.Int, id)
-            .query('INSERT INTO UserGroup (UserId, GroupId) VALUES (@userId, @groupId)');
+            .query('UPDATE users SET groupid = @groupId WHERE personalid = @personalId');
 
         res.status(201).json({ message: 'کاربر به گروه اضافه شد' });
     } catch (err) {
@@ -333,9 +339,9 @@ const removeUserFromGroup = async (req, res) => {
 
         const result = await pool
             .request()
-            .input('userId', sql.Int, userId)
+            .input('personalId', sql.Int, userId)
             .input('groupId', sql.Int, id)
-            .query('DELETE FROM UserGroup WHERE UserId = @userId AND GroupId = @groupId');
+            .query('UPDATE users SET groupid = NULL WHERE personalid = @personalId AND groupid = @groupId');
 
         if (result.rowsAffected[0] === 0) {
             return res.status(404).send('کاربر در این گروه یافت نشد');
@@ -353,9 +359,9 @@ const removeUserFromGroup = async (req, res) => {
  */
 const setGroupManager = async (req, res) => {
     const { id } = req.params;
-    const { ManagerId } = req.body;
+    const { managerId } = req.body;
 
-    if (!ManagerId) {
+    if (!managerId) {
         return res.status(400).send('شناسه مدیر الزامی است');
     }
 
@@ -366,7 +372,7 @@ const setGroupManager = async (req, res) => {
         const groupCheck = await pool
             .request()
             .input('groupId', sql.Int, id)
-            .query('SELECT COUNT(*) as count FROM Groups WHERE GroupId = @groupId');
+            .query('SELECT COUNT(*) as count FROM groups WHERE id = @groupId');
 
         if (groupCheck.recordset[0].count === 0) {
             return res.status(404).send('گروه یافت نشد');
@@ -375,8 +381,8 @@ const setGroupManager = async (req, res) => {
         // Check if user exists
         const userCheck = await pool
             .request()
-            .input('userId', sql.Int, ManagerId)
-            .query('SELECT COUNT(*) as count FROM Users WHERE UserId = @userId');
+            .input('personalId', sql.Int, managerId)
+            .query('SELECT COUNT(*) as count FROM users WHERE personalid = @personalId AND IsActive = 1');
 
         if (userCheck.recordset[0].count === 0) {
             return res.status(404).send('کاربر یافت نشد');
@@ -386,8 +392,8 @@ const setGroupManager = async (req, res) => {
         await pool
             .request()
             .input('groupId', sql.Int, id)
-            .input('managerId', sql.Int, ManagerId)
-            .query('UPDATE Groups SET ManagerId = @managerId WHERE GroupId = @groupId');
+            .input('managerId', sql.Int, managerId)
+            .query('UPDATE groups SET managerID = @managerId WHERE id = @groupId');
 
         res.json({ message: 'مدیر گروه با موفقیت تنظیم شد' });
     } catch (err) {

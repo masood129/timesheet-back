@@ -7,10 +7,15 @@ const getAllContractHours = async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-            SELECT uch.*, u.Username
+            SELECT 
+                uch.*,
+                u.id as username,
+                u.farsifirstname,
+                u.farsilastname
             FROM UserContractHours uch
-            JOIN Users u ON uch.UserId = u.UserId
-            ORDER BY u.Username
+            JOIN users u ON uch.UserId = u.personalid
+            WHERE u.IsActive = 1
+            ORDER BY u.id
         `);
 
         res.json(result.recordset);
@@ -32,10 +37,15 @@ const getUserContractHours = async (req, res) => {
             .request()
             .input('userId', sql.Int, userId)
             .query(`
-                SELECT uch.*, u.Username
+                SELECT 
+                    uch.*,
+                    u.id as username,
+                    u.farsifirstname,
+                    u.farsilastname
                 FROM UserContractHours uch
-                JOIN Users u ON uch.UserId = u.UserId
+                JOIN users u ON uch.UserId = u.personalid
                 WHERE uch.UserId = @userId
+                  AND u.IsActive = 1
             `);
 
         if (result.recordset.length === 0) {
@@ -67,7 +77,7 @@ const updateUserContractHours = async (req, res) => {
         const userCheck = await pool
             .request()
             .input('userId', sql.Int, userId)
-            .query('SELECT COUNT(*) as count FROM Users WHERE UserId = @userId');
+            .query('SELECT COUNT(*) as count FROM users WHERE personalid = @userId AND IsActive = 1');
 
         if (userCheck.recordset[0].count === 0) {
             return res.status(404).send('کاربر یافت نشد');
@@ -150,9 +160,9 @@ const getSystemConfig = async (req, res) => {
         // Get database info
         const dbInfoResult = await pool.request().query(`
             SELECT 
-                (SELECT COUNT(*) FROM Users) as TotalUsers,
-                (SELECT COUNT(*) FROM Projects) as TotalProjects,
-                (SELECT COUNT(*) FROM Groups) as TotalGroups,
+                (SELECT COUNT(*) FROM users WHERE IsActive = 1) as TotalUsers,
+                (SELECT COUNT(*) FROM projects) as TotalProjects,
+                (SELECT COUNT(*) FROM groups) as TotalGroups,
                 (SELECT COUNT(*) FROM DailyDetails) as TotalDailyRecords,
                 (SELECT COUNT(*) FROM MonthlyReports) as TotalMonthlyReports
         `);

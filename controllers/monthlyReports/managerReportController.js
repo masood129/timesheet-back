@@ -1,11 +1,10 @@
-const {sql, poolPromise} = require('../../config/db.config');
-const {getJalaliMonthRange} = require('../../utils/dateConverter');
+const { sql, poolPromise } = require('../../config/db.config');
+const { getJalaliMonthRange } = require('../../utils/dateConverter');
 
 const checkRole = (roles) => (req, res, next) => {
     if (!roles.includes(req.user?.role)) return res.status(403).send('Access denied');
     next();
 };
-
 
 /**
  * @swagger
@@ -41,10 +40,9 @@ const checkRole = (roles) => (req, res, next) => {
  *       500:
  *         description: Server error
  */
-
 const getReportById = async (req, res) => {
     checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
-        const {reportId} = req.body;
+        const { reportId } = req.body;
 
         if (!reportId) {
             return res.status(400).send('reportId is required');
@@ -55,12 +53,19 @@ const getReportById = async (req, res) => {
             const result = await pool.request()
                 .input('reportId', sql.Int, reportId)
                 .query(`
-                    SELECT mr.*, u.Username, g.GroupName, m.Username AS ManagerUsername
+                    SELECT 
+                        mr.*,
+                        u.id as username,
+                        u.farsifirstname,
+                        u.farsilastname,
+                        g.groupname,
+                        m.id AS managerUsername
                     FROM MonthlyReports mr
-                             JOIN Users u ON mr.UserId = u.UserId
-                             LEFT JOIN Groups g ON mr.GroupId = g.GroupId
-                             LEFT JOIN Users m ON g.ManagerId = m.UserId
+                    JOIN users u ON mr.UserId = u.personalid
+                    LEFT JOIN groups g ON mr.GroupId = g.id
+                    LEFT JOIN users m ON g.managerID = m.personalid
                     WHERE mr.ReportId = @reportId
+                      AND u.IsActive = 1
                 `);
 
             if (result.recordset.length === 0) {
@@ -71,7 +76,7 @@ const getReportById = async (req, res) => {
 
             // Access check
             const currentUserId = req.user.userId;
-            const currentRole = req.user.role; // Assuming role is available in req.user
+            const currentRole = req.user.role;
 
             let hasAccess = false;
 
@@ -81,8 +86,8 @@ const getReportById = async (req, res) => {
                 // Check if current user is the manager of the report's group
                 const groupResult = await pool.request()
                     .input('groupId', sql.Int, report.GroupId)
-                    .query('SELECT ManagerId FROM Groups WHERE GroupId = @groupId');
-                if (groupResult.recordset.length > 0 && groupResult.recordset[0].ManagerId === currentUserId) {
+                    .query('SELECT managerID FROM groups WHERE id = @groupId');
+                if (groupResult.recordset.length > 0 && groupResult.recordset[0].managerID === currentUserId) {
                     hasAccess = true;
                 }
             } else if (currentRole === 'general_manager' || currentRole === 'finance_manager') {
@@ -107,8 +112,7 @@ const getReportById = async (req, res) => {
                     WHERE UserId = @userId
                       AND Date >= @startDate
                       AND Date <= @endDate
-                      AND LeaveType IN ('work'
-                        , 'mission')
+                      AND LeaveType IN ('work', 'mission')
                 `);
             report.totalCommuteCost = commuteResult.recordset[0].TotalCommuteCost || 0;
 
@@ -119,7 +123,7 @@ const getReportById = async (req, res) => {
                 .query(`
                     SELECT dpc.ProjectID, SUM(ISNULL(dpc.Cost, 0)) AS TotalCost
                     FROM DailyPersonalCarCosts dpc
-                             INNER JOIN DailyDetails dd ON dpc.Date = dd.Date AND dpc.UserId = dd.UserId
+                    INNER JOIN DailyDetails dd ON dpc.Date = dd.Date AND dpc.UserId = dd.UserId
                     WHERE dpc.UserId = @userId
                       AND dpc.Date >= @startDate
                       AND dpc.Date <= @endDate
@@ -135,7 +139,7 @@ const getReportById = async (req, res) => {
                 .query(`
                     SELECT dpt.ProjectID, SUM(dpt.Duration) AS TotalHours
                     FROM DailyProjectTasks dpt
-                             INNER JOIN DailyDetails dd ON dpt.Date = dd.Date AND dpt.UserId = dd.UserId
+                    INNER JOIN DailyDetails dd ON dpt.Date = dd.Date AND dpt.UserId = dd.UserId
                     WHERE dpt.UserId = @userId
                       AND dpt.Date >= @startDate
                       AND dpt.Date <= @endDate
@@ -154,8 +158,7 @@ const getReportById = async (req, res) => {
                     WHERE UserId = @userId
                       AND Date >= @startDate
                       AND Date <= @endDate
-                      AND LeaveType NOT IN ('work'
-                        , 'mission')
+                      AND LeaveType NOT IN ('work', 'mission')
                     GROUP BY LeaveType
                 `);
             report.leaveTypesCount = leaveTypesResult.recordset.reduce((acc, row) => {
@@ -171,4 +174,4 @@ const getReportById = async (req, res) => {
     });
 };
 
-module.exports = {getReportById};
+module.exports = { getReportById };

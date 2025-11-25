@@ -1,9 +1,9 @@
 // controllers/dailyDetails/retrievalController.js (assuming folder structure)
 
-const {sql, poolPromise} = require('../../config/db.config');
-const {isValidDate, parseDate} = require('../../utils/dateUtils');
-const {DateTime} = require('luxon');
-const {getJalaliMonthRange, formatJalaliDate} = require('../../utils/dateConverter');
+const { sql, poolPromise } = require('../../config/db.config');
+const { isValidDate, parseDate } = require('../../utils/dateUtils');
+const { DateTime } = require('luxon');
+const { getJalaliMonthRange, formatJalaliDate } = require('../../utils/dateConverter');
 const exceljs = require('exceljs');
 
 /**
@@ -42,7 +42,7 @@ const exceljs = require('exceljs');
 const getJalaliMonthlyDetails = async (req, res) => {
     try {
         const pool = await poolPromise;
-        const {year, month} = req.params;
+        const { year, month } = req.params;
         const userId = req.user.userId;
 
         const jalaliYear = parseInt(year);
@@ -88,7 +88,7 @@ const getJalaliMonthlyDetails = async (req, res) => {
                 .input('userId', sql.Int, userId)
                 .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
-            const detailDate = DateTime.fromJSDate(detail.Date, {zone: 'Asia/Tehran'});
+            const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
 
             if (detail.ArrivalTime) {
                 const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
@@ -99,7 +99,7 @@ const getJalaliMonthlyDetails = async (req, res) => {
                     hour: hours,
                     minute: minutes,
                     second: seconds,
-                }, {zone: 'Asia/Tehran'}).toISO();
+                }, { zone: 'Asia/Tehran' }).toISO();
             }
             if (detail.LeaveTime) {
                 const [hours, minutes, seconds = '00'] = detail.LeaveTime.split(':').map(Number);
@@ -110,7 +110,7 @@ const getJalaliMonthlyDetails = async (req, res) => {
                     hour: hours,
                     minute: minutes,
                     second: seconds,
-                }, {zone: 'Asia/Tehran'}).toISO();
+                }, { zone: 'Asia/Tehran' }).toISO();
             }
 
             details.push({
@@ -165,7 +165,7 @@ const getJalaliMonthlyDetails = async (req, res) => {
 const getRangeDetails = async (req, res) => {
     try {
         const pool = await poolPromise;
-        const {startDate, endDate} = req.query;
+        const { startDate, endDate } = req.query;
         const userId = req.user.userId;
 
         if (!startDate || !endDate || !isValidDate(startDate) || !isValidDate(endDate)) {
@@ -207,7 +207,7 @@ const getRangeDetails = async (req, res) => {
                 .input('userId', sql.Int, userId)
                 .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
-            const detailDate = DateTime.fromJSDate(detail.Date, {zone: 'Asia/Tehran'});
+            const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
 
             if (detail.ArrivalTime) {
                 const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
@@ -218,7 +218,7 @@ const getRangeDetails = async (req, res) => {
                     hour: hours,
                     minute: minutes,
                     second: seconds,
-                }, {zone: 'Asia/Tehran'}).toISO();
+                }, { zone: 'Asia/Tehran' }).toISO();
             }
             if (detail.LeaveTime) {
                 const [hours, minutes, seconds = '00'] = detail.LeaveTime.split(':').map(Number);
@@ -229,7 +229,7 @@ const getRangeDetails = async (req, res) => {
                     hour: hours,
                     minute: minutes,
                     second: seconds,
-                }, {zone: 'Asia/Tehran'}).toISO();
+                }, { zone: 'Asia/Tehran' }).toISO();
             }
 
             details.push({
@@ -277,7 +277,7 @@ const getRangeDetails = async (req, res) => {
 const getDailyDetails = async (req, res) => {
     try {
         const pool = await poolPromise;
-        const {date} = req.params;
+        const { date } = req.params;
         const userId = req.user.userId;
 
         if (!date || !isValidDate(date)) {
@@ -310,7 +310,7 @@ const getDailyDetails = async (req, res) => {
             .input('userId', sql.Int, userId)
             .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
-        const detailDate = DateTime.fromJSDate(parsedDate, {zone: 'Asia/Tehran'});
+        const detailDate = DateTime.fromJSDate(parsedDate, { zone: 'Asia/Tehran' });
 
         if (detail.ArrivalTime) {
             const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
@@ -321,7 +321,7 @@ const getDailyDetails = async (req, res) => {
                 hour: hours,
                 minute: minutes,
                 second: seconds,
-            }, {zone: 'Asia/Tehran'}).toISO();
+            }, { zone: 'Asia/Tehran' }).toISO();
         }
         if (detail.LeaveTime) {
             const [hours, minutes, seconds = '00'] = detail.LeaveTime.split(':').map(Number);
@@ -332,7 +332,7 @@ const getDailyDetails = async (req, res) => {
                 hour: hours,
                 minute: minutes,
                 second: seconds,
-            }, {zone: 'Asia/Tehran'}).toISO();
+            }, { zone: 'Asia/Tehran' }).toISO();
         }
 
         res.json({
@@ -382,7 +382,7 @@ const getDailyDetails = async (req, res) => {
 const getMonthlyDetails = async (req, res) => {
     try {
         const pool = await poolPromise;
-        const {year, month} = req.params;
+        const { year, month } = req.params;
         const userId = req.user.userId;
 
         const parsedYear = parseInt(year);
@@ -394,10 +394,10 @@ const getMonthlyDetails = async (req, res) => {
 
         const startDate = DateTime.fromObject({
             year: parsedYear, month: parsedMonth, day: 1
-        }, {zone: 'Asia/Tehran'}).toJSDate();
+        }, { zone: 'Asia/Tehran' }).toJSDate();
         const endDate = DateTime.fromObject({
             year: parsedYear, month: parsedMonth + 1, day: 1
-        }, {zone: 'Asia/Tehran'}).minus({days: 1}).toJSDate();
+        }, { zone: 'Asia/Tehran' }).minus({ days: 1 }).toJSDate();
 
         const detailResult = await pool
             .request()
@@ -431,7 +431,7 @@ const getMonthlyDetails = async (req, res) => {
                 .input('userId', sql.Int, userId)
                 .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
 
-            const detailDate = DateTime.fromJSDate(detail.Date, {zone: 'Asia/Tehran'});
+            const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
 
             if (detail.ArrivalTime) {
                 const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
@@ -442,7 +442,7 @@ const getMonthlyDetails = async (req, res) => {
                     hour: hours,
                     minute: minutes,
                     second: seconds,
-                }, {zone: 'Asia/Tehran'}).toISO();
+                }, { zone: 'Asia/Tehran' }).toISO();
             }
             if (detail.LeaveTime) {
                 const [hours, minutes, seconds = '00'] = detail.LeaveTime.split(':').map(Number);
@@ -453,7 +453,7 @@ const getMonthlyDetails = async (req, res) => {
                     hour: hours,
                     minute: minutes,
                     second: seconds,
-                }, {zone: 'Asia/Tehran'}).toISO();
+                }, { zone: 'Asia/Tehran' }).toISO();
             }
 
             details.push({
@@ -559,7 +559,7 @@ const getMonthlyDetails = async (req, res) => {
 const getUserJalaliMonthlyDetails = async (req, res) => {
     try {
         const pool = await poolPromise;
-        const {userId: paramUserId, year, month} = req.params;
+        const { userId: paramUserId, year, month } = req.params;
         const targetUserId = parseInt(paramUserId);
         const requesterId = req.user.userId;
         const requesterRole = req.user.role;
@@ -587,10 +587,11 @@ const getUserJalaliMonthlyDetails = async (req, res) => {
                 .input('userId', sql.Int, targetUserId)
                 .query(`
                     SELECT 1
-                    FROM UserGroup ug
-                             INNER JOIN Groups g ON ug.GroupId = g.GroupId
-                    WHERE ug.UserId = @userId
-                      AND g.ManagerId = @managerId
+                    FROM users u
+                    INNER JOIN groups g ON u.groupid = g.id
+                    WHERE u.personalid = @userId
+                      AND g.managerID = @managerId
+                      AND u.IsActive = 1
                 `);
             if (groupCheck.recordset.length > 0) {
                 allowed = true;
@@ -633,14 +634,14 @@ const getUserJalaliMonthlyDetails = async (req, res) => {
                 console.warn(`Skipping record with invalid date: ${detail.Date}`);
                 continue;
             }
-            const gregDateStr = DateTime.fromJSDate(detail.Date, {zone: 'Asia/Tehran'}).toFormat('yyyy-MM-dd');
+            const gregDateStr = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' }).toFormat('yyyy-MM-dd');
             detailsMap.set(gregDateStr, detail);
         }
 
         // Generate data for all days in the month
         const data = [];
-        let currentDate = DateTime.fromJSDate(startDate, {zone: 'Asia/Tehran'});
-        const endDt = DateTime.fromJSDate(endDate, {zone: 'Asia/Tehran'});
+        let currentDate = DateTime.fromJSDate(startDate, { zone: 'Asia/Tehran' });
+        const endDt = DateTime.fromJSDate(endDate, { zone: 'Asia/Tehran' });
 
         while (currentDate <= endDt) {
             const gregDateStr = currentDate.toFormat('yyyy-MM-dd');
@@ -669,13 +670,13 @@ const getUserJalaliMonthlyDetails = async (req, res) => {
             let arrivalTime = null;
             if (detail.ArrivalTime) {
                 const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
-                arrivalTime = currentDate.set({hour: hours, minute: minutes, second: seconds}).toISO();
+                arrivalTime = currentDate.set({ hour: hours, minute: minutes, second: seconds }).toISO();
             }
 
             let leaveTime = null;
             if (detail.LeaveTime) {
                 const [hours, minutes, seconds = '00'] = detail.LeaveTime.split(':').map(Number);
-                leaveTime = currentDate.set({hour: hours, minute: minutes, second: seconds}).toISO();
+                leaveTime = currentDate.set({ hour: hours, minute: minutes, second: seconds }).toISO();
             }
 
             const totalDailyWork = tasks.reduce((sum, t) => sum + (t.Duration || 0), 0);
@@ -712,7 +713,7 @@ const getUserJalaliMonthlyDetails = async (req, res) => {
                 description: detail.Description || null
             });
 
-            currentDate = currentDate.plus({days: 1});
+            currentDate = currentDate.plus({ days: 1 });
         }
 
         res.json(data);
@@ -765,7 +766,7 @@ const getUserJalaliMonthlyDetails = async (req, res) => {
 const exportUserJalaliMonthlyToExcel = async (req, res) => {
     try {
         const pool = await poolPromise;
-        const {userId: paramUserId, year, month} = req.params;
+        const { userId: paramUserId, year, month } = req.params;
         const targetUserId = parseInt(paramUserId);
         const requesterId = req.user.userId;
         const requesterRole = req.user.role;
@@ -793,10 +794,11 @@ const exportUserJalaliMonthlyToExcel = async (req, res) => {
                 .input('userId', sql.Int, targetUserId)
                 .query(`
                     SELECT 1
-                    FROM UserGroup ug
-                             INNER JOIN Groups g ON ug.GroupId = g.GroupId
-                    WHERE ug.UserId = @userId
-                      AND g.ManagerId = @managerId
+                    FROM users u
+                    INNER JOIN groups g ON u.groupid = g.id
+                    WHERE u.personalid = @userId
+                      AND g.managerID = @managerId
+                      AND u.IsActive = 1
                 `);
             if (groupCheck.recordset.length > 0) {
                 allowed = true;
@@ -839,14 +841,14 @@ const exportUserJalaliMonthlyToExcel = async (req, res) => {
                 console.warn(`Skipping record with invalid date: ${detail.Date}`);
                 continue;
             }
-            const gregDateStr = DateTime.fromJSDate(detail.Date, {zone: 'Asia/Tehran'}).toFormat('yyyy-MM-dd');
+            const gregDateStr = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' }).toFormat('yyyy-MM-dd');
             detailsMap.set(gregDateStr, detail);
         }
 
         // Generate data for all days in the month (same as before)
         const data = [];
-        let currentDate = DateTime.fromJSDate(startDate, {zone: 'Asia/Tehran'});
-        const endDt = DateTime.fromJSDate(endDate, {zone: 'Asia/Tehran'});
+        let currentDate = DateTime.fromJSDate(startDate, { zone: 'Asia/Tehran' });
+        const endDt = DateTime.fromJSDate(endDate, { zone: 'Asia/Tehran' });
 
         while (currentDate <= endDt) {
             const gregDateStr = currentDate.toFormat('yyyy-MM-dd');
@@ -875,13 +877,13 @@ const exportUserJalaliMonthlyToExcel = async (req, res) => {
             let arrivalTime = null;
             if (detail.ArrivalTime) {
                 const [hours, minutes, seconds = '00'] = detail.ArrivalTime.split(':').map(Number);
-                arrivalTime = currentDate.set({hour: hours, minute: minutes, second: seconds}).toISO();
+                arrivalTime = currentDate.set({ hour: hours, minute: minutes, second: seconds }).toISO();
             }
 
             let leaveTime = null;
             if (detail.LeaveTime) {
                 const [hours, minutes, seconds = '00'] = detail.LeaveTime.split(':').map(Number);
-                leaveTime = currentDate.set({hour: hours, minute: minutes, second: seconds}).toISO();
+                leaveTime = currentDate.set({ hour: hours, minute: minutes, second: seconds }).toISO();
             }
 
             const totalDailyWork = tasks.reduce((sum, t) => sum + (t.Duration || 0), 0);
@@ -918,7 +920,7 @@ const exportUserJalaliMonthlyToExcel = async (req, res) => {
                 description: detail.Description || null
             });
 
-            currentDate = currentDate.plus({days: 1});
+            currentDate = currentDate.plus({ days: 1 });
         }
 
         // Now, create Excel file
@@ -995,16 +997,16 @@ const exportUserJalaliMonthlyToExcel = async (req, res) => {
 
         // Set column widths (optional)
         sheet.columns = [
-            {width: 15},
-            {width: 15},
-            {width: 15},
-            {width: 15},
-            {width: 15},
-            {width: 20},
-            {width: 30},
-            {width: 20},
-            {width: 15},
-            {width: 40}
+            { width: 15 },
+            { width: 15 },
+            { width: 15 },
+            { width: 15 },
+            { width: 15 },
+            { width: 20 },
+            { width: 30 },
+            { width: 20 },
+            { width: 15 },
+            { width: 40 }
         ];
 
         // Generate buffer

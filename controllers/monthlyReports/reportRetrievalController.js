@@ -1,4 +1,4 @@
-const {sql, poolPromise} = require('../../config/db.config');
+const { sql, poolPromise } = require('../../config/db.config');
 
 const checkRole = (roles) => (req, res, next) => {
     if (!roles.includes(req.user?.role)) return res.status(403).send('Access denied');
@@ -14,49 +14,9 @@ const validateReportId = (req, res, next) => {
     next();
 };
 
-/**
- * @swagger
- * /monthly-reports/report-ids/jalali/{year}/{month}:
- *   get:
- *     summary: Get report IDs and user IDs for the specified Jalali month (for authorized users)
- *     tags: [MonthlyReports]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: year
- *         required: true
- *         schema:
- *           type: integer
- *         description: Jalali year (e.g., 1404)
- *       - in: path
- *         name: month
- *         required: true
- *         schema:
- *           type: integer
- *         description: Jalali month (1-12, e.g., 6 for Shahrivar)
- *     responses:
- *       200:
- *         description: List of report IDs and user IDs
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   reportId: { type: integer }
- *                   userId: { type: integer }
- *       400:
- *         description: Invalid Jalali year or month
- *       403:
- *         description: Access denied
- *       500:
- *         description: Server error
- */
 const getReportIdsJalali = async (req, res) => {
     checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
-        const {year, month} = req.params;
+        const { year, month } = req.params;
         const userId = req.user.userId;
         const role = req.user.role;
 
@@ -78,7 +38,7 @@ const getReportIdsJalali = async (req, res) => {
             if (role === 'user') {
                 query += ' AND UserId = @userId';
             } else if (role === 'group_manager') {
-                query += ' AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
+                query += ' AND GroupId IN (SELECT id FROM groups WHERE managerID = @userId)';
             }
 
             const result = await pool.request()
@@ -87,7 +47,7 @@ const getReportIdsJalali = async (req, res) => {
                 .input('userId', sql.Int, userId)
                 .query(query);
 
-            res.json(result.recordset.map(row => ({reportId: row.ReportId, userId: row.UserId})));
+            res.json(result.recordset.map(row => ({ reportId: row.ReportId, userId: row.UserId })));
         } catch (err) {
             console.error('Error in GET /monthly-reports/report-ids/jalali/:year/:month:', err.message);
             res.status(500).send('Server error');
@@ -95,49 +55,9 @@ const getReportIdsJalali = async (req, res) => {
     });
 };
 
-/**
- * @swagger
- * /monthly-reports/check-submitted/jalali/{year}/{month}:
- *   get:
- *     summary: Get the status for the monthly report of the current user in the specified Jalali month
- *     tags: [MonthlyReports]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: year
- *         required: true
- *         schema:
- *           type: integer
- *           description: Jalali year (e.g., 1404)
- *       - in: path
- *         name: month
- *         required: true
- *         schema:
- *           type: integer
- *           description: Jalali month (1-12, e.g., 6 for Shahrivar)
- *     responses:
- *       200:
- *         description: Status of the report
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   nullable: true
- *                   description: The overall status (e.g., 'draft', 'approved', 'submitted_to_group_manager') or null if no report exists
- *       400:
- *         description: Invalid Jalali year or month
- *       403:
- *         description: Access denied (not user role)
- *       500:
- *         description: Server error
- */
 const checkSubmittedJalali = async (req, res) => {
     checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
-        const {year, month} = req.params;
+        const { year, month } = req.params;
         const userId = req.user.userId;
 
         const jy = parseInt(year);
@@ -157,7 +77,7 @@ const checkSubmittedJalali = async (req, res) => {
 
             const status = result.recordset.length > 0 ? result.recordset[0].Status : null;
 
-            res.json({status});
+            res.json({ status });
         } catch (err) {
             console.error('Error in GET /monthly-reports/check-submitted/jalali/:year/:month:', err.message);
             res.status(500).send('Server error');
@@ -165,27 +85,9 @@ const checkSubmittedJalali = async (req, res) => {
     });
 };
 
-/**
- * @swagger
- * /monthly-reports/{reportId}:
- *   get:
- *     summary: Get report by ID
- *     tags: [MonthlyReports]
- *     parameters:
- *       - in: path
- *         name: reportId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200: { description: Report details }
- *       403: { description: Access denied }
- *       404: { description: Report not found }
- *       500: { description: Server error }
- */
 const getReportById = async (req, res) => {
     validateReportId(req, res, async () => {
-        const {reportId} = req.params;
+        const { reportId } = req.params;
         const userId = req.user.userId;
         const role = req.user.role;
         try {
@@ -194,7 +96,7 @@ const getReportById = async (req, res) => {
             if (role === 'user') {
                 query += ' AND UserId = @userId';
             } else if (role === 'group_manager') {
-                query += ' AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
+                query += ' AND GroupId IN (SELECT id FROM groups WHERE managerID = @userId)';
             }
 
             const result = await pool.request()
@@ -212,38 +114,16 @@ const getReportById = async (req, res) => {
     });
 };
 
-/**
- * @swagger
- * /monthly-reports/group/{year}/{month}:
- *   get:
- *     summary: Get reports for group manager, general manager, or finance manager using Gregorian calendar
- *     tags: [MonthlyReports]
- *     parameters:
- *       - in: path
- *         name: year
- *         required: true
- *         schema:
- *           type: integer
- *       - in: path
- *         name: month
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200: { description: List of reports }
- *       403: { description: Access denied }
- *       500: { description: Server error }
- */
 const getGroupReportsGregorian = async (req, res) => {
     checkRole(['group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
-        const {year, month} = req.params;
+        const { year, month } = req.params;
         const userId = req.user.userId;
         const role = req.user.role;
         try {
             const pool = await poolPromise;
-            let query = 'SELECT mr.*, u.Username FROM MonthlyReports mr JOIN Users u ON mr.UserId = u.UserId WHERE Year = @year AND Month = @month';
+            let query = 'SELECT mr.*, u.id as username FROM MonthlyReports mr JOIN users u ON mr.UserId = u.personalid WHERE Year = @year AND Month = @month AND u.IsActive = 1';
             if (role === 'group_manager') {
-                query += ' AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
+                query += ' AND GroupId IN (SELECT id FROM groups WHERE managerID = @userId)';
             }
 
             const result = await pool.request()
@@ -258,31 +138,9 @@ const getGroupReportsGregorian = async (req, res) => {
     });
 };
 
-/**
- * @swagger
- * /monthly-reports/jalali/group/{year}/{month}:
- *   get:
- *     summary: Get reports for group manager, general manager, or finance manager using Jalali calendar
- *     tags: [MonthlyReports]
- *     parameters:
- *       - in: path
- *         name: year
- *         required: true
- *         schema:
- *           type: integer
- *       - in: path
- *         name: month
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200: { description: List of reports }
- *       403: { description: Access denied }
- *       500: { description: Server error }
- */
 const getGroupReportsJalali = async (req, res) => {
     checkRole(['group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
-        const {year, month} = req.params;
+        const { year, month } = req.params;
         const userId = req.user.userId;
         const role = req.user.role;
 
@@ -296,15 +154,16 @@ const getGroupReportsJalali = async (req, res) => {
 
             const pool = await poolPromise;
             let query = `
-                SELECT mr.*, u.Username
+                SELECT mr.*, u.id as username
                 FROM MonthlyReports mr
-                         JOIN Users u ON mr.UserId = u.UserId
+                JOIN users u ON mr.UserId = u.personalid
                 WHERE mr.JalaliYear = @jalaliYear
                   AND mr.JalaliMonth = @jalaliMonth
+                  AND u.IsActive = 1
             `;
 
             if (role === 'group_manager') {
-                query += ' AND mr.GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
+                query += ' AND mr.GroupId IN (SELECT id FROM groups WHERE managerID = @userId)';
             }
 
             const result = await pool.request()
@@ -320,53 +179,9 @@ const getGroupReportsJalali = async (req, res) => {
     });
 };
 
-/**
- * @swagger
- * /monthly-reports/group/range/{startYear}/{startMonth}/{endYear}/{endMonth}:
- *   get:
- *     summary: Get reports for group manager, general manager, or finance manager within a year-month range (Gregorian)
- *     tags: [MonthlyReports]
- *     parameters:
- *       - in: path
- *         name: startYear
- *         required: true
- *         schema:
- *           type: integer
- *         description: Start year of the range
- *       - in: path
- *         name: startMonth
- *         required: true
- *         schema:
- *           type: integer
- *         description: Start month of the range (1-12)
- *       - in: path
- *         name: endYear
- *         required: true
- *         schema:
- *           type: integer
- *         description: End year of the range
- *       - in: path
- *         name: endMonth
- *         required: true
- *         schema:
- *           type: integer
- *         description: End month of the range (1-12)
- *     responses:
- *       200:
- *         description: List of reports
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/MonthlyReport'
- *       400: { description: Invalid input (e.g., invalid year or month) }
- *       403: { description: Access denied }
- *       500: { description: Server error }
- */
 const getGroupRangeReports = async (req, res) => {
     checkRole(['group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
-        const {startYear, startMonth, endYear, endMonth} = req.params;
+        const { startYear, startMonth, endYear, endMonth } = req.params;
         const userId = req.user.userId;
         const role = req.user.role;
         try {
@@ -386,14 +201,15 @@ const getGroupRangeReports = async (req, res) => {
 
             const pool = await poolPromise;
             let query = `
-                SELECT mr.*, u.Username
+                SELECT mr.*, u.id as username
                 FROM MonthlyReports mr
-                         JOIN Users u ON mr.UserId = u.UserId
+                JOIN users u ON mr.UserId = u.personalid
                 WHERE (Year > @startYear OR (Year = @startYear AND Month >= @startMonth))
                   AND (Year < @endYear OR (Year = @endYear AND Month <= @endMonth))
+                  AND u.IsActive = 1
             `;
             if (role === 'group_manager') {
-                query += ' AND GroupId IN (SELECT GroupId FROM Groups WHERE ManagerId = @userId)';
+                query += ' AND GroupId IN (SELECT id FROM groups WHERE managerID = @userId)';
             }
 
             const result = await pool.request()

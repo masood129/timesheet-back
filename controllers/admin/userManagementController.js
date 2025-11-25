@@ -10,42 +10,49 @@ const getAllUsers = async (req, res) => {
     try {
         const pool = await poolPromise;
         let query = `
-            SELECT u.UserId, u.Username, u.Role, ug.GroupId, g.GroupName
-            FROM Users u
-            LEFT JOIN UserGroup ug ON u.UserId = ug.UserId
-            LEFT JOIN Groups g ON ug.GroupId = g.GroupId
-            WHERE 1=1
+            SELECT 
+                u.personalid,
+                u.id as username,
+                u.farsifirstname,
+                u.farsilastname,
+                u.email,
+                u.role,
+                u.groupid,
+                g.groupname
+            FROM users u
+            LEFT JOIN groups g ON u.groupid = g.id
+            WHERE u.IsActive = 1
         `;
 
         const request = pool.request();
 
         if (role) {
-            query += ' AND u.Role = @role';
+            query += ' AND u.role = @role';
             request.input('role', sql.NVarChar, role);
         }
 
         if (search) {
-            query += ' AND u.Username LIKE @search';
+            query += ' AND (u.id LIKE @search OR u.farsifirstname LIKE @search OR u.farsilastname LIKE @search)';
             request.input('search', sql.NVarChar, `%${search}%`);
         }
 
-        query += ` ORDER BY u.UserId OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
+        query += ` ORDER BY u.personalid OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
         request.input('offset', sql.Int, offset);
         request.input('limit', sql.Int, parseInt(limit));
 
         const result = await request.query(query);
 
         // Get total count
-        let countQuery = 'SELECT COUNT(*) as total FROM Users u WHERE 1=1';
+        let countQuery = 'SELECT COUNT(*) as total FROM users u WHERE u.IsActive = 1';
         const countRequest = pool.request();
 
         if (role) {
-            countQuery += ' AND u.Role = @role';
+            countQuery += ' AND u.role = @role';
             countRequest.input('role', sql.NVarChar, role);
         }
 
         if (search) {
-            countQuery += ' AND u.Username LIKE @search';
+            countQuery += ' AND (u.id LIKE @search OR u.farsifirstname LIKE @search OR u.farsilastname LIKE @search)';
             countRequest.input('search', sql.NVarChar, `%${search}%`);
         }
 
@@ -73,15 +80,24 @@ const getUserById = async (req, res) => {
         const pool = await poolPromise;
         const result = await pool
             .request()
-            .input('userId', sql.Int, id)
+            .input('personalId', sql.Int, id)
             .query(`
-                SELECT u.UserId, u.Username, u.Role, ug.GroupId, g.GroupName,
-                       uch.ContractArrivalTime, uch.ContractLeaveTime, uch.MinMonthlyHours
-                FROM Users u
-                LEFT JOIN UserGroup ug ON u.UserId = ug.UserId
-                LEFT JOIN Groups g ON ug.GroupId = g.GroupId
-                LEFT JOIN UserContractHours uch ON u.UserId = uch.UserId
-                WHERE u.UserId = @userId
+                SELECT 
+                    u.personalid,
+                    u.id as username,
+                    u.farsifirstname,
+                    u.farsilastname,
+                    u.email,
+                    u.role,
+                    u.groupid,
+                    g.groupname,
+                    uch.ContractArrivalTime,
+                    uch.ContractLeaveTime,
+                    uch.MinMonthlyHours
+                FROM users u
+                LEFT JOIN groups g ON u.groupid = g.id
+                LEFT JOIN UserContractHours uch ON u.personalid = uch.UserId
+                WHERE u.personalid = @personalId AND u.IsActive = 1
             `);
 
         if (result.recordset.length === 0) {
@@ -91,12 +107,12 @@ const getUserById = async (req, res) => {
         // Get user's projects
         const projectsResult = await pool
             .request()
-            .input('userId', sql.Int, id)
+            .input('personalId', sql.Int, id)
             .query(`
-                SELECT p.Id, p.ProjectName, p.securityLevel
-                FROM Projects p
-                JOIN UserProjectAccess upa ON p.Id = upa.ProjectId
-                WHERE upa.UserId = @userId
+                SELECT p.id, p.projectName
+                FROM projects p
+                JOIN UserProjectAccess upa ON p.id = upa.ProjectId
+                WHERE upa.UserId = @personalId
             `);
 
         const user = result.recordset[0];
@@ -113,14 +129,14 @@ const getUserById = async (req, res) => {
  * Create new user
  */
 const createUser = async (req, res) => {
-    const { UserId, Username, Role = 'user' } = req.body;
+    const { personalId, username, farsifirstname, farsilastname, email, role = 'user', groupId } = req.body;
 
-    if (!UserId || !Username) {
-        return res.status(400).send('شناسه کاربر و نام کاربری الزامی است');
+    if (!personalId || !username) {
+        return res.status(400).send('کد پرسنلی و نام کاربری الزامی است');
     }
 
-    const validRoles = ['user', 'group_manager', 'general_manager', 'finance_manager', 'admin'];
-    if (!validRoles.includes(Role)) {
+    const validRoles = ['user', 'group_manager'];
+    if (!validRoles.includes(role)) {
         return res.status(400).send('نقش نامعتبر است');
     }
 
@@ -130,36 +146,36 @@ const createUser = async (req, res) => {
         // Check if user already exists
         const checkResult = await pool
             .request()
-            .input('userId', sql.Int, UserId)
-            .query('SELECT COUNT(*) as count FROM Users WHERE UserId = @userId');
+            .input('personalId', sql.Int, personalId)
+            .query('SELECT COUNT(*) as count FROM users WHERE personalid = @personalId');
 
         if (checkResult.recordset[0].count > 0) {
-            return res.status(400).send('کاربر با این شناسه قبلاً وجود دارد');
+            return res.status(400).send('کاربر با این کد پرسنلی قبلاً وجود دارد');
         }
 
-        // Insert user (will use INSTEAD OF trigger)
+        // Insert user
         await pool
             .request()
-            .input('userId', sql.Int, UserId)
-            .input('username', sql.NVarChar, Username)
-            .input('role', sql.NVarChar, Role)
-            .query('INSERT INTO Users (UserId, Username, Role) VALUES (@userId, @username, @role)');
-
-        // If admin role, add to AdminUsers table
-        if (Role === 'admin') {
-            await pool
-                .request()
-                .input('userId', sql.Int, UserId)
-                .query(`
-                    IF NOT EXISTS (SELECT 1 FROM AdminUsers WHERE UserId = @userId)
-                    INSERT INTO AdminUsers (UserId) VALUES (@userId)
-                `);
-        }
+            .input('personalId', sql.Int, personalId)
+            .input('username', sql.NVarChar, username)
+            .input('farsifirstname', sql.NVarChar, farsifirstname || null)
+            .input('farsilastname', sql.NVarChar, farsilastname || null)
+            .input('email', sql.NVarChar, email || null)
+            .input('role', sql.NVarChar, role)
+            .input('groupId', sql.Int, groupId || null)
+            .query(`
+                INSERT INTO users (personalid, id, farsifirstname, farsilastname, email, role, groupid, IsActive)
+                VALUES (@personalId, @username, @farsifirstname, @farsilastname, @email, @role, @groupId, 1)
+            `);
 
         res.status(201).json({
-            UserId,
-            Username,
-            Role,
+            personalId,
+            username,
+            farsifirstname,
+            farsilastname,
+            email,
+            role,
+            groupId,
             message: 'کاربر با موفقیت ایجاد شد'
         });
     } catch (err) {
@@ -173,10 +189,10 @@ const createUser = async (req, res) => {
  */
 const updateUser = async (req, res) => {
     const { id } = req.params;
-    const { Username } = req.body;
+    const { username, farsifirstname, farsilastname, email, groupId } = req.body;
 
-    if (!Username) {
-        return res.status(400).send('نام کاربری الزامی است');
+    if (!username && !farsifirstname && !farsilastname && !email && groupId == null) {
+        return res.status(400).send('حداقل یکی از فیلدها الزامی است');
     }
 
     try {
@@ -185,8 +201,8 @@ const updateUser = async (req, res) => {
         // Check if user exists
         const checkResult = await pool
             .request()
-            .input('userId', sql.Int, id)
-            .query('SELECT COUNT(*) as count FROM Users WHERE UserId = @userId');
+            .input('personalId', sql.Int, id)
+            .query('SELECT COUNT(*) as count FROM users WHERE personalid = @personalId');
 
         if (checkResult.recordset[0].count === 0) {
             return res.status(404).send('کاربر یافت نشد');
@@ -195,9 +211,21 @@ const updateUser = async (req, res) => {
         // Update user
         await pool
             .request()
-            .input('userId', sql.Int, id)
-            .input('username', sql.NVarChar, Username)
-            .query('UPDATE Users SET Username = @username WHERE UserId = @userId');
+            .input('personalId', sql.Int, id)
+            .input('username', sql.NVarChar, username || null)
+            .input('farsifirstname', sql.NVarChar, farsifirstname || null)
+            .input('farsilastname', sql.NVarChar, farsilastname || null)
+            .input('email', sql.NVarChar, email || null)
+            .input('groupId', sql.Int, groupId ?? null)
+            .query(`
+                UPDATE users
+                SET id = COALESCE(@username, id),
+                    farsifirstname = COALESCE(@farsifirstname, farsifirstname),
+                    farsilastname = COALESCE(@farsilastname, farsilastname),
+                    email = COALESCE(@email, email),
+                    groupid = COALESCE(@groupId, groupid)
+                WHERE personalid = @personalId
+            `);
 
         res.json({ message: 'کاربر با موفقیت بروزرسانی شد' });
     } catch (err) {
@@ -218,20 +246,20 @@ const deleteUser = async (req, res) => {
         // Check if user exists
         const checkResult = await pool
             .request()
-            .input('userId', sql.Int, id)
-            .query('SELECT COUNT(*) as count FROM Users WHERE UserId = @userId');
+            .input('personalId', sql.Int, id)
+            .query('SELECT COUNT(*) as count FROM users WHERE personalid = @personalId');
 
         if (checkResult.recordset[0].count === 0) {
             return res.status(404).send('کاربر یافت نشد');
         }
 
-        // Delete user (will use INSTEAD OF trigger to set IsActive = 0)
+        // Deactivate user (set IsActive = 0)
         await pool
             .request()
-            .input('userId', sql.Int, id)
-            .query('DELETE FROM Users WHERE UserId = @userId');
+            .input('personalId', sql.Int, id)
+            .query('UPDATE users SET IsActive = 0 WHERE personalid = @personalId');
 
-        res.json({ message: 'کاربر با موفقیت حذف شد' });
+        res.json({ message: 'کاربر با موفقیت غیرفعال شد' });
     } catch (err) {
         console.error('Error in deleteUser:', err.message);
         res.status(500).send('خطای سرور در حذف کاربر');
@@ -243,10 +271,10 @@ const deleteUser = async (req, res) => {
  */
 const updateUserRole = async (req, res) => {
     const { id } = req.params;
-    const { Role } = req.body;
+    const { role } = req.body;
 
-    const validRoles = ['user', 'group_manager', 'general_manager', 'finance_manager', 'admin'];
-    if (!validRoles.includes(Role)) {
+    const validRoles = ['user', 'group_manager'];
+    if (!validRoles.includes(role)) {
         return res.status(400).send('نقش نامعتبر است');
     }
 
@@ -256,37 +284,19 @@ const updateUserRole = async (req, res) => {
         // Check if user exists
         const checkResult = await pool
             .request()
-            .input('userId', sql.Int, id)
-            .query('SELECT Role FROM Users WHERE UserId = @userId');
+            .input('personalId', sql.Int, id)
+            .query('SELECT role FROM users WHERE personalid = @personalId');
 
         if (checkResult.recordset.length === 0) {
             return res.status(404).send('کاربر یافت نشد');
         }
 
-        const oldRole = checkResult.recordset[0].Role;
-
         // Update role
         await pool
             .request()
-            .input('userId', sql.Int, id)
-            .input('role', sql.NVarChar, Role)
-            .query('UPDATE Users SET Role = @role WHERE UserId = @userId');
-
-        // Manage AdminUsers table
-        if (Role === 'admin') {
-            await pool
-                .request()
-                .input('userId', sql.Int, id)
-                .query(`
-                    IF NOT EXISTS (SELECT 1 FROM AdminUsers WHERE UserId = @userId)
-                    INSERT INTO AdminUsers (UserId) VALUES (@userId)
-                `);
-        } else if (oldRole === 'admin') {
-            await pool
-                .request()
-                .input('userId', sql.Int, id)
-                .query('DELETE FROM AdminUsers WHERE UserId = @userId');
-        }
+            .input('personalId', sql.Int, id)
+            .input('role', sql.NVarChar, role)
+            .query('UPDATE users SET role = @role WHERE personalid = @personalId');
 
         res.json({ message: 'نقش کاربر با موفقیت بروزرسانی شد' });
     } catch (err) {

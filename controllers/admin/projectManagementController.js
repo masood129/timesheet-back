@@ -9,26 +9,26 @@ const getAllProjects = async (req, res) => {
 
     try {
         const pool = await poolPromise;
-        let query = 'SELECT * FROM Projects WHERE 1=1';
+        let query = 'SELECT id, projectName FROM projects WHERE 1=1';
         const request = pool.request();
 
         if (search) {
-            query += ' AND ProjectName LIKE @search';
+            query += ' AND projectName LIKE @search';
             request.input('search', sql.NVarChar, `%${search}%`);
         }
 
-        query += ' ORDER BY Id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY';
+        query += ' ORDER BY id OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY';
         request.input('offset', sql.Int, offset);
         request.input('limit', sql.Int, parseInt(limit));
 
         const result = await request.query(query);
 
         // Get total count
-        let countQuery = 'SELECT COUNT(*) as total FROM Projects WHERE 1=1';
+        let countQuery = 'SELECT COUNT(*) as total FROM projects WHERE 1=1';
         const countRequest = pool.request();
 
         if (search) {
-            countQuery += ' AND ProjectName LIKE @search';
+            countQuery += ' AND projectName LIKE @search';
             countRequest.input('search', sql.NVarChar, `%${search}%`);
         }
 
@@ -57,7 +57,7 @@ const getProjectById = async (req, res) => {
         const result = await pool
             .request()
             .input('projectId', sql.Int, id)
-            .query('SELECT * FROM Projects WHERE Id = @projectId');
+            .query('SELECT id, projectName FROM projects WHERE id = @projectId');
 
         if (result.recordset.length === 0) {
             return res.status(404).send('پروژه یافت نشد');
@@ -68,10 +68,16 @@ const getProjectById = async (req, res) => {
             .request()
             .input('projectId', sql.Int, id)
             .query(`
-                SELECT u.UserId, u.Username, u.Role
-                FROM Users u
-                JOIN UserProjectAccess upa ON u.UserId = upa.UserId
-                WHERE upa.ProjectId = @projectId
+                SELECT 
+                    u.personalid,
+                    u.id as username,
+                    u.farsifirstname,
+                    u.farsilastname,
+                    u.email,
+                    u.role
+                FROM users u
+                JOIN UserProjectAccess upa ON u.personalid = upa.UserId
+                WHERE upa.ProjectId = @projectId AND u.IsActive = 1
             `);
 
         const project = result.recordset[0];
@@ -88,9 +94,9 @@ const getProjectById = async (req, res) => {
  * Create new project
  */
 const createProject = async (req, res) => {
-    const { Id, ProjectName, securityLevel = 1 } = req.body;
+    const { id, projectName } = req.body;
 
-    if (!Id || !ProjectName) {
+    if (!id || !projectName) {
         return res.status(400).send('شناسه و نام پروژه الزامی است');
     }
 
@@ -100,8 +106,8 @@ const createProject = async (req, res) => {
         // Check if project already exists
         const checkResult = await pool
             .request()
-            .input('id', sql.Int, Id)
-            .query('SELECT COUNT(*) as count FROM Projects WHERE Id = @id');
+            .input('id', sql.Int, id)
+            .query('SELECT COUNT(*) as count FROM projects WHERE id = @id');
 
         if (checkResult.recordset[0].count > 0) {
             return res.status(400).send('پروژه با این شناسه قبلاً وجود دارد');
@@ -109,13 +115,12 @@ const createProject = async (req, res) => {
 
         const result = await pool
             .request()
-            .input('id', sql.Int, Id)
-            .input('projectName', sql.NVarChar, ProjectName)
-            .input('securityLevel', sql.Int, securityLevel)
+            .input('id', sql.Int, id)
+            .input('projectName', sql.NVarChar, projectName)
             .query(`
-                INSERT INTO Projects (Id, ProjectName, securityLevel)
+                INSERT INTO projects (id, projectName)
                 OUTPUT INSERTED.*
-                VALUES (@id, @projectName, @securityLevel)
+                VALUES (@id, @projectName)
             `);
 
         res.status(201).json(result.recordset[0]);
@@ -130,10 +135,10 @@ const createProject = async (req, res) => {
  */
 const updateProject = async (req, res) => {
     const { id } = req.params;
-    const { ProjectName, securityLevel } = req.body;
+    const { projectName } = req.body;
 
-    if (!ProjectName && securityLevel == null) {
-        return res.status(400).send('حداقل یکی از فیلدها الزامی است');
+    if (!projectName) {
+        return res.status(400).send('نام پروژه الزامی است');
     }
 
     try {
@@ -142,14 +147,12 @@ const updateProject = async (req, res) => {
         const result = await pool
             .request()
             .input('id', sql.Int, id)
-            .input('projectName', sql.NVarChar, ProjectName || null)
-            .input('securityLevel', sql.Int, securityLevel ?? null)
+            .input('projectName', sql.NVarChar, projectName)
             .query(`
-                UPDATE Projects
-                SET ProjectName = COALESCE(@projectName, ProjectName),
-                    securityLevel = COALESCE(@securityLevel, securityLevel)
+                UPDATE projects
+                SET projectName = @projectName
                 OUTPUT INSERTED.*
-                WHERE Id = @id
+                WHERE id = @id
             `);
 
         if (result.recordset.length === 0) {
@@ -182,7 +185,7 @@ const deleteProject = async (req, res) => {
         const result = await pool
             .request()
             .input('id', sql.Int, id)
-            .query('DELETE FROM Projects WHERE Id = @id');
+            .query('DELETE FROM projects WHERE id = @id');
 
         if (result.rowsAffected[0] === 0) {
             return res.status(404).send('پروژه یافت نشد');
@@ -208,7 +211,7 @@ const getProjectUsers = async (req, res) => {
         const projectCheck = await pool
             .request()
             .input('projectId', sql.Int, id)
-            .query('SELECT COUNT(*) as count FROM Projects WHERE Id = @projectId');
+            .query('SELECT COUNT(*) as count FROM projects WHERE id = @projectId');
 
         if (projectCheck.recordset[0].count === 0) {
             return res.status(404).send('پروژه یافت نشد');
@@ -218,10 +221,16 @@ const getProjectUsers = async (req, res) => {
             .request()
             .input('projectId', sql.Int, id)
             .query(`
-                SELECT u.UserId, u.Username, u.Role
-                FROM Users u
-                JOIN UserProjectAccess upa ON u.UserId = upa.UserId
-                WHERE upa.ProjectId = @projectId
+                SELECT 
+                    u.personalid,
+                    u.id as username,
+                    u.farsifirstname,
+                    u.farsilastname,
+                    u.email,
+                    u.role
+                FROM users u
+                JOIN UserProjectAccess upa ON u.personalid = upa.UserId
+                WHERE upa.ProjectId = @projectId AND u.IsActive = 1
             `);
 
         res.json(result.recordset);
@@ -236,9 +245,9 @@ const getProjectUsers = async (req, res) => {
  */
 const addUserToProject = async (req, res) => {
     const { id } = req.params;
-    const { UserId } = req.body;
+    const { userId } = req.body;
 
-    if (!UserId) {
+    if (!userId) {
         return res.status(400).send('شناسه کاربر الزامی است');
     }
 
@@ -249,7 +258,7 @@ const addUserToProject = async (req, res) => {
         const projectCheck = await pool
             .request()
             .input('projectId', sql.Int, id)
-            .query('SELECT COUNT(*) as count FROM Projects WHERE Id = @projectId');
+            .query('SELECT COUNT(*) as count FROM projects WHERE id = @projectId');
 
         if (projectCheck.recordset[0].count === 0) {
             return res.status(404).send('پروژه یافت نشد');
@@ -258,8 +267,8 @@ const addUserToProject = async (req, res) => {
         // Check if user exists
         const userCheck = await pool
             .request()
-            .input('userId', sql.Int, UserId)
-            .query('SELECT COUNT(*) as count FROM Users WHERE UserId = @userId');
+            .input('personalId', sql.Int, userId)
+            .query('SELECT COUNT(*) as count FROM users WHERE personalid = @personalId AND IsActive = 1');
 
         if (userCheck.recordset[0].count === 0) {
             return res.status(404).send('کاربر یافت نشد');
@@ -268,7 +277,7 @@ const addUserToProject = async (req, res) => {
         // Check if access already exists
         const accessCheck = await pool
             .request()
-            .input('userId', sql.Int, UserId)
+            .input('userId', sql.Int, userId)
             .input('projectId', sql.Int, id)
             .query('SELECT COUNT(*) as count FROM UserProjectAccess WHERE UserId = @userId AND ProjectId = @projectId');
 
@@ -279,7 +288,7 @@ const addUserToProject = async (req, res) => {
         // Add access
         await pool
             .request()
-            .input('userId', sql.Int, UserId)
+            .input('userId', sql.Int, userId)
             .input('projectId', sql.Int, id)
             .query('INSERT INTO UserProjectAccess (UserId, ProjectId) VALUES (@userId, @projectId)');
 

@@ -1,5 +1,5 @@
-const {sql, poolPromise} = require('../../config/db.config');
-const {getJalaliMonthRange} = require('../../utils/dateConverter');
+const { sql, poolPromise } = require('../../config/db.config');
+const { getJalaliMonthRange } = require('../../utils/dateConverter');
 
 const checkRole = (roles) => (req, res, next) => {
     if (!roles.includes(req.user?.role)) return res.status(403).send('Access denied');
@@ -46,13 +46,20 @@ const getMyDrafts = async (req, res) => {
             const result = await pool.request()
                 .input('userId', sql.Int, userId)
                 .query(`
-                    SELECT mr.*, u.Username, g.GroupName, m.Username AS ManagerUsername
+                    SELECT 
+                        mr.*,
+                        u.id as username,
+                        u.farsifirstname,
+                        u.farsilastname,
+                        g.groupname,
+                        m.id AS managerUsername
                     FROM MonthlyReports mr
-                             JOIN Users u ON mr.UserId = u.UserId
-                             LEFT JOIN Groups g ON mr.GroupId = g.GroupId
-                             LEFT JOIN Users m ON g.ManagerId = m.UserId
+                    JOIN users u ON mr.UserId = u.personalid
+                    LEFT JOIN groups g ON mr.GroupId = g.id
+                    LEFT JOIN users m ON g.managerID = m.personalid
                     WHERE mr.UserId = @userId
                       AND mr.Status = 'draft'
+                      AND u.IsActive = 1
                 `);
 
             const drafts = result.recordset;
@@ -72,8 +79,8 @@ const getMyDrafts = async (req, res) => {
                         WHERE UserId = @userId
                           AND Date >= @startDate
                           AND Date <= @endDate
-                          AND LeaveType IN ('work'
-                            , 'mission')                    `);
+                          AND LeaveType IN ('work', 'mission')
+                    `);
                 report.totalCommuteCost = commuteResult.recordset[0].TotalCommuteCost || 0;
 
                 const carCostsResult = await pool.request()
@@ -83,7 +90,7 @@ const getMyDrafts = async (req, res) => {
                     .query(`
                         SELECT dpc.ProjectID, SUM(ISNULL(dpc.Cost, 0)) AS TotalCost
                         FROM DailyPersonalCarCosts dpc
-                                 INNER JOIN DailyDetails dd ON dpc.Date = dd.Date AND dpc.UserId = dd.UserId
+                        INNER JOIN DailyDetails dd ON dpc.Date = dd.Date AND dpc.UserId = dd.UserId
                         WHERE dpc.UserId = @userId
                           AND dpc.Date >= @startDate
                           AND dpc.Date <= @endDate
@@ -99,7 +106,7 @@ const getMyDrafts = async (req, res) => {
                     .query(`
                         SELECT dpt.ProjectID, SUM(dpt.Duration) AS TotalHours
                         FROM DailyProjectTasks dpt
-                                 INNER JOIN DailyDetails dd ON dpt.Date = dd.Date AND dpt.UserId = dd.UserId
+                        INNER JOIN DailyDetails dd ON dpt.Date = dd.Date AND dpt.UserId = dd.UserId
                         WHERE dpt.UserId = @userId
                           AND dpt.Date >= @startDate
                           AND dpt.Date <= @endDate
@@ -165,7 +172,7 @@ const getMyDrafts = async (req, res) => {
 const exitDraft = async (req, res) => {
     checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
         validateReportId(req, res, async () => {
-            const {reportId} = req.params;
+            const { reportId } = req.params;
             const userId = req.user.userId;
 
             try {
@@ -226,14 +233,15 @@ const exitDraft = async (req, res) => {
  */
 const createMonthlyReportGregorian = async (req, res) => {
     checkRole(['user', 'group_manager', 'general_manager'])(req, res, async () => {
-        const {year, month} = req.params;
+        const { year, month } = req.params;
         const userId = req.user.userId;
         try {
             const pool = await poolPromise;
+            // Get user's group from users table
             const groupResult = await pool.request()
                 .input('userId', sql.Int, userId)
-                .query('SELECT GroupId FROM UserGroup WHERE UserId = @userId');
-            const groupId = groupResult.recordset[0]?.GroupId || null;
+                .query('SELECT groupid FROM users WHERE personalid = @userId');
+            const groupId = groupResult.recordset[0]?.groupid || null;
 
             const hoursResult = await pool.request()
                 .input('userId', sql.Int, userId)
@@ -242,13 +250,12 @@ const createMonthlyReportGregorian = async (req, res) => {
                 .query(`
                     SELECT SUM(dpt.Duration) AS TotalHours
                     FROM DailyProjectTasks dpt
-                             INNER JOIN DailyDetails dd ON dpt.Date = dd.Date AND dpt.UserId = dd.UserId
+                    INNER JOIN DailyDetails dd ON dpt.Date = dd.Date AND dpt.UserId = dd.UserId
                     WHERE dpt.UserId = @userId
-                        AND YEAR (
-                        dpt.Date) = @year
-                      AND MONTH (dpt.Date) = @month
-                      AND dd.LeaveType IN ('work'
-                        , 'mission')                `);
+                      AND YEAR(dpt.Date) = @year
+                      AND MONTH(dpt.Date) = @month
+                      AND dd.LeaveType IN ('work', 'mission')
+                `);
             const totalHours = hoursResult.recordset[0].TotalHours || 0;
 
             const gymResult = await pool.request()
@@ -266,8 +273,8 @@ const createMonthlyReportGregorian = async (req, res) => {
                     SELECT Status
                     FROM MonthlyReports
                     WHERE UserId = @userId
-                              AND Year = @year
-                              AND Month = @month
+                      AND Year = @year
+                      AND Month = @month
                 `);
 
             if (existingReport.recordset.length > 0) {
@@ -287,7 +294,8 @@ const createMonthlyReportGregorian = async (req, res) => {
                         SET TotalHours = @totalHours,
                             GymCost    = @gymCost,
                             Status     = 'draft',
-                            GroupId    = @groupId OUTPUT INSERTED.*
+                            GroupId    = @groupId 
+                        OUTPUT INSERTED.*
                         WHERE UserId = @userId
                           AND Year = @year
                           AND Month = @month
@@ -304,7 +312,7 @@ const createMonthlyReportGregorian = async (req, res) => {
                     .input('groupId', sql.Int, groupId)
                     .query(`
                         INSERT INTO MonthlyReports (UserId, Year, Month, TotalHours, GymCost, Status, GroupId)
-                            OUTPUT INSERTED.*
+                        OUTPUT INSERTED.*
                         VALUES (@userId, @year, @month, @totalHours, @gymCost, 'draft', @groupId)
                     `);
                 res.status(201).json(insertResult.recordset[0]);
@@ -339,7 +347,7 @@ const createMonthlyReportGregorian = async (req, res) => {
  */
 const createMonthlyReportJalali = async (req, res) => {
     checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
-        const {year, month} = req.params;
+        const { year, month } = req.params;
         const userId = req.user.userId;
 
         try {
@@ -358,10 +366,11 @@ const createMonthlyReportJalali = async (req, res) => {
             const gregorianMonth = startDate.getMonth() + 1;
 
             const pool = await poolPromise;
+            // Get user's group from users table
             const groupResult = await pool.request()
                 .input('userId', sql.Int, userId)
-                .query('SELECT GroupId FROM UserGroup WHERE UserId = @userId');
-            const groupId = groupResult.recordset[0]?.GroupId || null;
+                .query('SELECT groupid FROM users WHERE personalid = @userId');
+            const groupId = groupResult.recordset[0]?.groupid || null;
 
             const hoursResult = await pool.request()
                 .input('userId', sql.Int, userId)
@@ -370,7 +379,7 @@ const createMonthlyReportJalali = async (req, res) => {
                 .query(`
                     SELECT SUM(dpt.Duration) AS TotalHours
                     FROM DailyProjectTasks dpt
-                             INNER JOIN DailyDetails dd ON dpt.Date = dd.Date AND dpt.UserId = dd.UserId
+                    INNER JOIN DailyDetails dd ON dpt.Date = dd.Date AND dpt.UserId = dd.UserId
                     WHERE dpt.UserId = @userId
                       AND dpt.Date >= @startDate
                       AND dpt.Date <= @endDate
@@ -394,8 +403,8 @@ const createMonthlyReportJalali = async (req, res) => {
                     SELECT Status
                     FROM MonthlyReports
                     WHERE UserId = @userId
-                              AND Year = @year
-                              AND Month = @month
+                      AND Year = @year
+                      AND Month = @month
                 `);
 
             if (existingReport.recordset.length > 0) {
@@ -419,7 +428,8 @@ const createMonthlyReportJalali = async (req, res) => {
                             TotalHours  = @totalHours,
                             GymCost     = @gymCost,
                             Status      = 'draft',
-                            GroupId     = @groupId OUTPUT INSERTED.*
+                            GroupId     = @groupId 
+                        OUTPUT INSERTED.*
                         WHERE UserId = @userId
                           AND Year = @year
                           AND Month = @month
@@ -439,7 +449,7 @@ const createMonthlyReportJalali = async (req, res) => {
                     .query(`
                         INSERT INTO MonthlyReports (UserId, Year, Month, JalaliYear, JalaliMonth, TotalHours, GymCost,
                                                     Status, GroupId)
-                            OUTPUT INSERTED.*
+                        OUTPUT INSERTED.*
                         VALUES (@userId, @year, @month, @jalaliYear, @jalaliMonth, @totalHours, @gymCost, 'draft', @groupId)
                     `);
                 res.status(201).json(insertResult.recordset[0]);
