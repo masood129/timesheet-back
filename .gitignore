@@ -17,4 +17,4 @@ yarn-error.log
 
 # پوشه‌های بیلد یا خروجی
 dist/
-build/
+build/logs/
