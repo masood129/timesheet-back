@@ -7,51 +7,7 @@ const { sql, poolPromise } = require('../config/db.config');
  * @swagger
  * /auth/login:
  *   post:
- *     summary: Authenticate user and generate JWT token using username only
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - username
- *             properties:
- *               username:
- *                 type: string
- *                 description: User's username
- *     responses:
- *       200:
- *         description: Successful login, returns JWT token and userId
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 token:
- *                   type: string
- *                   description: JWT token for authentication
- *                 userId:
- *                   type: integer
- *                   description: User's ID
- *                 Username:
- *                   type: string
- *                   description: User's username
- *                 Role:
- *                   type: string
- *                   description: User's role
- *       400:
-const express = require('express');
-const router = express.Router();
-const jwt = require('jsonwebtoken');
-const {sql, poolPromise} = require('../config/db.config');
-
-/**
- * @swagger
- * /auth/login:
- *   post:
- *     summary: Authenticate user and generate JWT token using username only
+ *     summary: Authenticate user (admin or regular) and generate JWT token using username only
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -101,20 +57,51 @@ router.post('/login', async (req, res) => {
 
     try {
         const pool = await poolPromise;
-        const result = await pool
+
+        // ابتدا چک کنیم آیا admin است
+        const adminResult = await pool
+            .request()
+            .input('username', sql.NVarChar, username)
+            .query('SELECT AdminId as UserId, Username, \'admin\' as Role FROM Admins WHERE Username = @username AND IsActive = 1');
+
+        if (adminResult.recordset.length > 0) {
+            const admin = adminResult.recordset[0];
+            const token = jwt.sign(
+                { userId: admin.UserId, role: admin.Role },
+                process.env.JWT_SECRET,
+                { expiresIn: '24h' }
+            );
+
+            // به‌روزرسانی آخرین ورود
+            await pool
+                .request()
+                .input('adminId', sql.Int, admin.UserId)
+                .query('UPDATE Admins SET LastLoginAt = GETDATE() WHERE AdminId = @adminId');
+
+            return res.json({
+                token,
+                userId: admin.UserId,
+                Username: admin.Username,
+                Role: admin.Role,
+                message: 'Admin login successful'
+            });
+        }
+
+        // اگر admin نبود، کاربر عادی را چک کنیم
+        const userResult = await pool
             .request()
             .input('username', sql.NVarChar, username)
             .query('SELECT personalid as UserId, id as Username, role as Role FROM users WHERE id = @username AND IsActive = 1');
 
-        if (result.recordset.length === 0) {
+        if (userResult.recordset.length === 0) {
             return res.status(401).send('Invalid username');
         }
 
-        const user = result.recordset[0];
+        const user = userResult.recordset[0];
         const token = jwt.sign(
             { userId: user.UserId, role: user.Role },
             process.env.JWT_SECRET,
-            { expiresIn: '24h' } // افزایش زمان انقضا
+            { expiresIn: '24h' }
         );
 
         res.json({

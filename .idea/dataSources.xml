@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="flutter@localhost" uuid="77935314-7748-42b2-866b-61e70d9cce16">
+    <data-source source="LOCAL" name="UMD@localhost" uuid="9c9461f7-d24c-4977-8dc4-2bb008e481d4">
       <driver-ref>sqlserver.ms</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>com.microsoft.sqlserver.jdbc.SQLServerDriver</jdbc-driver>
-      <jdbc-url>jdbc:sqlserver://localhost;database=flutter</jdbc-url>
+      <jdbc-url>jdbc:sqlserver://localhost;database=UMD</jdbc-url>
       <jdbc-additional-properties>
         <property name="com.intellij.clouds.kubernetes.db.host.port" />
         <property name="com.intellij.clouds.kubernetes.db.enabled" value="false" />
