@@ -159,6 +159,34 @@ const createMonthPeriod = async (req, res) => {
             return res.status(400).send('تاریخ شروع نمی‌تواند بعد از تاریخ پایان باشد');
         }
 
+        // بررسی اینکه اگر EndMonth به ماه بعد ادامه می‌دهد، ماه بعد نباید گذشته باشد
+        if (EndMonth !== Month || EndYear !== Year) {
+            // بازه به ماه بعد ادامه می‌دهد
+            let nextMonth, nextYear;
+            if (EndMonth === 12) {
+                nextYear = EndYear + 1;
+                nextMonth = 1;
+            } else {
+                nextYear = EndYear;
+                nextMonth = EndMonth + 1;
+            }
+            
+            // بررسی اینکه ماه بعد گذشته نیست
+            const nextMonthEditable = await pool
+                .request()
+                .input('year', sql.Int, nextYear)
+                .input('month', sql.Int, nextMonth)
+                .input('currentYear', sql.Int, CurrentJalaliYear || 1404)
+                .input('currentMonth', sql.Int, CurrentJalaliMonth || 1)
+                .query(`
+                    SELECT dbo.fn_IsMonthEditable(@year, @month, @currentYear, @currentMonth) as IsEditable
+                `);
+            
+            if (!nextMonthEditable.recordset[0].IsEditable) {
+                return res.status(400).send('نمی‌توانید بازه را تا ماه گذشته ادامه دهید');
+            }
+        }
+
         // ایجاد بازه جدید
         await pool
             .request()
@@ -174,6 +202,27 @@ const createMonthPeriod = async (req, res) => {
                 INSERT INTO MonthPeriodSettings (Year, Month, StartDay, StartMonth, StartYear, EndDay, EndMonth, EndYear)
                 VALUES (@year, @month, @startDay, @startMonth, @startYear, @endDay, @endMonth, @endYear)
             `);
+
+        // اگر بازه به ماه بعد ادامه می‌دهد، بازه سفارشی ماه بعد را حذف کن تا خودکار محاسبه شود
+        if (EndMonth !== Month || EndYear !== Year) {
+            let nextMonth, nextYear;
+            if (EndMonth === 12) {
+                nextYear = EndYear + 1;
+                nextMonth = 1;
+            } else {
+                nextYear = EndYear;
+                nextMonth = EndMonth + 1;
+            }
+            
+            // حذف بازه سفارشی ماه بعد (اگر وجود دارد) تا خودکار محاسبه شود
+            await pool
+                .request()
+                .input('year', sql.Int, nextYear)
+                .input('month', sql.Int, nextMonth)
+                .query(`
+                    DELETE FROM MonthPeriodSettings WHERE Year = @year AND Month = @month
+                `);
+        }
 
         res.status(201).json({
             Year,
@@ -272,11 +321,42 @@ const updateMonthPeriod = async (req, res) => {
             return res.status(400).send('تاریخ شروع نمی‌تواند بعد از تاریخ پایان باشد');
         }
 
+        // بررسی اینکه اگر EndMonth به ماه بعد ادامه می‌دهد، ماه بعد نباید گذشته باشد
+        const periodYear = parseInt(year);
+        const periodMonth = parseInt(month);
+        
+        if (EndMonth !== periodMonth || EndYear !== periodYear) {
+            // بازه به ماه بعد ادامه می‌دهد
+            let nextMonth, nextYear;
+            if (EndMonth === 12) {
+                nextYear = EndYear + 1;
+                nextMonth = 1;
+            } else {
+                nextYear = EndYear;
+                nextMonth = EndMonth + 1;
+            }
+            
+            // بررسی اینکه ماه بعد گذشته نیست
+            const nextMonthEditable = await pool
+                .request()
+                .input('year', sql.Int, nextYear)
+                .input('month', sql.Int, nextMonth)
+                .input('currentYear', sql.Int, CurrentJalaliYear || 1404)
+                .input('currentMonth', sql.Int, CurrentJalaliMonth || 1)
+                .query(`
+                    SELECT dbo.fn_IsMonthEditable(@year, @month, @currentYear, @currentMonth) as IsEditable
+                `);
+            
+            if (!nextMonthEditable.recordset[0].IsEditable) {
+                return res.status(400).send('نمی‌توانید بازه را تا ماه گذشته ادامه دهید');
+            }
+        }
+
         // ویرایش رکورد
         await pool
             .request()
-            .input('year', sql.Int, parseInt(year))
-            .input('month', sql.Int, parseInt(month))
+            .input('year', sql.Int, periodYear)
+            .input('month', sql.Int, periodMonth)
             .input('startDay', sql.Int, StartDay)
             .input('startMonth', sql.Int, StartMonth)
             .input('startYear', sql.Int, StartYear)
@@ -294,9 +374,30 @@ const updateMonthPeriod = async (req, res) => {
                 WHERE Year = @year AND Month = @month
             `);
 
+        // اگر بازه به ماه بعد ادامه می‌دهد، بازه سفارشی ماه بعد را حذف کن تا خودکار محاسبه شود
+        if (EndMonth !== periodMonth || EndYear !== periodYear) {
+            let nextMonth, nextYear;
+            if (EndMonth === 12) {
+                nextYear = EndYear + 1;
+                nextMonth = 1;
+            } else {
+                nextYear = EndYear;
+                nextMonth = EndMonth + 1;
+            }
+            
+            // حذف بازه سفارشی ماه بعد (اگر وجود دارد) تا خودکار محاسبه شود
+            await pool
+                .request()
+                .input('year', sql.Int, nextYear)
+                .input('month', sql.Int, nextMonth)
+                .query(`
+                    DELETE FROM MonthPeriodSettings WHERE Year = @year AND Month = @month
+                `);
+        }
+
         res.json({
-            Year: parseInt(year),
-            Month: parseInt(month),
+            Year: periodYear,
+            Month: periodMonth,
             StartDay,
             StartMonth,
             StartYear,
