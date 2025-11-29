@@ -154,19 +154,16 @@ EXEC sp_GetMonthPeriod @Year = 1404, @Month = 9;
 
 ### مدیریت بازه ماه‌ها
 
-سیستم به طور خودکار بازه‌های ماه‌ها را محاسبه می‌کند. اما شما می‌توانید برای هر ماه، بازه سفارشی تعریف کنید:
+سیستم به طور خودکار بازه‌های ماه‌ها را محاسبه می‌کند. اما شما می‌توانید برای هر ماه، بازه سفارشی تعریف کنید از طریق پنل ادمین.
 
+برای دریافت بازه یک ماه خاص:
 ```sql
--- مثال: تعریف فروردین از 1 فروردین تا 5 اردیبهشت (همان سال)
-INSERT INTO MonthPeriodSettings (Year, Month, StartDay, StartMonth, StartYear, EndDay, EndMonth, EndYear)
-VALUES (1404, 1, 1, 1, 1404, 5, 2, 1404);
-
--- مثال: تعریف اسفند از 1 اسفند 1403 تا 5 فروردین 1404 (بازه سال‌شکن)
-INSERT INTO MonthPeriodSettings (Year, Month, StartDay, StartMonth, StartYear, EndDay, EndMonth, EndYear)
-VALUES (1403, 12, 1, 12, 1403, 5, 1, 1404);
-
--- دریافت بازه اردیبهشت (به طور خودکار از 6 اردیبهشت شروع می‌شود)
 EXEC sp_GetMonthPeriod @Year = 1404, @Month = 2;
+```
+
+برای دریافت تمام بازه‌های یک سال:
+```sql
+EXEC sp_GetYearMonthPeriods @Year = 1404;
 ```
 
 ### وضعیت‌های گزارش ماهیانه

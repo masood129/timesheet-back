@@ -178,14 +178,7 @@ PRINT N'✓ گزارش‌های ماهیانه درج شد';
 -- =============================================
 -- INSERT داده‌های تستی برای جدول MonthPeriodSettings
 -- =============================================
-PRINT N'→ درج داده‌های تستی در جدول MonthPeriodSettings...';
-INSERT INTO MonthPeriodSettings (Year, Month, StartDay, StartMonth, StartYear, EndDay, EndMonth, EndYear)
-VALUES
-    (1404, 1, 1, 1, 1404, 5, 2, 1404),      -- فروردین: از 1 فروردین 1404 تا 5 اردیبهشت 1404
-    (1404, 8, 1, 8, 1404, 30, 8, 1404),     -- آبان: عادی (1 تا 30 آبان 1404)
-    (1404, 9, 24, 8, 1404, 30, 9, 1404);    -- آذر: از 24 آبان 1404 تا 30 آذر 1404
-GO
-PRINT N'✓ تنظیمات بازه ماه درج شد';
+-- توجه: بازه‌های ماه باید از طریق پنل ادمین تنظیم شوند.
 
 -- =============================================
 -- تست Stored Procedures
@@ -198,7 +191,7 @@ EXEC sp_GetMonthPeriod @Year = 1404, @Month = 10;
 -- خلاصه
 -- =============================================
 DECLARE @AdminCount INT, @ProjectAccessCount INT, @ContractCount INT, @DailyDetailCount INT;
-DECLARE @TaskCount INT, @CarCostCount INT, @GymCostCount INT, @ReportCount INT, @PeriodCount INT;
+DECLARE @TaskCount INT, @CarCostCount INT, @GymCostCount INT, @ReportCount INT;
 
 SELECT @AdminCount = COUNT(*) FROM Admins;
 SELECT @ProjectAccessCount = COUNT(*) FROM UserProjectAccess;
@@ -208,7 +201,6 @@ SELECT @TaskCount = COUNT(*) FROM DailyProjectTasks;
 SELECT @CarCostCount = COUNT(*) FROM DailyPersonalCarCosts;
 SELECT @GymCostCount = COUNT(*) FROM MonthlyGymCosts;
 SELECT @ReportCount = COUNT(*) FROM MonthlyReports;
-SELECT @PeriodCount = COUNT(*) FROM MonthPeriodSettings;
 
 PRINT N'';
 PRINT N'========================================';
@@ -221,7 +213,6 @@ PRINT N'  • وظایف پروژه: ' + CAST(@TaskCount AS NVARCHAR(10));
 PRINT N'  • هزینه ماشین: ' + CAST(@CarCostCount AS NVARCHAR(10));
 PRINT N'  • هزینه ورزش: ' + CAST(@GymCostCount AS NVARCHAR(10));
 PRINT N'  • گزارش‌های ماهیانه: ' + CAST(@ReportCount AS NVARCHAR(10));
-PRINT N'  • بازه ماه‌ها: ' + CAST(@PeriodCount AS NVARCHAR(10));
 PRINT N'========================================';
 PRINT N'';
 PRINT N'✓✓✓ دیتابیس آماده استفاده است! ✓✓✓';
