@@ -5,7 +5,6 @@ const approvalController = require('../controllers/monthlyReports/approvalContro
 const gymCostController = require('../controllers/monthlyReports/gymCostController');
 const reportRetrievalController = require('../controllers/monthlyReports/reportRetrievalController');
 const managerReportControler = require('../controllers/monthlyReports/managerReportController');
-const monthPeriodsController = require('../controllers/monthlyReports/monthPeriodsController');
 
 router.get('/my-drafts', draftController.getMyDrafts);
 router.delete('/exit-draft/:reportId', draftController.exitDraft);
@@ -28,9 +27,5 @@ router.get('/:reportId', reportRetrievalController.getReportById);
 router.get('/group/:year/:month', reportRetrievalController.getGroupReportsGregorian);
 router.get('/jalali/group/:year/:month', reportRetrievalController.getGroupReportsJalali);
 router.get('/group/range/:startYear/:startMonth/:endYear/:endMonth', reportRetrievalController.getGroupRangeReports);
-
-// Month period settings (public endpoints)
-router.get('/month-periods/:year', monthPeriodsController.getYearMonthPeriods);
-router.get('/month-periods/:year/:month', monthPeriodsController.getMonthPeriod);
 
 module.exports = router;
