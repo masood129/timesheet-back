@@ -1,22 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db.config');
-
-/**
- * @swagger
- * /projects:
- *   get:
- *     summary: Retrieve all projects accessible to the current user
- *     tags: [Projects]
- *     responses:
- *       200:
- *         description: List of projects
- *         content:
- *           application/json:
- *             schema:
-const express = require('express');
-const router = express.Router();
-const {sql, poolPromise} = require('../config/db.config');
+const logger = require('../utils/logger.service');
 
 /**
  * @swagger
@@ -38,6 +23,8 @@ const {sql, poolPromise} = require('../config/db.config');
  */
 router.get('/', async (req, res) => {
     const userId = req.user.userId;
+    logger.api.info('GET /projects request', { userId });
+    
     try {
         const pool = await poolPromise;
         const result = await pool.request()
@@ -48,10 +35,28 @@ router.get('/', async (req, res) => {
                          JOIN UserProjectAccess upa ON p.id = upa.ProjectId
                 WHERE upa.UserId = @userId
             `);
+        
+        logger.api.info('GET /projects query executed', { 
+            userId, 
+            projectCount: result.recordset.length 
+        });
+        
+        if (result.recordset.length === 0) {
+            logger.api.warn('No projects found for user', { userId });
+        }
+        
         res.json(result.recordset);
     } catch (err) {
+        logger.errors.error('Error in GET /projects', { 
+            userId, 
+            error: err.message,
+            stack: err.stack 
+        });
         console.error('Error in GET /projects:', err);
-        res.status(500).send('خطای سرور در دریافت پروژه‌ها');
+        res.status(500).json({ 
+            error: 'خطای سرور در دریافت پروژه‌ها',
+            message: err.message 
+        });
     }
 });
 

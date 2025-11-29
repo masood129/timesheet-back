@@ -103,3 +103,4 @@ fs.writeFileSync(outputPath, JSON.stringify(baseSwagger, null, 2), 'utf8');
 console.log(`✅ Swagger JSON file created successfully at ${outputPath}`);
 console.log(`   Total paths: ${Object.keys(baseSwagger.paths).length}`);
 
+
