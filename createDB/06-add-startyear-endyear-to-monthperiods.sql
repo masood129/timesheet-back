@@ -5,7 +5,7 @@
 --           تا بتوان بازه‌های سال‌شکن را پشتیبانی کرد (مثل اسفند سال 1403 تا فروردین سال 1404)
 -- =============================================
 
-USE [TimesheetDB]
+USE [UMD]
 GO
 
 PRINT N'شروع migration: اضافه کردن StartYear و EndYear...';
@@ -92,6 +92,9 @@ END
 GO
 
 PRINT N'✓ Migration با موفقیت انجام شد!';
-PRINT N'توجه: باید Stored Procedures را مجدداً ایجاد کنید.';
+PRINT N'';
+PRINT N'⚠️  توجه: Stored Procedures حذف شده‌اند و باید بازسازی شوند.';
+PRINT N'⚠️  لطفاً فایل 07-rebuild-monthperiod-stored-procedures.sql را اجرا کنید.';
+PRINT N'';
 GO
 
