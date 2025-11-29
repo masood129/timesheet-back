@@ -159,6 +159,46 @@ const createMonthPeriod = async (req, res) => {
             return res.status(400).send('تاریخ شروع نمی‌تواند بعد از تاریخ پایان باشد');
         }
 
+        // بررسی طول بازه (حداقل 20 روز و حداکثر 40 روز)
+        const periodLengthResult = await pool
+            .request()
+            .input('startYear', sql.Int, StartYear)
+            .input('startMonth', sql.Int, StartMonth)
+            .input('startDay', sql.Int, StartDay)
+            .input('endYear', sql.Int, EndYear)
+            .input('endMonth', sql.Int, EndMonth)
+            .input('endDay', sql.Int, EndDay)
+            .query(`
+                SELECT dbo.fn_GetPeriodLength(@startYear, @startMonth, @startDay, @endYear, @endMonth, @endDay) as PeriodLength
+            `);
+        
+        const periodLength = periodLengthResult.recordset[0].PeriodLength;
+        if (periodLength < 20) {
+            return res.status(400).send('طول بازه باید حداقل 20 روز باشد');
+        }
+        if (periodLength > 40) {
+            return res.status(400).send('طول بازه باید حداکثر 40 روز باشد');
+        }
+
+        // اعتبارسنجی با ماه‌های مجاور (بررسی overlap و gap)
+        const validationResult = await pool
+            .request()
+            .input('year', sql.Int, Year)
+            .input('month', sql.Int, Month)
+            .input('startDay', sql.Int, StartDay)
+            .input('startMonth', sql.Int, StartMonth)
+            .input('startYear', sql.Int, StartYear)
+            .input('endDay', sql.Int, EndDay)
+            .input('endMonth', sql.Int, EndMonth)
+            .input('endYear', sql.Int, EndYear)
+            .execute('sp_ValidatePeriodWithNeighbors');
+
+        if (validationResult.recordset.length > 0) {
+            // اگر خطایی وجود دارد، اولین خطا را برگردان
+            const firstError = validationResult.recordset[0];
+            return res.status(400).send(firstError.ErrorMessage);
+        }
+
         // بررسی اینکه اگر EndMonth به ماه بعد ادامه می‌دهد، ماه بعد نباید گذشته باشد
         if (EndMonth !== Month || EndYear !== Year) {
             // بازه به ماه بعد ادامه می‌دهد
@@ -203,26 +243,18 @@ const createMonthPeriod = async (req, res) => {
                 VALUES (@year, @month, @startDay, @startMonth, @startYear, @endDay, @endMonth, @endYear)
             `);
 
-        // اگر بازه به ماه بعد ادامه می‌دهد، بازه سفارشی ماه بعد را حذف کن تا خودکار محاسبه شود
-        if (EndMonth !== Month || EndYear !== Year) {
-            let nextMonth, nextYear;
-            if (EndMonth === 12) {
-                nextYear = EndYear + 1;
-                nextMonth = 1;
-            } else {
-                nextYear = EndYear;
-                nextMonth = EndMonth + 1;
-            }
-            
-            // حذف بازه سفارشی ماه بعد (اگر وجود دارد) تا خودکار محاسبه شود
-            await pool
-                .request()
-                .input('year', sql.Int, nextYear)
-                .input('month', sql.Int, nextMonth)
-                .query(`
-                    DELETE FROM MonthPeriodSettings WHERE Year = @year AND Month = @month
-                `);
-        }
+        // تنظیم خودکار ماه قبل و بعد
+        await pool
+            .request()
+            .input('year', sql.Int, Year)
+            .input('month', sql.Int, Month)
+            .input('startDay', sql.Int, StartDay)
+            .input('startMonth', sql.Int, StartMonth)
+            .input('startYear', sql.Int, StartYear)
+            .input('endDay', sql.Int, EndDay)
+            .input('endMonth', sql.Int, EndMonth)
+            .input('endYear', sql.Int, EndYear)
+            .execute('sp_AutoAdjustNeighborMonths');
 
         res.status(201).json({
             Year,
@@ -321,9 +353,50 @@ const updateMonthPeriod = async (req, res) => {
             return res.status(400).send('تاریخ شروع نمی‌تواند بعد از تاریخ پایان باشد');
         }
 
-        // بررسی اینکه اگر EndMonth به ماه بعد ادامه می‌دهد، ماه بعد نباید گذشته باشد
+        // بررسی طول بازه (حداقل 20 روز و حداکثر 40 روز)
+        const periodLengthResult = await pool
+            .request()
+            .input('startYear', sql.Int, StartYear)
+            .input('startMonth', sql.Int, StartMonth)
+            .input('startDay', sql.Int, StartDay)
+            .input('endYear', sql.Int, EndYear)
+            .input('endMonth', sql.Int, EndMonth)
+            .input('endDay', sql.Int, EndDay)
+            .query(`
+                SELECT dbo.fn_GetPeriodLength(@startYear, @startMonth, @startDay, @endYear, @endMonth, @endDay) as PeriodLength
+            `);
+        
+        const periodLength = periodLengthResult.recordset[0].PeriodLength;
+        if (periodLength < 20) {
+            return res.status(400).send('طول بازه باید حداقل 20 روز باشد');
+        }
+        if (periodLength > 40) {
+            return res.status(400).send('طول بازه باید حداکثر 40 روز باشد');
+        }
+
+        // اعتبارسنجی با ماه‌های مجاور (بررسی overlap و gap)
         const periodYear = parseInt(year);
         const periodMonth = parseInt(month);
+        
+        const validationResult = await pool
+            .request()
+            .input('year', sql.Int, periodYear)
+            .input('month', sql.Int, periodMonth)
+            .input('startDay', sql.Int, StartDay)
+            .input('startMonth', sql.Int, StartMonth)
+            .input('startYear', sql.Int, StartYear)
+            .input('endDay', sql.Int, EndDay)
+            .input('endMonth', sql.Int, EndMonth)
+            .input('endYear', sql.Int, EndYear)
+            .execute('sp_ValidatePeriodWithNeighbors');
+
+        if (validationResult.recordset.length > 0) {
+            // اگر خطایی وجود دارد، اولین خطا را برگردان
+            const firstError = validationResult.recordset[0];
+            return res.status(400).send(firstError.ErrorMessage);
+        }
+
+        // بررسی اینکه اگر EndMonth به ماه بعد ادامه می‌دهد، ماه بعد نباید گذشته باشد
         
         if (EndMonth !== periodMonth || EndYear !== periodYear) {
             // بازه به ماه بعد ادامه می‌دهد
@@ -374,26 +447,18 @@ const updateMonthPeriod = async (req, res) => {
                 WHERE Year = @year AND Month = @month
             `);
 
-        // اگر بازه به ماه بعد ادامه می‌دهد، بازه سفارشی ماه بعد را حذف کن تا خودکار محاسبه شود
-        if (EndMonth !== periodMonth || EndYear !== periodYear) {
-            let nextMonth, nextYear;
-            if (EndMonth === 12) {
-                nextYear = EndYear + 1;
-                nextMonth = 1;
-            } else {
-                nextYear = EndYear;
-                nextMonth = EndMonth + 1;
-            }
-            
-            // حذف بازه سفارشی ماه بعد (اگر وجود دارد) تا خودکار محاسبه شود
-            await pool
-                .request()
-                .input('year', sql.Int, nextYear)
-                .input('month', sql.Int, nextMonth)
-                .query(`
-                    DELETE FROM MonthPeriodSettings WHERE Year = @year AND Month = @month
-                `);
-        }
+        // تنظیم خودکار ماه قبل و بعد
+        await pool
+            .request()
+            .input('year', sql.Int, periodYear)
+            .input('month', sql.Int, periodMonth)
+            .input('startDay', sql.Int, StartDay)
+            .input('startMonth', sql.Int, StartMonth)
+            .input('startYear', sql.Int, StartYear)
+            .input('endDay', sql.Int, EndDay)
+            .input('endMonth', sql.Int, EndMonth)
+            .input('endYear', sql.Int, EndYear)
+            .execute('sp_AutoAdjustNeighborMonths');
 
         res.json({
             Year: periodYear,
