@@ -97,13 +97,20 @@ PRINT N'✓ 10 پروژه درج شد';
 -- =============================================
 -- خلاصه
 -- =============================================
+DECLARE @GroupCount INT, @ManagerCount INT, @ActiveUserCount INT, @ProjectCount INT;
+
+SELECT @GroupCount = COUNT(*) FROM groups;
+SELECT @ManagerCount = COUNT(*) FROM groupManagers;
+SELECT @ActiveUserCount = COUNT(*) FROM users WHERE IsActive = 1;
+SELECT @ProjectCount = COUNT(*) FROM projects;
+
 PRINT N'';
 PRINT N'========================================';
 PRINT N'خلاصه داده‌های تستی:';
-PRINT N'  • گروه‌ها: ' + CAST((SELECT COUNT(*) FROM groups) AS NVARCHAR(10));
-PRINT N'  • مدیران گروه: ' + CAST((SELECT COUNT(*) FROM groupManagers) AS NVARCHAR(10));
-PRINT N'  • کاربران فعال: ' + CAST((SELECT COUNT(*) FROM users WHERE IsActive = 1) AS NVARCHAR(10));
-PRINT N'  • پروژه‌ها: ' + CAST((SELECT COUNT(*) FROM projects) AS NVARCHAR(10));
+PRINT N'  • گروه‌ها: ' + CAST(@GroupCount AS NVARCHAR(10));
+PRINT N'  • مدیران گروه: ' + CAST(@ManagerCount AS NVARCHAR(10));
+PRINT N'  • کاربران فعال: ' + CAST(@ActiveUserCount AS NVARCHAR(10));
+PRINT N'  • پروژه‌ها: ' + CAST(@ProjectCount AS NVARCHAR(10));
 PRINT N'========================================';
 PRINT N'';
 PRINT N'مرحله بعدی: اجرای 04-insert-app-test-data.sql';

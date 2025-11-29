@@ -179,11 +179,11 @@ PRINT N'✓ گزارش‌های ماهیانه درج شد';
 -- INSERT داده‌های تستی برای جدول MonthPeriodSettings
 -- =============================================
 PRINT N'→ درج داده‌های تستی در جدول MonthPeriodSettings...';
-INSERT INTO MonthPeriodSettings (Year, Month, StartDay, StartMonth, EndDay, EndMonth)
+INSERT INTO MonthPeriodSettings (Year, Month, StartDay, StartMonth, StartYear, EndDay, EndMonth, EndYear)
 VALUES
-    (1404, 1, 1, 1, 5, 2),      -- فروردین: از 1 فروردین تا 5 اردیبهشت
-    (1404, 8, 1, 8, 30, 8),     -- آبان: عادی
-    (1404, 9, 24, 8, 30, 9);    -- آذر: از 24 آبان تا آخر آذر
+    (1404, 1, 1, 1, 1404, 5, 2, 1404),      -- فروردین: از 1 فروردین 1404 تا 5 اردیبهشت 1404
+    (1404, 8, 1, 8, 1404, 30, 8, 1404),     -- آبان: عادی (1 تا 30 آبان 1404)
+    (1404, 9, 24, 8, 1404, 30, 9, 1404);    -- آذر: از 24 آبان 1404 تا 30 آذر 1404
 GO
 PRINT N'✓ تنظیمات بازه ماه درج شد';
 
@@ -197,18 +197,31 @@ EXEC sp_GetMonthPeriod @Year = 1404, @Month = 10;
 -- =============================================
 -- خلاصه
 -- =============================================
+DECLARE @AdminCount INT, @ProjectAccessCount INT, @ContractCount INT, @DailyDetailCount INT;
+DECLARE @TaskCount INT, @CarCostCount INT, @GymCostCount INT, @ReportCount INT, @PeriodCount INT;
+
+SELECT @AdminCount = COUNT(*) FROM Admins;
+SELECT @ProjectAccessCount = COUNT(*) FROM UserProjectAccess;
+SELECT @ContractCount = COUNT(*) FROM UserContractHours;
+SELECT @DailyDetailCount = COUNT(*) FROM DailyDetails;
+SELECT @TaskCount = COUNT(*) FROM DailyProjectTasks;
+SELECT @CarCostCount = COUNT(*) FROM DailyPersonalCarCosts;
+SELECT @GymCostCount = COUNT(*) FROM MonthlyGymCosts;
+SELECT @ReportCount = COUNT(*) FROM MonthlyReports;
+SELECT @PeriodCount = COUNT(*) FROM MonthPeriodSettings;
+
 PRINT N'';
 PRINT N'========================================';
 PRINT N'خلاصه داده‌های تستی برنامه:';
-PRINT N'  • ادمین‌ها: ' + CAST((SELECT COUNT(*) FROM Admins) AS NVARCHAR(10));
-PRINT N'  • دسترسی پروژه: ' + CAST((SELECT COUNT(*) FROM UserProjectAccess) AS NVARCHAR(10));
-PRINT N'  • قراردادها: ' + CAST((SELECT COUNT(*) FROM UserContractHours) AS NVARCHAR(10));
-PRINT N'  • جزئیات روزانه: ' + CAST((SELECT COUNT(*) FROM DailyDetails) AS NVARCHAR(10));
-PRINT N'  • وظایف پروژه: ' + CAST((SELECT COUNT(*) FROM DailyProjectTasks) AS NVARCHAR(10));
-PRINT N'  • هزینه ماشین: ' + CAST((SELECT COUNT(*) FROM DailyPersonalCarCosts) AS NVARCHAR(10));
-PRINT N'  • هزینه ورزش: ' + CAST((SELECT COUNT(*) FROM MonthlyGymCosts) AS NVARCHAR(10));
-PRINT N'  • گزارش‌های ماهیانه: ' + CAST((SELECT COUNT(*) FROM MonthlyReports) AS NVARCHAR(10));
-PRINT N'  • بازه ماه‌ها: ' + CAST((SELECT COUNT(*) FROM MonthPeriodSettings) AS NVARCHAR(10));
+PRINT N'  • ادمین‌ها: ' + CAST(@AdminCount AS NVARCHAR(10));
+PRINT N'  • دسترسی پروژه: ' + CAST(@ProjectAccessCount AS NVARCHAR(10));
+PRINT N'  • قراردادها: ' + CAST(@ContractCount AS NVARCHAR(10));
+PRINT N'  • جزئیات روزانه: ' + CAST(@DailyDetailCount AS NVARCHAR(10));
+PRINT N'  • وظایف پروژه: ' + CAST(@TaskCount AS NVARCHAR(10));
+PRINT N'  • هزینه ماشین: ' + CAST(@CarCostCount AS NVARCHAR(10));
+PRINT N'  • هزینه ورزش: ' + CAST(@GymCostCount AS NVARCHAR(10));
+PRINT N'  • گزارش‌های ماهیانه: ' + CAST(@ReportCount AS NVARCHAR(10));
+PRINT N'  • بازه ماه‌ها: ' + CAST(@PeriodCount AS NVARCHAR(10));
 PRINT N'========================================';
 PRINT N'';
 PRINT N'✓✓✓ دیتابیس آماده استفاده است! ✓✓✓';
