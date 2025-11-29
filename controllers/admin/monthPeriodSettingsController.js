@@ -87,20 +87,26 @@ const createMonthPeriod = async (req, res) => {
         Year, 
         Month, 
         StartDay, 
-        StartMonth, 
+        StartMonth,
+        StartYear,
         EndDay, 
         EndMonth,
+        EndYear,
         CurrentJalaliYear,
         CurrentJalaliMonth 
     } = req.body;
 
     // Validation
-    if (!Year || !Month || !StartDay || !StartMonth || !EndDay || !EndMonth) {
+    if (!Year || !Month || !StartDay || !StartMonth || !StartYear || !EndDay || !EndMonth || !EndYear) {
         return res.status(400).send('تمام فیلدها الزامی است');
     }
 
     if (Month < 1 || Month > 12 || StartMonth < 1 || StartMonth > 12 || EndMonth < 1 || EndMonth > 12) {
         return res.status(400).send('ماه باید بین 1 تا 12 باشد');
+    }
+
+    if (StartYear < 1300 || StartYear > 1500 || EndYear < 1300 || EndYear > 1500) {
+        return res.status(400).send('سال باید بین 1300 تا 1500 باشد');
     }
 
     if (StartDay < 1 || EndDay < 1) {
@@ -136,12 +142,20 @@ const createMonthPeriod = async (req, res) => {
             return res.status(400).send('بازه این ماه قبلاً تنظیم شده است. از PUT برای ویرایش استفاده کنید');
         }
 
-        // بررسی صحت بازه (StartDate <= EndDate)
-        // تبدیل به روز از اول سال برای مقایسه
-        const startDayOfYear = (StartMonth - 1) * 31 + StartDay;  // تقریبی
-        const endDayOfYear = (EndMonth - 1) * 31 + EndDay;        // تقریبی
+        // بررسی صحت بازه: تاریخ شروع نباید بعد از تاریخ پایان باشد
+        // محاسبه بر اساس سال و ماه
+        let isStartAfterEnd = false;
+        if (StartYear > EndYear) {
+            isStartAfterEnd = true;
+        } else if (StartYear === EndYear) {
+            if (StartMonth > EndMonth) {
+                isStartAfterEnd = true;
+            } else if (StartMonth === EndMonth && StartDay > EndDay) {
+                isStartAfterEnd = true;
+            }
+        }
         
-        if (startDayOfYear > endDayOfYear) {
+        if (isStartAfterEnd) {
             return res.status(400).send('تاریخ شروع نمی‌تواند بعد از تاریخ پایان باشد');
         }
 
@@ -152,11 +166,13 @@ const createMonthPeriod = async (req, res) => {
             .input('month', sql.Int, Month)
             .input('startDay', sql.Int, StartDay)
             .input('startMonth', sql.Int, StartMonth)
+            .input('startYear', sql.Int, StartYear)
             .input('endDay', sql.Int, EndDay)
             .input('endMonth', sql.Int, EndMonth)
+            .input('endYear', sql.Int, EndYear)
             .query(`
-                INSERT INTO MonthPeriodSettings (Year, Month, StartDay, StartMonth, EndDay, EndMonth)
-                VALUES (@year, @month, @startDay, @startMonth, @endDay, @endMonth)
+                INSERT INTO MonthPeriodSettings (Year, Month, StartDay, StartMonth, StartYear, EndDay, EndMonth, EndYear)
+                VALUES (@year, @month, @startDay, @startMonth, @startYear, @endDay, @endMonth, @endYear)
             `);
 
         res.status(201).json({
@@ -164,8 +180,10 @@ const createMonthPeriod = async (req, res) => {
             Month,
             StartDay,
             StartMonth,
+            StartYear,
             EndDay,
             EndMonth,
+            EndYear,
             message: 'بازه ماه با موفقیت ایجاد شد'
         });
     } catch (err) {
@@ -188,19 +206,25 @@ const updateMonthPeriod = async (req, res) => {
     const { year, month } = req.params;
     const { 
         StartDay, 
-        StartMonth, 
+        StartMonth,
+        StartYear,
         EndDay, 
         EndMonth,
+        EndYear,
         CurrentJalaliYear,
         CurrentJalaliMonth 
     } = req.body;
 
-    if (!StartDay || !StartMonth || !EndDay || !EndMonth) {
+    if (!StartDay || !StartMonth || !StartYear || !EndDay || !EndMonth || !EndYear) {
         return res.status(400).send('تمام فیلدها الزامی است');
     }
 
     if (StartMonth < 1 || StartMonth > 12 || EndMonth < 1 || EndMonth > 12) {
         return res.status(400).send('ماه باید بین 1 تا 12 باشد');
+    }
+
+    if (StartYear < 1300 || StartYear > 1500 || EndYear < 1300 || EndYear > 1500) {
+        return res.status(400).send('سال باید بین 1300 تا 1500 باشد');
     }
 
     try {
@@ -233,10 +257,18 @@ const updateMonthPeriod = async (req, res) => {
         }
 
         // بررسی صحت بازه
-        const startDayOfYear = (StartMonth - 1) * 31 + StartDay;
-        const endDayOfYear = (EndMonth - 1) * 31 + EndDay;
+        let isStartAfterEnd = false;
+        if (StartYear > EndYear) {
+            isStartAfterEnd = true;
+        } else if (StartYear === EndYear) {
+            if (StartMonth > EndMonth) {
+                isStartAfterEnd = true;
+            } else if (StartMonth === EndMonth && StartDay > EndDay) {
+                isStartAfterEnd = true;
+            }
+        }
         
-        if (startDayOfYear > endDayOfYear) {
+        if (isStartAfterEnd) {
             return res.status(400).send('تاریخ شروع نمی‌تواند بعد از تاریخ پایان باشد');
         }
 
@@ -247,14 +279,18 @@ const updateMonthPeriod = async (req, res) => {
             .input('month', sql.Int, parseInt(month))
             .input('startDay', sql.Int, StartDay)
             .input('startMonth', sql.Int, StartMonth)
+            .input('startYear', sql.Int, StartYear)
             .input('endDay', sql.Int, EndDay)
             .input('endMonth', sql.Int, EndMonth)
+            .input('endYear', sql.Int, EndYear)
             .query(`
                 UPDATE MonthPeriodSettings
                 SET StartDay = @startDay,
                     StartMonth = @startMonth,
+                    StartYear = @startYear,
                     EndDay = @endDay,
-                    EndMonth = @endMonth
+                    EndMonth = @endMonth,
+                    EndYear = @endYear
                 WHERE Year = @year AND Month = @month
             `);
 
@@ -263,8 +299,10 @@ const updateMonthPeriod = async (req, res) => {
             Month: parseInt(month),
             StartDay,
             StartMonth,
+            StartYear,
             EndDay,
             EndMonth,
+            EndYear,
             message: 'بازه ماه با موفقیت بروزرسانی شد'
         });
     } catch (err) {

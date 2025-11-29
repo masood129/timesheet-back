@@ -177,8 +177,10 @@ CREATE TABLE MonthPeriodSettings (
     Month INT NOT NULL CHECK (Month BETWEEN 1 AND 12), -- ماه شمسی (1-12)
     StartDay INT NOT NULL,                           -- روز شروع (مثلاً 1)
     StartMonth INT NOT NULL CHECK (StartMonth BETWEEN 1 AND 12), -- ماه شروع
+    StartYear INT NOT NULL,                          -- سال شروع (برای پشتیبانی از بازه‌های سال‌شکن)
     EndDay INT NOT NULL,                             -- روز پایان (مثلاً 5)
     EndMonth INT NOT NULL CHECK (EndMonth BETWEEN 1 AND 12), -- ماه پایان
+    EndYear INT NOT NULL,                            -- سال پایان (برای پشتیبانی از بازه‌های سال‌شکن)
     CreatedAt DATETIME DEFAULT GETDATE(),            -- تاریخ ایجاد
     UpdatedAt DATETIME DEFAULT GETDATE(),            -- تاریخ بروزرسانی
     CONSTRAINT UQ_MonthPeriod UNIQUE(Year, Month)    -- هر سال فقط یک بازه برای هر ماه
@@ -260,9 +262,11 @@ BEGIN
             Year,
             Month,
             StartDay, 
-            StartMonth, 
+            StartMonth,
+            StartYear,
             EndDay, 
-            EndMonth
+            EndMonth,
+            EndYear
         FROM MonthPeriodSettings
         WHERE Year = @Year AND Month = @Month;
         RETURN;
@@ -275,30 +279,51 @@ BEGIN
     IF EXISTS (SELECT 1 FROM MonthPeriodSettings WHERE Year = @PrevYear AND Month = @PrevMonth)
     BEGIN
         -- شروع از روز بعدی پایان ماه قبل
-        DECLARE @PrevEndDay INT, @PrevEndMonth INT;
-        SELECT @PrevEndDay = EndDay, @PrevEndMonth = EndMonth
+        DECLARE @PrevEndDay INT, @PrevEndMonth INT, @PrevEndYear INT;
+        SELECT @PrevEndDay = EndDay, @PrevEndMonth = EndMonth, @PrevEndYear = EndYear
         FROM MonthPeriodSettings
         WHERE Year = @PrevYear AND Month = @PrevMonth;
         
-        IF @PrevEndMonth = @Month
+        -- محاسبه StartYear و StartMonth
+        DECLARE @CalcStartYear INT, @CalcStartMonth INT;
+        IF @PrevEndMonth = 12
+        BEGIN
+            -- اگر پایان ماه قبل در اسفند است، شروع از فروردین سال بعد
+            SET @CalcStartYear = @PrevEndYear + 1;
+            SET @CalcStartMonth = 1;
+        END
+        ELSE
+        BEGIN
+            -- در غیر این صورت، ماه بعدی همان سال
+            SET @CalcStartYear = @PrevEndYear;
+            SET @CalcStartMonth = @PrevEndMonth + 1;
+        END
+        
+        -- اگر محاسبه شده با ماه درخواستی مطابقت دارد
+        IF @CalcStartYear = @Year AND @CalcStartMonth = @Month
         BEGIN
             SELECT 
                 @Year AS Year,
                 @Month AS Month,
                 @PrevEndDay + 1 AS StartDay,
                 @Month AS StartMonth,
+                @Year AS StartYear,
                 dbo.fn_GetMonthLength(@Year, @Month) AS EndDay,
-                @Month AS EndMonth;
+                @Month AS EndMonth,
+                @Year AS EndYear;
         END
         ELSE
         BEGIN
+            -- حالت پیش‌فرض: از اول تا آخر ماه
             SELECT 
                 @Year AS Year,
                 @Month AS Month,
                 1 AS StartDay,
                 @Month AS StartMonth,
+                @Year AS StartYear,
                 dbo.fn_GetMonthLength(@Year, @Month) AS EndDay,
-                @Month AS EndMonth;
+                @Month AS EndMonth,
+                @Year AS EndYear;
         END
     END
     ELSE
@@ -309,8 +334,10 @@ BEGIN
             @Month AS Month,
             1 AS StartDay,
             @Month AS StartMonth,
+            @Year AS StartYear,
             dbo.fn_GetMonthLength(@Year, @Month) AS EndDay,
-            @Month AS EndMonth;
+            @Month AS EndMonth,
+            @Year AS EndYear;
     END
 END;
 GO
@@ -329,14 +356,16 @@ BEGIN
         Month INT,
         StartDay INT,
         StartMonth INT,
+        StartYear INT,
         EndDay INT,
         EndMonth INT,
+        EndYear INT,
         IsCustom BIT
     );
     
     DECLARE @CurrentMonth INT = 1;
-    DECLARE @StartDay INT, @StartMonth INT, @EndDay INT, @EndMonth INT, @IsCustom BIT;
-    DECLARE @PrevMonth INT, @PrevYear INT, @PrevEndDay INT, @PrevEndMonth INT;
+    DECLARE @StartDay INT, @StartMonth INT, @StartYear INT, @EndDay INT, @EndMonth INT, @EndYear INT, @IsCustom BIT;
+    DECLARE @PrevMonth INT, @PrevYear INT, @PrevEndDay INT, @PrevEndMonth INT, @PrevEndYear INT;
     
     WHILE @CurrentMonth <= 12
     BEGIN
@@ -345,8 +374,10 @@ BEGIN
             SELECT 
                 @StartDay = StartDay,
                 @StartMonth = StartMonth,
+                @StartYear = StartYear,
                 @EndDay = EndDay,
-                @EndMonth = EndMonth
+                @EndMonth = EndMonth,
+                @EndYear = EndYear
             FROM MonthPeriodSettings
             WHERE Year = @Year AND Month = @CurrentMonth;
             
@@ -359,51 +390,80 @@ BEGIN
             
             IF @PrevYear = @Year AND EXISTS (SELECT 1 FROM #MonthPeriods WHERE Month = @PrevMonth)
             BEGIN
-                SELECT @PrevEndDay = EndDay, @PrevEndMonth = EndMonth
+                SELECT @PrevEndDay = EndDay, @PrevEndMonth = EndMonth, @PrevEndYear = EndYear
                 FROM #MonthPeriods
                 WHERE Month = @PrevMonth;
                 
-                IF @PrevEndMonth = @CurrentMonth
+                -- محاسبه StartYear و StartMonth بر اساس پایان ماه قبل
+                IF @PrevEndMonth = 12
+                BEGIN
+                    -- اگر پایان در اسفند است، شروع از فروردین سال بعد
+                    SET @StartYear = @PrevEndYear + 1;
+                    SET @StartMonth = 1;
+                END
+                ELSE
+                BEGIN
+                    SET @StartYear = @PrevEndYear;
+                    SET @StartMonth = @PrevEndMonth + 1;
+                END
+                
+                -- بررسی تطابق با ماه جاری
+                IF @StartYear = @Year AND @StartMonth = @CurrentMonth
                 BEGIN
                     SET @StartDay = @PrevEndDay + 1;
-                    SET @StartMonth = @CurrentMonth;
                 END
                 ELSE
                 BEGIN
                     SET @StartDay = 1;
+                    SET @StartYear = @Year;
                     SET @StartMonth = @CurrentMonth;
                 END
             END
             ELSE IF EXISTS (SELECT 1 FROM MonthPeriodSettings WHERE Year = @PrevYear AND Month = @PrevMonth)
             BEGIN
-                SELECT @PrevEndDay = EndDay, @PrevEndMonth = EndMonth
+                SELECT @PrevEndDay = EndDay, @PrevEndMonth = EndMonth, @PrevEndYear = EndYear
                 FROM MonthPeriodSettings
                 WHERE Year = @PrevYear AND Month = @PrevMonth;
                 
-                IF @PrevEndMonth = @CurrentMonth
+                -- محاسبه StartYear و StartMonth بر اساس پایان ماه قبل
+                IF @PrevEndMonth = 12
+                BEGIN
+                    SET @StartYear = @PrevEndYear + 1;
+                    SET @StartMonth = 1;
+                END
+                ELSE
+                BEGIN
+                    SET @StartYear = @PrevEndYear;
+                    SET @StartMonth = @PrevEndMonth + 1;
+                END
+                
+                -- بررسی تطابق با ماه جاری
+                IF @StartYear = @Year AND @StartMonth = @CurrentMonth
                 BEGIN
                     SET @StartDay = @PrevEndDay + 1;
-                    SET @StartMonth = @CurrentMonth;
                 END
                 ELSE
                 BEGIN
                     SET @StartDay = 1;
+                    SET @StartYear = @Year;
                     SET @StartMonth = @CurrentMonth;
                 END
             END
             ELSE
             BEGIN
                 SET @StartDay = 1;
+                SET @StartYear = @Year;
                 SET @StartMonth = @CurrentMonth;
             END
             
             SET @EndDay = dbo.fn_GetMonthLength(@Year, @CurrentMonth);
             SET @EndMonth = @CurrentMonth;
+            SET @EndYear = @Year;
             SET @IsCustom = 0;
         END
         
-        INSERT INTO #MonthPeriods (Year, Month, StartDay, StartMonth, EndDay, EndMonth, IsCustom)
-        VALUES (@Year, @CurrentMonth, @StartDay, @StartMonth, @EndDay, @EndMonth, @IsCustom);
+        INSERT INTO #MonthPeriods (Year, Month, StartDay, StartMonth, StartYear, EndDay, EndMonth, EndYear, IsCustom)
+        VALUES (@Year, @CurrentMonth, @StartDay, @StartMonth, @StartYear, @EndDay, @EndMonth, @EndYear, @IsCustom);
         
         SET @CurrentMonth = @CurrentMonth + 1;
     END
