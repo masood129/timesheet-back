@@ -1,0 +1,261 @@
+schemas:
+  Project:
+    type: object
+    properties:
+      Id:
+        type: integer
+        description: Unique identifier for the project
+      ProjectName:
+        type: string
+        description: Name of the project
+      securityLevel:
+        type: integer
+        description: Security level of the project
+
+  ProjectInput:
+    type: object
+    required:
+      - Id
+      - ProjectName
+      - securityLevel
+    properties:
+      Id:
+        type: integer
+        description: Unique identifier for the project
+      ProjectName:
+        type: string
+        description: Name of the project
+      securityLevel:
+        type: integer
+        description: Security level of the project
+
+  DailyDetail:
+    type: object
+    properties:
+      Date:
+        type: string
+        format: date-time
+        description: Date of the daily details
+      UserId:
+        type: integer
+        description: User ID
+      LeaveType:
+        type: string
+        nullable: true
+        description: Type of leave
+      ArrivalTime:
+        type: string
+        nullable: true
+        description: Arrival time
+      LeaveTime:
+        type: string
+        nullable: true
+        description: Leave time
+      PersonalTime:
+        type: integer
+        nullable: true
+        description: Personal time in minutes
+      Description:
+        type: string
+        nullable: true
+        description: Description
+      GoCost:
+        type: integer
+        nullable: true
+        description: Cost of going
+      ReturnCost:
+        type: integer
+        nullable: true
+        description: Cost of returning
+      tasks:
+        type: array
+        items:
+          $ref: '#/components/schemas/DailyProjectTask'
+        description: List of tasks for the day
+      personalCarCosts:
+        type: array
+        items:
+          $ref: '#/components/schemas/DailyPersonalCarCost'
+        description: List of personal car costs for the day
+
+  DailyProjectTask:
+    type: object
+    properties:
+      Date:
+        type: string
+        format: date-time
+        description: Date of the task
+      UserId:
+        type: integer
+        description: User ID
+      ProjectId:
+        type: integer
+        description: Project ID
+      Duration:
+        type: integer
+        description: Duration of the task in minutes
+      Description:
+        type: string
+        nullable: true
+        description: Description of the task
+
+  DailyPersonalCarCost:
+    type: object
+    properties:
+      Date:
+        type: string
+        format: date-time
+        description: Date of the cost
+      UserId:
+        type: integer
+        description: User ID
+      ProjectId:
+        type: integer
+        description: Project ID
+      Cost:
+        type: integer
+        description: Cost amount
+      Description:
+        type: string
+        nullable: true
+        description: Description of the cost
+
+  MonthlyReport:
+    type: object
+    properties:
+      ReportId:
+        type: integer
+        description: Unique identifier for the report
+      UserId:
+        type: integer
+        description: Identifier of the user
+      Year:
+        type: integer
+        description: Gregorian year of the report
+      Month:
+        type: integer
+        description: Gregorian month of the report (1-12)
+      JalaliYear:
+        type: integer
+        description: Jalali year of the report
+      JalaliMonth:
+        type: integer
+        description: Jalali month of the report (1-12)
+      TotalHours:
+        type: integer
+        nullable: true
+        description: Total hours worked in the month
+      GymCost:
+        type: integer
+        nullable: true
+        description: Gym cost for the month
+      Status:
+        type: string
+        description: Status of the report (draft, submitted_to_group_manager, submitted_to_general_manager, submitted_to_finance, approved)
+      ManagerComment:
+        type: string
+        nullable: true
+        description: Comment from the manager
+      FinanceComment:
+        type: string
+        nullable: true
+        description: Comment from the finance team
+      SubmittedAt:
+        type: string
+        format: date-time
+        nullable: true
+        description: Date and time when the report was submitted to manager
+      ApprovedAt:
+        type: string
+        format: date-time
+        nullable: true
+        description: Date and time when the report was final approved
+      GroupId:
+        type: integer
+        nullable: true
+        description: Identifier of the group
+      GeneralManagerStatus:
+        type: string
+        nullable: true
+        description: Status of general manager approval (pending, approved_by_general_manager)
+      Username:
+        type: string
+        nullable: true
+        description: Username of the report owner (included in group reports)
+
+  User:
+    type: object
+    properties:
+      UserId:
+        type: integer
+        description: User ID
+      Username:
+        type: string
+        description: Username
+      Role:
+        type: string
+        description: User role
+      GroupId:
+        type: integer
+        nullable: true
+        description: Group ID
+      GroupName:
+        type: string
+        nullable: true
+        description: Group name
+      FarsiFirstName:
+        type: string
+        nullable: true
+        description: Persian first name
+      FarsiLastName:
+        type: string
+        nullable: true
+        description: Persian last name
+
+  Group:
+    type: object
+    properties:
+      GroupId:
+        type: integer
+        description: Group ID
+      GroupName:
+        type: string
+        description: Group name
+      ManagerId:
+        type: integer
+        nullable: true
+        description: Manager user ID
+
+  MonthPeriod:
+    type: object
+    properties:
+      Year:
+        type: integer
+        description: Jalali year
+      Month:
+        type: integer
+        description: Jalali month (1-12)
+      StartDay:
+        type: integer
+        description: Start day
+      StartMonth:
+        type: integer
+        description: Start month (1-12)
+      EndDay:
+        type: integer
+        description: End day
+      EndMonth:
+        type: integer
+        description: End month (1-12)
+
+  Error:
+    type: object
+    properties:
+      message:
+        type: string
+        description: Error message
+      code:
+        type: string
+        nullable: true
+        description: Error code
+

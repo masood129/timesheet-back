@@ -1,0 +1,192 @@
+paths:
+  /admin/users:
+    get:
+      summary: Get all users (Admin only)
+      tags:
+        - Admin - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: role
+          schema:
+            type: string
+          description: Filter by role
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search by username
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '403':
+          description: Access denied
+        '500':
+          description: Server error
+
+    post:
+      summary: Create new user (Admin only)
+      tags:
+        - Admin - Users
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - UserId
+                - Username
+              properties:
+                UserId:
+                  type: integer
+                Username:
+                  type: string
+                Role:
+                  type: string
+                  enum:
+                    - user
+                    - group_manager
+                    - general_manager
+                    - finance_manager
+                    - admin
+                  default: user
+      responses:
+        '201':
+          description: User created
+        '400':
+          description: Invalid input
+        '500':
+          description: Server error
+
+  /admin/users/{id}:
+    get:
+      summary: Get user by ID (Admin only)
+      tags:
+        - Admin - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+        '500':
+          description: Server error
+
+    put:
+      summary: Update user (Admin only)
+      tags:
+        - Admin - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                Username:
+                  type: string
+      responses:
+        '200':
+          description: User updated
+        '404':
+          description: User not found
+        '500':
+          description: Server error
+
+    delete:
+      summary: Delete user (Admin only)
+      tags:
+        - Admin - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User deleted
+        '404':
+          description: User not found
+        '500':
+          description: Server error
+
+  /admin/users/{id}/role:
+    put:
+      summary: Update user role (Admin only)
+      tags:
+        - Admin - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Role
+              properties:
+                Role:
+                  type: string
+                  enum:
+                    - user
+                    - group_manager
+                    - general_manager
+                    - finance_manager
+                    - admin
+      responses:
+        '200':
+          description: Role updated
+        '404':
+          description: User not found
+        '500':
+          description: Server error
+

@@ -1,0 +1,22 @@
+paths:
+  /users/subordinates:
+    get:
+      summary: Get list of subordinates or all users based on role (excluding self)
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of users (subordinates for group managers, all for general/finance managers, excluding the logged-in user)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '403':
+          description: Access denied - Insufficient permissions
+        '500':
+          description: Server error
+

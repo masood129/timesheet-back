@@ -1,0 +1,44 @@
+paths:
+  /test/jalali/{year}/{month}:
+    get:
+      summary: Test Jalali to Gregorian date conversion
+      tags:
+        - Test
+      parameters:
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Jalali year
+        - in: path
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Jalali month (1-12)
+      responses:
+        '200':
+          description: Date conversion result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jalaliYear:
+                    type: integer
+                  jalaliMonth:
+                    type: integer
+                  gregorianStart:
+                    type: string
+                    format: date-time
+                  gregorianEnd:
+                    type: string
+                    format: date-time
+        '400':
+          description: Invalid input (e.g., invalid year or month)
+        '500':
+          description: Server error
+

@@ -1,0 +1,311 @@
+paths:
+  /daily-details:
+    post:
+      summary: Create or update daily details for a specific date
+      tags:
+        - DailyDetails
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - date
+              properties:
+                date:
+                  type: string
+                  format: date
+                  description: Date of the daily details (YYYY-MM-DD)
+                leaveType:
+                  type: string
+                  nullable: true
+                  description: Type of leave
+                arrivalTime:
+                  type: string
+                  nullable: true
+                  description: Arrival time (HH:mm)
+                leaveTime:
+                  type: string
+                  nullable: true
+                  description: Leave time (HH:mm)
+                personalTime:
+                  type: integer
+                  nullable: true
+                  description: Personal time in minutes
+                description:
+                  type: string
+                  nullable: true
+                  description: Description
+                goCost:
+                  type: integer
+                  nullable: true
+                  description: Cost of going
+                returnCost:
+                  type: integer
+                  nullable: true
+                  description: Cost of returning
+                tasks:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      projectId:
+                        type: integer
+                      duration:
+                        type: integer
+                      description:
+                        type: string
+                  description: List of tasks for the day
+                personalCarCosts:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      projectId:
+                        type: integer
+                      kilometers:
+                        type: integer
+                      cost:
+                        type: integer
+                      description:
+                        type: string
+                  description: List of personal car costs for the day
+      responses:
+        '201':
+          description: Daily details created or updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyDetail'
+        '400':
+          description: Invalid input (e.g., invalid date format)
+        '500':
+          description: Server error
+
+  /daily-details/{date}:
+    get:
+      summary: Get daily details by date
+      tags:
+        - DailyDetails
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: date
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Date of the daily details (YYYY-MM-DD)
+      responses:
+        '200':
+          description: Daily details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyDetail'
+        '400':
+          description: Invalid date
+        '404':
+          description: No details found for the date
+        '500':
+          description: Server error
+
+  /daily-details/month/{year}/{month}:
+    get:
+      summary: Get monthly details using Gregorian calendar
+      tags:
+        - DailyDetails
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Gregorian year
+        - in: path
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Gregorian month (1-12)
+      responses:
+        '200':
+          description: Monthly details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DailyDetail'
+        '400':
+          description: Invalid year or month
+        '500':
+          description: Server error
+
+  /daily-details/jalali/month/{year}/{month}:
+    get:
+      summary: Get monthly details using Jalali calendar
+      tags:
+        - DailyDetails
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Jalali year (e.g., 1404)
+        - in: path
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Jalali month (1-12, e.g., 6 for Shahrivar)
+      responses:
+        '200':
+          description: Monthly details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DailyDetail'
+        '400':
+          description: Invalid Jalali year or month
+        '500':
+          description: Server error
+
+  /daily-details/range:
+    get:
+      summary: Get daily details for a date range
+      tags:
+        - DailyDetails
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: startDate
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Start date of the range (YYYY-MM-DD)
+        - in: query
+          name: endDate
+          required: true
+          schema:
+            type: string
+            format: date
+          description: End date of the range (YYYY-MM-DD)
+      responses:
+        '200':
+          description: Daily details for the range
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DailyDetail'
+        '400':
+          description: Invalid input (e.g., missing or invalid parameters)
+        '500':
+          description: Server error
+
+  /daily-details/user/{userId}/jalali/month/{year}/{month}:
+    get:
+      summary: Get monthly details for a specific user using Jalali calendar, formatted for table display
+      tags:
+        - DailyDetails
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+          description: ID of the user to fetch details for
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Jalali year
+        - in: path
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Jalali month (1-12)
+      responses:
+        '200':
+          description: Monthly details formatted for table
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '400':
+          description: Invalid Jalali year or month
+        '403':
+          description: Access denied
+        '500':
+          description: Server error
+
+  /daily-details/user/{userId}/jalali/month/{year}/{month}/export-excel:
+    get:
+      summary: Export user monthly details to Excel file
+      tags:
+        - DailyDetails
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+          description: ID of the user
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Jalali year
+        - in: path
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Jalali month (1-12)
+      responses:
+        '200':
+          description: Excel file download
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid Jalali year or month
+        '403':
+          description: Access denied
+        '500':
+          description: Server error
+

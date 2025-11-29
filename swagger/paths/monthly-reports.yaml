@@ -1,0 +1,676 @@
+paths:
+  /monthly-reports/my-drafts:
+    get:
+      summary: Get list of draft reports for the current user
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of draft reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MonthlyReport'
+        '403':
+          description: Access denied
+        '500':
+          description: Server error
+
+  /monthly-reports/{reportId}/exit-draft:
+    delete:
+      summary: Exit from draft state by deleting the draft monthly report (by user)
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: integer
+          description: The ID of the report to exit from draft
+      responses:
+        '200':
+          description: Exited from draft state successfully
+        '400':
+          description: Only draft reports can be exited
+        '403':
+          description: Access denied (not the owner or invalid role)
+        '404':
+          description: Report not found
+        '500':
+          description: Server error
+
+  /monthly-reports/{year}/{month}:
+    post:
+      summary: Create or update a draft monthly report for a Gregorian month
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Gregorian year
+        - in: path
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Gregorian month (1-12)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                totalHours:
+                  type: integer
+                  description: Total hours worked in the month
+                gymCost:
+                  type: integer
+                  description: Gym cost for the month
+      responses:
+        '201':
+          description: Report created or updated in draft status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyReport'
+        '400':
+          description: Invalid input or report already submitted
+        '403':
+          description: Access denied
+        '500':
+          description: Server error
+
+  /monthly-reports/jalali/{year}/{month}:
+    post:
+      summary: Create or update a draft monthly report for a Jalali month
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Jalali year (e.g., 1404)
+        - in: path
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Jalali month (1-12, e.g., 6 for Shahrivar)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                totalHours:
+                  type: integer
+                  description: Total hours worked in the month
+                gymCost:
+                  type: integer
+                  description: Gym cost for the month
+      responses:
+        '201':
+          description: Report created or updated in draft status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyReport'
+        '400':
+          description: Invalid input or report already submitted
+        '403':
+          description: Access denied
+        '500':
+          description: Server error
+
+  /monthly-reports/{reportId}:
+    get:
+      summary: Get report by ID
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: integer
+          description: The ID of the report
+      responses:
+        '200':
+          description: Report details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyReport'
+        '403':
+          description: Access denied
+        '404':
+          description: Report not found
+        '500':
+          description: Server error
+
+  /monthly-reports/{reportId}/submit-to-group-manager:
+    put:
+      summary: Submit report to group manager (by user)
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: integer
+          description: The ID of the report
+      responses:
+        '200':
+          description: Report submitted to manager
+        '400':
+          description: Report cannot be submitted; invalid status
+        '403':
+          description: Access denied
+        '404':
+          description: Report not found
+        '500':
+          description: Server error
+
+  /monthly-reports/{reportId}/approve-group-manager:
+    put:
+      summary: Approve report by group manager
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: integer
+          description: The ID of the report
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+                  description: Optional comment
+      responses:
+        '200':
+          description: Report approved by group manager
+        '400':
+          description: Report cannot be approved; invalid status
+        '403':
+          description: Access denied
+        '404':
+          description: Report not found
+        '500':
+          description: Server error
+
+  /monthly-reports/{reportId}/approve-general-manager:
+    put:
+      summary: Approve report by general manager
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: integer
+          description: The ID of the report
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+                  description: Optional comment
+      responses:
+        '200':
+          description: Report approved by general manager
+        '400':
+          description: Report cannot be approved; invalid status
+        '403':
+          description: Access denied
+        '404':
+          description: Report not found
+        '500':
+          description: Server error
+
+  /monthly-reports/{reportId}/approve-finance:
+    put:
+      summary: Approve report by finance manager
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: integer
+          description: The ID of the report
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+                  description: Optional comment
+      responses:
+        '200':
+          description: Report approved by finance
+        '400':
+          description: Report cannot be approved; invalid status
+        '403':
+          description: Access denied
+        '404':
+          description: Report not found
+        '500':
+          description: Server error
+
+  /monthly-reports/{reportId}/reject-to-draft:
+    put:
+      summary: Reject report and revert to draft (by managers)
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: integer
+          description: The ID of the report
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+                  description: Reason for rejection
+      responses:
+        '200':
+          description: Report rejected and reverted to draft
+        '400':
+          description: Report cannot be rejected; invalid status
+        '403':
+          description: Access denied
+        '404':
+          description: Report not found
+        '500':
+          description: Server error
+
+  /monthly-reports/check-submitted/jalali/{year}/{month}:
+    get:
+      summary: Get the status for the monthly report of the current user in the specified Jalali month
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Jalali year (e.g., 1404)
+        - in: path
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Jalali month (1-12, e.g., 6 for Shahrivar)
+      responses:
+        '200':
+          description: Status of the report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    nullable: true
+                    description: The overall status (e.g., 'draft', 'approved', 'submitted_to_group_manager') or null if no report exists
+        '400':
+          description: Invalid Jalali year or month
+        '403':
+          description: Access denied (not user role)
+        '500':
+          description: Server error
+
+  /monthly-reports/group/{year}/{month}:
+    get:
+      summary: Get reports for group manager, general manager, or finance manager using Gregorian calendar
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Gregorian year
+        - in: path
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Gregorian month (1-12)
+      responses:
+        '200':
+          description: List of reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MonthlyReport'
+        '403':
+          description: Access denied
+        '500':
+          description: Server error
+
+  /monthly-reports/jalali/group/{year}/{month}:
+    get:
+      summary: Get reports for group manager, general manager, or finance manager using Jalali calendar
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Jalali year (e.g., 1404)
+        - in: path
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Jalali month (1-12, e.g., 6 for Shahrivar)
+      responses:
+        '200':
+          description: List of reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MonthlyReport'
+        '400':
+          description: Invalid Jalali year or month
+        '403':
+          description: Access denied
+        '500':
+          description: Server error
+
+  /monthly-reports/group/range/{startYear}/{startMonth}/{endYear}/{endMonth}:
+    get:
+      summary: Get reports for group manager, general manager, or finance manager within a year-month range (Gregorian)
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: startYear
+          required: true
+          schema:
+            type: integer
+          description: Start year of the range
+        - in: path
+          name: startMonth
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Start month of the range (1-12)
+        - in: path
+          name: endYear
+          required: true
+          schema:
+            type: integer
+          description: End year of the range
+        - in: path
+          name: endMonth
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: End month of the range (1-12)
+      responses:
+        '200':
+          description: List of reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MonthlyReport'
+        '400':
+          description: Invalid input (e.g., invalid year or month)
+        '403':
+          description: Access denied
+        '500':
+          description: Server error
+
+  /monthly-reports/report-ids/jalali/{year}/{month}:
+    get:
+      summary: Get report IDs and user IDs for the specified Jalali month (for authorized users)
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Jalali year (e.g., 1404)
+        - in: path
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Jalali month (1-12, e.g., 6 for Shahrivar)
+      responses:
+        '200':
+          description: List of report IDs and user IDs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    reportId:
+                      type: integer
+                    userId:
+                      type: integer
+        '400':
+          description: Invalid Jalali year or month
+        '403':
+          description: Access denied
+        '500':
+          description: Server error
+
+  /monthly-reports/month-periods/{year}:
+    get:
+      summary: Get all month periods for a year (public endpoint)
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Jalali year (e.g., 1404)
+      responses:
+        '200':
+          description: List of month periods for the year
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MonthlyReport'
+        '400':
+          description: Invalid year
+        '500':
+          description: Server error
+
+  /monthly-reports/month-periods/{year}/{month}:
+    get:
+      summary: Get month period for specific year/month (public endpoint)
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Jalali year
+        - in: path
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Jalali month (1-12)
+      responses:
+        '200':
+          description: Month period details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthPeriod'
+        '404':
+          description: Month period not found
+        '500':
+          description: Server error
+
+  /monthly-reports/monthly-gym-costs:
+    post:
+      summary: Save monthly gym cost (Gregorian)
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - year
+                - month
+                - gymCost
+              properties:
+                year:
+                  type: integer
+                month:
+                  type: integer
+                gymCost:
+                  type: integer
+      responses:
+        '200':
+          description: Gym cost saved
+        '400':
+          description: Invalid input
+        '500':
+          description: Server error
+
+  /monthly-reports/jalali-monthly-gym-costs:
+    post:
+      summary: Save monthly gym cost (Jalali)
+      tags:
+        - MonthlyReports
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - year
+                - month
+                - gymCost
+              properties:
+                year:
+                  type: integer
+                month:
+                  type: integer
+                gymCost:
+                  type: integer
+      responses:
+        '200':
+          description: Gym cost saved
+        '400':
+          description: Invalid input
+        '500':
+          description: Server error
+
