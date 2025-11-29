@@ -6,11 +6,19 @@ const logger = require('../utils/logger.service');
 const requestLogger = (req, res, next) => {
     const startTime = Date.now();
 
+    // Helper to format IP as IPv4
+    const formatIp = (ip) => {
+        if (!ip) return ip;
+        if (ip === '::1') return '127.0.0.1';
+        if (ip.startsWith('::ffff:')) return ip.substring(7);
+        return ip;
+    };
+
     // Log the incoming request
     const requestLog = {
         method: req.method,
         url: req.originalUrl,
-        ip: req.ip || req.connection.remoteAddress,
+        ip: formatIp(req.ip || req.connection.remoteAddress),
         userAgent: req.get('user-agent'),
         userId: req.user ? req.user.userId : null,
         role: req.user ? req.user.role : null
