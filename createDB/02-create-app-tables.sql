@@ -278,30 +278,17 @@ BEGIN
     
     IF EXISTS (SELECT 1 FROM MonthPeriodSettings WHERE Year = @PrevYear AND Month = @PrevMonth)
     BEGIN
-        -- شروع از روز بعدی پایان ماه قبل
+        -- بررسی پایان ماه قبل
         DECLARE @PrevEndDay INT, @PrevEndMonth INT, @PrevEndYear INT;
         SELECT @PrevEndDay = EndDay, @PrevEndMonth = EndMonth, @PrevEndYear = EndYear
         FROM MonthPeriodSettings
         WHERE Year = @PrevYear AND Month = @PrevMonth;
         
-        -- محاسبه StartYear و StartMonth
-        DECLARE @CalcStartYear INT, @CalcStartMonth INT;
-        IF @PrevEndMonth = 12
+        -- بررسی اینکه آیا ماه قبل به ماه جاری ادامه پیدا می‌کند
+        -- یعنی EndMonth ماه قبل برابر با Month جاری باشد
+        IF @PrevEndMonth = @Month AND @PrevEndYear = @Year
         BEGIN
-            -- اگر پایان ماه قبل در اسفند است، شروع از فروردین سال بعد
-            SET @CalcStartYear = @PrevEndYear + 1;
-            SET @CalcStartMonth = 1;
-        END
-        ELSE
-        BEGIN
-            -- در غیر این صورت، ماه بعدی همان سال
-            SET @CalcStartYear = @PrevEndYear;
-            SET @CalcStartMonth = @PrevEndMonth + 1;
-        END
-        
-        -- اگر محاسبه شده با ماه درخواستی مطابقت دارد
-        IF @CalcStartYear = @Year AND @CalcStartMonth = @Month
-        BEGIN
+            -- ماه قبل به ماه جاری ادامه دارد، پس از روز بعدی شروع می‌شود
             SELECT 
                 @Year AS Year,
                 @Month AS Month,
@@ -314,7 +301,7 @@ BEGIN
         END
         ELSE
         BEGIN
-            -- حالت پیش‌فرض: از اول تا آخر ماه
+            -- ماه قبل به ماه جاری ادامه نمی‌دهد، پس از اول ماه شروع می‌شود
             SELECT 
                 @Year AS Year,
                 @Month AS Month,
@@ -394,26 +381,18 @@ BEGIN
                 FROM #MonthPeriods
                 WHERE Month = @PrevMonth;
                 
-                -- محاسبه StartYear و StartMonth بر اساس پایان ماه قبل
-                IF @PrevEndMonth = 12
+                -- بررسی اینکه آیا ماه قبل به ماه جاری ادامه پیدا می‌کند
+                -- یعنی EndMonth ماه قبل برابر با CurrentMonth باشد
+                IF @PrevEndMonth = @CurrentMonth AND @PrevEndYear = @Year
                 BEGIN
-                    -- اگر پایان در اسفند است، شروع از فروردین سال بعد
-                    SET @StartYear = @PrevEndYear + 1;
-                    SET @StartMonth = 1;
-                END
-                ELSE
-                BEGIN
-                    SET @StartYear = @PrevEndYear;
-                    SET @StartMonth = @PrevEndMonth + 1;
-                END
-                
-                -- بررسی تطابق با ماه جاری
-                IF @StartYear = @Year AND @StartMonth = @CurrentMonth
-                BEGIN
+                    -- ماه قبل به ماه جاری ادامه دارد، پس از روز بعدی شروع می‌شود
                     SET @StartDay = @PrevEndDay + 1;
+                    SET @StartYear = @Year;
+                    SET @StartMonth = @CurrentMonth;
                 END
                 ELSE
                 BEGIN
+                    -- ماه قبل به ماه جاری ادامه نمی‌دهد، پس از اول ماه شروع می‌شود
                     SET @StartDay = 1;
                     SET @StartYear = @Year;
                     SET @StartMonth = @CurrentMonth;
@@ -425,25 +404,18 @@ BEGIN
                 FROM MonthPeriodSettings
                 WHERE Year = @PrevYear AND Month = @PrevMonth;
                 
-                -- محاسبه StartYear و StartMonth بر اساس پایان ماه قبل
-                IF @PrevEndMonth = 12
+                -- بررسی اینکه آیا ماه قبل به ماه جاری ادامه پیدا می‌کند
+                -- یعنی EndMonth ماه قبل برابر با CurrentMonth باشد
+                IF @PrevEndMonth = @CurrentMonth AND @PrevEndYear = @Year
                 BEGIN
-                    SET @StartYear = @PrevEndYear + 1;
-                    SET @StartMonth = 1;
-                END
-                ELSE
-                BEGIN
-                    SET @StartYear = @PrevEndYear;
-                    SET @StartMonth = @PrevEndMonth + 1;
-                END
-                
-                -- بررسی تطابق با ماه جاری
-                IF @StartYear = @Year AND @StartMonth = @CurrentMonth
-                BEGIN
+                    -- ماه قبل به ماه جاری ادامه دارد، پس از روز بعدی شروع می‌شود
                     SET @StartDay = @PrevEndDay + 1;
+                    SET @StartYear = @Year;
+                    SET @StartMonth = @CurrentMonth;
                 END
                 ELSE
                 BEGIN
+                    -- ماه قبل به ماه جاری ادامه نمی‌دهد، پس از اول ماه شروع می‌شود
                     SET @StartDay = 1;
                     SET @StartYear = @Year;
                     SET @StartMonth = @CurrentMonth;
