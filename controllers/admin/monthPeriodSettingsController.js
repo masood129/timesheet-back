@@ -254,6 +254,8 @@ const createMonthPeriod = async (req, res) => {
             .input('endDay', sql.Int, EndDay)
             .input('endMonth', sql.Int, EndMonth)
             .input('endYear', sql.Int, EndYear)
+            .input('currentJalaliYear', sql.Int, CurrentJalaliYear || 1404)
+            .input('currentJalaliMonth', sql.Int, CurrentJalaliMonth || 1)
             .execute('sp_AutoAdjustNeighborMonths');
 
         res.status(201).json({
@@ -458,6 +460,8 @@ const updateMonthPeriod = async (req, res) => {
             .input('endDay', sql.Int, EndDay)
             .input('endMonth', sql.Int, EndMonth)
             .input('endYear', sql.Int, EndYear)
+            .input('currentJalaliYear', sql.Int, CurrentJalaliYear || 1404)
+            .input('currentJalaliMonth', sql.Int, CurrentJalaliMonth || 1)
             .execute('sp_AutoAdjustNeighborMonths');
 
         res.json({

@@ -373,10 +373,18 @@ CREATE PROCEDURE sp_AutoAdjustNeighborMonths
     @StartYear INT,
     @EndDay INT,
     @EndMonth INT,
-    @EndYear INT
+    @EndYear INT,
+    @CurrentJalaliYear INT = NULL,
+    @CurrentJalaliMonth INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
+    
+    -- اگر CurrentJalaliYear و CurrentJalaliMonth مشخص نشده باشند، از سال و ماه جاری استفاده می‌کنیم
+    IF @CurrentJalaliYear IS NULL
+        SET @CurrentJalaliYear = @Year;
+    IF @CurrentJalaliMonth IS NULL
+        SET @CurrentJalaliMonth = @Month;
     
     -- محاسبه ماه قبل و بعد
     DECLARE @PrevMonth INT = CASE WHEN @Month = 1 THEN 12 ELSE @Month - 1 END;
@@ -384,42 +392,150 @@ BEGIN
     DECLARE @NextMonth INT = CASE WHEN @Month = 12 THEN 1 ELSE @Month + 1 END;
     DECLARE @NextYear INT = CASE WHEN @Month = 12 THEN @Year + 1 ELSE @Year END;
     
-    -- محاسبه روز بعدی پایان بازه جاری
-    DECLARE @NextDayFromCurrent INT = dbo.fn_GetNextDay(@EndYear, @EndMonth, @EndDay);
-    DECLARE @NextMonthFromCurrent INT = dbo.fn_GetNextMonth(@EndYear, @EndMonth, @EndDay);
-    DECLARE @NextYearFromCurrent INT = dbo.fn_GetNextYear(@EndYear, @EndMonth, @EndDay);
+    -- بررسی اینکه آیا بازه در همان ماه است یا به ماه‌های دیگر ادامه می‌دهد
+    DECLARE @IsStartInSameMonth BIT = CASE WHEN @StartMonth = @Month AND @StartYear = @Year THEN 1 ELSE 0 END;
+    DECLARE @IsEndInSameMonth BIT = CASE WHEN @EndMonth = @Month AND @EndYear = @Year THEN 1 ELSE 0 END;
     
-    -- محاسبه روز قبلی شروع بازه جاری
-    DECLARE @PrevDayFromCurrent INT = dbo.fn_GetPrevDay(@StartYear, @StartMonth, @StartDay);
-    DECLARE @PrevMonthFromCurrent INT = dbo.fn_GetPrevMonth(@StartYear, @StartMonth, @StartDay);
-    DECLARE @PrevYearFromCurrent INT = dbo.fn_GetPrevYear(@StartYear, @StartMonth, @StartDay);
-    
+    -- ============================================
     -- تنظیم خودکار ماه بعد
-    -- اگر بازه جاری به ماه بعد ادامه می‌دهد
-    IF @NextYearFromCurrent = @NextYear AND @NextMonthFromCurrent = @NextMonth
+    -- ============================================
+    
+    -- اگر بازه تا آخر ماه تمام نمی‌شود (یعنی در همان ماه است و تا آخر ماه نیست)
+    IF @IsEndInSameMonth = 1
     BEGIN
-        -- بررسی اینکه آیا ماه بعد قابل ویرایش است (باید از fn_IsMonthEditable استفاده کنیم)
-        -- اما چون اینجا فقط تنظیم خودکار انجام می‌دهیم، فقط اگر تنظیم سفارشی وجود دارد، آن را حذف می‌کنیم
-        -- تا به صورت خودکار محاسبه شود
+        DECLARE @MonthLength INT = dbo.fn_GetMonthLength(@Year, @Month);
         
-        -- حذف تنظیم سفارشی ماه بعد (اگر وجود دارد)
-        DELETE FROM MonthPeriodSettings 
-        WHERE Year = @NextYear AND Month = @NextMonth;
+        -- اگر آخرین روز بازه، آخرین روز ماه نیست
+        IF @EndDay < @MonthLength
+        BEGIN
+            -- بررسی اینکه آیا ماه بعد قابل ویرایش است
+            DECLARE @NextMonthEditable BIT = dbo.fn_IsMonthEditable(@NextYear, @NextMonth, @CurrentJalaliYear, @CurrentJalaliMonth);
+            
+            IF @NextMonthEditable = 1
+            BEGIN
+                -- محاسبه روز بعدی پایان بازه جاری (که در همان ماه است)
+                -- مثلاً اگر بازه 1 بهمن تا 26 بهمن است، روز بعدی 27 بهمن است
+                DECLARE @NextDayFromCurrent INT = @EndDay + 1;
+                DECLARE @NextMonthFromCurrent INT = @Month;  -- همان ماه (بهمن)
+                DECLARE @NextYearFromCurrent INT = @Year;
+                
+                -- محاسبه آخرین روز ماه بعد
+                DECLARE @NextMonthLength INT = dbo.fn_GetMonthLength(@NextYear, @NextMonth);
+                
+                -- ایجاد یا به‌روزرسانی بازه ماه بعد
+                -- اگر قبلاً تنظیم سفارشی وجود دارد، حذف می‌کنیم و جدید می‌سازیم
+                DELETE FROM MonthPeriodSettings 
+                WHERE Year = @NextYear AND Month = @NextMonth;
+                
+                -- ایجاد بازه جدید برای ماه بعد: از روز بعدی پایان بازه جاری (در همان ماه) تا آخر ماه بعد
+                -- مثلاً: از 27 بهمن تا 29/30 اسفند
+                INSERT INTO MonthPeriodSettings (Year, Month, StartDay, StartMonth, StartYear, EndDay, EndMonth, EndYear)
+                VALUES (@NextYear, @NextMonth, @NextDayFromCurrent, @NextMonthFromCurrent, @NextYearFromCurrent, 
+                        @NextMonthLength, @NextMonth, @NextYear);
+            END
+        END
+    END
+    -- اگر بازه به ماه بعد ادامه می‌دهد (یعنی EndMonth != Month)
+    ELSE
+    BEGIN
+        -- بررسی اینکه آیا ماه بعد قابل ویرایش است
+        DECLARE @NextMonthEditable2 BIT = dbo.fn_IsMonthEditable(@NextYear, @NextMonth, @CurrentJalaliYear, @CurrentJalaliMonth);
         
-        -- ماه بعد به صورت خودکار از روز بعدی پایان بازه جاری شروع می‌شود
-        -- و تا آخر ماه بعد ادامه می‌یابد
+        IF @NextMonthEditable2 = 1
+        BEGIN
+            -- محاسبه روز بعدی پایان بازه جاری
+            DECLARE @NextDayFromCurrent2 INT = dbo.fn_GetNextDay(@EndYear, @EndMonth, @EndDay);
+            DECLARE @NextMonthFromCurrent2 INT = dbo.fn_GetNextMonth(@EndYear, @EndMonth, @EndDay);
+            DECLARE @NextYearFromCurrent2 INT = dbo.fn_GetNextYear(@EndYear, @EndMonth, @EndDay);
+            
+            -- اگر ماه بعد همان ماه بعدی است
+            IF @NextYearFromCurrent2 = @NextYear AND @NextMonthFromCurrent2 = @NextMonth
+            BEGIN
+                -- محاسبه آخرین روز ماه بعد
+                DECLARE @NextMonthLength2 INT = dbo.fn_GetMonthLength(@NextYear, @NextMonth);
+                
+                -- حذف تنظیم سفارشی قبلی (اگر وجود دارد)
+                DELETE FROM MonthPeriodSettings 
+                WHERE Year = @NextYear AND Month = @NextMonth;
+                
+                -- ایجاد بازه جدید برای ماه بعد: از روز بعدی پایان بازه جاری تا آخر ماه بعد
+                INSERT INTO MonthPeriodSettings (Year, Month, StartDay, StartMonth, StartYear, EndDay, EndMonth, EndYear)
+                VALUES (@NextYear, @NextMonth, @NextDayFromCurrent2, @NextMonthFromCurrent2, @NextYearFromCurrent2, 
+                        @NextMonthLength2, @NextMonth, @NextYear);
+            END
+        END
     END
     
+    -- ============================================
     -- تنظیم خودکار ماه قبل
-    -- اگر بازه جاری از ماه قبل شروع می‌شود
-    IF @PrevYearFromCurrent = @PrevYear AND @PrevMonthFromCurrent = @PrevMonth
+    -- ============================================
+    
+    -- اگر بازه از اول ماه شروع نمی‌شود (یعنی در همان ماه است و از اول ماه نیست)
+    IF @IsStartInSameMonth = 1
     BEGIN
-        -- حذف تنظیم سفارشی ماه قبل (اگر وجود دارد)
-        DELETE FROM MonthPeriodSettings 
-        WHERE Year = @PrevYear AND Month = @PrevMonth;
+        -- اگر اولین روز بازه، اولین روز ماه نیست
+        IF @StartDay > 1
+        BEGIN
+            -- بررسی اینکه آیا ماه قبل قابل ویرایش است
+            DECLARE @PrevMonthEditable BIT = dbo.fn_IsMonthEditable(@PrevYear, @PrevMonth, @CurrentJalaliYear, @CurrentJalaliMonth);
+            
+            IF @PrevMonthEditable = 1
+            BEGIN
+                -- محاسبه روز قبلی شروع بازه جاری (که در همان ماه است)
+                -- مثلاً اگر بازه 5 بهمن تا 30 بهمن است، روز قبلی 4 بهمن است
+                DECLARE @PrevDayFromCurrent INT = @StartDay - 1;
+                DECLARE @PrevMonthFromCurrent INT = @Month;  -- همان ماه (بهمن)
+                DECLARE @PrevYearFromCurrent INT = @Year;
+                
+                -- محاسبه اولین روز ماه قبل
+                DECLARE @PrevMonthStartDay INT = 1;
+                DECLARE @PrevMonthStartMonth INT = @PrevMonth;
+                DECLARE @PrevMonthStartYear INT = @PrevYear;
+                
+                -- ایجاد یا به‌روزرسانی بازه ماه قبل
+                -- اگر قبلاً تنظیم سفارشی وجود دارد، حذف می‌کنیم و جدید می‌سازیم
+                DELETE FROM MonthPeriodSettings 
+                WHERE Year = @PrevYear AND Month = @PrevMonth;
+                
+                -- ایجاد بازه جدید برای ماه قبل: از اول ماه قبل تا روز قبلی شروع بازه جاری (در همان ماه)
+                -- مثلاً: از 1 دی تا 4 بهمن
+                INSERT INTO MonthPeriodSettings (Year, Month, StartDay, StartMonth, StartYear, EndDay, EndMonth, EndYear)
+                VALUES (@PrevYear, @PrevMonth, @PrevMonthStartDay, @PrevMonthStartMonth, @PrevMonthStartYear, 
+                        @PrevDayFromCurrent, @PrevMonthFromCurrent, @PrevYearFromCurrent);
+            END
+        END
+    END
+    -- اگر بازه از ماه قبل شروع می‌شود (یعنی StartMonth != Month)
+    ELSE
+    BEGIN
+        -- بررسی اینکه آیا ماه قبل قابل ویرایش است
+        DECLARE @PrevMonthEditable2 BIT = dbo.fn_IsMonthEditable(@PrevYear, @PrevMonth, @CurrentJalaliYear, @CurrentJalaliMonth);
         
-        -- ماه قبل به صورت خودکار از اول ماه قبل شروع می‌شود
-        -- و تا روز قبلی شروع بازه جاری ادامه می‌یابد
+        IF @PrevMonthEditable2 = 1
+        BEGIN
+            -- محاسبه روز قبلی شروع بازه جاری
+            DECLARE @PrevDayFromCurrent2 INT = dbo.fn_GetPrevDay(@StartYear, @StartMonth, @StartDay);
+            DECLARE @PrevMonthFromCurrent2 INT = dbo.fn_GetPrevMonth(@StartYear, @StartMonth, @StartDay);
+            DECLARE @PrevYearFromCurrent2 INT = dbo.fn_GetPrevYear(@StartYear, @StartMonth, @StartDay);
+            
+            -- اگر ماه قبل همان ماه قبلی است
+            IF @PrevYearFromCurrent2 = @PrevYear AND @PrevMonthFromCurrent2 = @PrevMonth
+            BEGIN
+                -- محاسبه اولین روز ماه قبل
+                DECLARE @PrevMonthStartDay2 INT = 1;
+                DECLARE @PrevMonthStartMonth2 INT = @PrevMonth;
+                DECLARE @PrevMonthStartYear2 INT = @PrevYear;
+                
+                -- حذف تنظیم سفارشی قبلی (اگر وجود دارد)
+                DELETE FROM MonthPeriodSettings 
+                WHERE Year = @PrevYear AND Month = @PrevMonth;
+                
+                -- ایجاد بازه جدید برای ماه قبل: از اول ماه قبل تا روز قبلی شروع بازه جاری
+                INSERT INTO MonthPeriodSettings (Year, Month, StartDay, StartMonth, StartYear, EndDay, EndMonth, EndYear)
+                VALUES (@PrevYear, @PrevMonth, @PrevMonthStartDay2, @PrevMonthStartMonth2, @PrevMonthStartYear2, 
+                        @PrevDayFromCurrent2, @PrevMonthFromCurrent2, @PrevYearFromCurrent2);
+            END
+        END
     END
 END;
 GO
