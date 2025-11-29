@@ -10,6 +10,7 @@ const monthPeriodsRoutes = require('./routes/monthPeriods.routes');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const adminRoutes = require('./routes/admin.routes');
+const userProjectAccessRoutes = require('./routes/userProjectAccess.routes');
 const { getJalaliMonthRange } = require('./utils/dateConverter');
 const logger = require('./utils/logger.service');
 const { requestLogger, errorLogger } = require('./middleware/logging.middleware');
@@ -97,6 +98,7 @@ app.use('/daily-details', authMiddleware, dailyDetailsRoutes);
 app.use('/monthly-reports', authMiddleware, monthlyReportsRoutes);
 app.use('/month-periods', authMiddleware, monthPeriodsRoutes);
 app.use('/users', authMiddleware, userRoutes);
+app.use('/user-project-access', authMiddleware, userProjectAccessRoutes);
 app.use('/admin', authMiddleware, adminMiddleware, adminRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
