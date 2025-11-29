@@ -40,10 +40,12 @@ router.get('/', async (req, res) => {
                 SELECT 
                     p.id,
                     p.projectName,
-                    CASE 
-                        WHEN upa.UserId IS NOT NULL THEN 1
-                        ELSE 0
-                    END as hasAccess
+                    CAST(
+                        CASE 
+                            WHEN upa.UserId IS NOT NULL THEN 1
+                            ELSE 0
+                        END AS BIT
+                    ) as hasAccess
                 FROM projects p
                 LEFT JOIN UserProjectAccess upa 
                     ON p.id = upa.ProjectId AND upa.UserId = @userId
@@ -153,20 +155,33 @@ router.put('/:projectId', async (req, res) => {
             });
         } else {
             // Add access
-            await pool.request()
-                .input('userId', sql.Int, userId)
-                .input('projectId', sql.Int, projectId)
-                .query(`
-                    INSERT INTO UserProjectAccess (UserId, ProjectId)
-                    VALUES (@userId, @projectId)
-                `);
+            try {
+                await pool.request()
+                    .input('userId', sql.Int, userId)
+                    .input('projectId', sql.Int, projectId)
+                    .query(`
+                        INSERT INTO UserProjectAccess (UserId, ProjectId)
+                        VALUES (@userId, @projectId)
+                    `);
 
-            logger.api.info('Project access added', { userId, projectId });
+                logger.api.info('Project access added', { userId, projectId });
 
-            res.json({
-                hasAccess: true,
-                message: 'دسترسی به پروژه اضافه شد'
-            });
+                res.json({
+                    hasAccess: true,
+                    message: 'دسترسی به پروژه اضافه شد'
+                });
+            } catch (insertErr) {
+                // Handle potential duplicate key error (race condition)
+                if (insertErr.number === 2627 || insertErr.code === 'EREQUEST' && insertErr.message.includes('PRIMARY KEY')) {
+                    logger.api.warn('Duplicate access attempt (race condition)', { userId, projectId });
+                    res.json({
+                        hasAccess: true,
+                        message: 'دسترسی به پروژه اضافه شد'
+                    });
+                } else {
+                    throw insertErr;
+                }
+            }
         }
     } catch (err) {
         logger.errors.error('Error in PUT /user-project-access/:projectId', {
