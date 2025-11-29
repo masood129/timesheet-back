@@ -309,31 +309,41 @@ BEGIN
     END
     
     -- بررسی 3: آیا gap با ماه قبل وجود دارد؟
-    -- روز بعدی پایان ماه قبل باید اولین روز بازه جاری باشد
-    DECLARE @PrevNextDay INT = dbo.fn_GetNextDay(@PrevEndYear, @PrevEndMonth, @PrevEndDay);
-    DECLARE @PrevNextMonth INT = dbo.fn_GetNextMonth(@PrevEndYear, @PrevEndMonth, @PrevEndDay);
-    DECLARE @PrevNextYear INT = dbo.fn_GetNextYear(@PrevEndYear, @PrevEndMonth, @PrevEndDay);
-    
-    IF NOT (@PrevNextYear = @StartYear AND @PrevNextMonth = @StartMonth AND @PrevNextDay = @StartDay)
+    -- فقط اگر ماه قبل تنظیم سفارشی داشته باشد، gap را بررسی می‌کنیم
+    -- اگر ماه قبل تنظیم سفارشی نداشته باشد، به صورت خودکار محاسبه می‌شود و gap وجود ندارد
+    IF @PrevExists = 1
     BEGIN
-        INSERT INTO #ValidationResults (ErrorCode, ErrorMessage)
-        VALUES (3, N'بین بازه ماه قبل و بازه جاری فاصله وجود دارد. روز بعدی آخرین روز ماه قبل (' + 
-                CAST(@PrevEndDay AS NVARCHAR(2)) + N' ' + CAST(@PrevEndMonth AS NVARCHAR(2)) + N' ' + CAST(@PrevEndYear AS NVARCHAR(4)) + 
-                N') باید اولین روز بازه جاری باشد.');
+        -- روز بعدی پایان ماه قبل باید اولین روز بازه جاری باشد
+        DECLARE @PrevNextDay INT = dbo.fn_GetNextDay(@PrevEndYear, @PrevEndMonth, @PrevEndDay);
+        DECLARE @PrevNextMonth INT = dbo.fn_GetNextMonth(@PrevEndYear, @PrevEndMonth, @PrevEndDay);
+        DECLARE @PrevNextYear INT = dbo.fn_GetNextYear(@PrevEndYear, @PrevEndMonth, @PrevEndDay);
+        
+        IF NOT (@PrevNextYear = @StartYear AND @PrevNextMonth = @StartMonth AND @PrevNextDay = @StartDay)
+        BEGIN
+            INSERT INTO #ValidationResults (ErrorCode, ErrorMessage)
+            VALUES (3, N'بین بازه ماه قبل و بازه جاری فاصله وجود دارد. روز بعدی آخرین روز ماه قبل (' + 
+                    CAST(@PrevEndDay AS NVARCHAR(2)) + N' ' + CAST(@PrevEndMonth AS NVARCHAR(2)) + N' ' + CAST(@PrevEndYear AS NVARCHAR(4)) + 
+                    N') باید اولین روز بازه جاری باشد.');
+        END
     END
     
     -- بررسی 4: آیا gap با ماه بعد وجود دارد؟
-    -- روز قبلی شروع ماه بعد باید آخرین روز بازه جاری باشد
-    DECLARE @NextPrevDay INT = dbo.fn_GetPrevDay(@NextStartYear, @NextStartMonth, @NextStartDay);
-    DECLARE @NextPrevMonth INT = dbo.fn_GetPrevMonth(@NextStartYear, @NextStartMonth, @NextStartDay);
-    DECLARE @NextPrevYear INT = dbo.fn_GetPrevYear(@NextStartYear, @NextStartMonth, @NextStartDay);
-    
-    IF NOT (@NextPrevYear = @EndYear AND @NextPrevMonth = @EndMonth AND @NextPrevDay = @EndDay)
+    -- فقط اگر ماه بعد تنظیم سفارشی داشته باشد، gap را بررسی می‌کنیم
+    -- اگر ماه بعد تنظیم سفارشی نداشته باشد، به صورت خودکار از روز بعدی پایان بازه جاری شروع می‌شود
+    IF @NextExists = 1
     BEGIN
-        INSERT INTO #ValidationResults (ErrorCode, ErrorMessage)
-        VALUES (4, N'بین بازه جاری و بازه ماه بعد فاصله وجود دارد. روز قبلی اولین روز ماه بعد (' + 
-                CAST(@NextStartDay AS NVARCHAR(2)) + N' ' + CAST(@NextStartMonth AS NVARCHAR(2)) + N' ' + CAST(@NextStartYear AS NVARCHAR(4)) + 
-                N') باید آخرین روز بازه جاری باشد.');
+        -- روز قبلی شروع ماه بعد باید آخرین روز بازه جاری باشد
+        DECLARE @NextPrevDay INT = dbo.fn_GetPrevDay(@NextStartYear, @NextStartMonth, @NextStartDay);
+        DECLARE @NextPrevMonth INT = dbo.fn_GetPrevMonth(@NextStartYear, @NextStartMonth, @NextStartDay);
+        DECLARE @NextPrevYear INT = dbo.fn_GetPrevYear(@NextStartYear, @NextStartMonth, @NextStartDay);
+        
+        IF NOT (@NextPrevYear = @EndYear AND @NextPrevMonth = @EndMonth AND @NextPrevDay = @EndDay)
+        BEGIN
+            INSERT INTO #ValidationResults (ErrorCode, ErrorMessage)
+            VALUES (4, N'بین بازه جاری و بازه ماه بعد فاصله وجود دارد. روز قبلی اولین روز ماه بعد (' + 
+                    CAST(@NextStartDay AS NVARCHAR(2)) + N' ' + CAST(@NextStartMonth AS NVARCHAR(2)) + N' ' + CAST(@NextStartYear AS NVARCHAR(4)) + 
+                    N') باید آخرین روز بازه جاری باشد.');
+        END
     END
     
     SELECT * FROM #ValidationResults;
