@@ -1,5 +1,5 @@
 const { sql, poolPromise } = require('../../config/db.config');
-const { getJalaliMonthRange } = require('../../utils/dateConverter');
+const { getJalaliMonthRange, getActualMonthRange } = require('../../utils/dateConverter');
 
 const checkRole = (roles) => (req, res, next) => {
     if (!roles.includes(req.user?.role)) return res.status(403).send('Access denied');
@@ -98,7 +98,8 @@ const getReportById = async (req, res) => {
                 return res.status(403).send('Access denied');
             }
 
-            const monthRange = getJalaliMonthRange(report.JalaliYear, report.JalaliMonth);
+            // استفاده از بازه واقعی بر اساس تنظیمات ادمین
+            const monthRange = await getActualMonthRange(pool, report.JalaliYear, report.JalaliMonth);
             const startDate = monthRange.start;
             const endDate = monthRange.end;
 

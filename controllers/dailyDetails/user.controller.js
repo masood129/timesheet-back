@@ -1,6 +1,6 @@
 const { sql, poolPromise } = require('../../config/db.config');
 const { DateTime } = require('luxon');
-const { getJalaliMonthRange, formatJalaliDate } = require('../../utils/dateConverter');
+const { getJalaliMonthRange, getActualMonthRange, formatJalaliDate } = require('../../utils/dateConverter');
 const exceljs = require('exceljs');
 
 /**
@@ -141,8 +141,8 @@ const getUserJalaliMonthlyDetails = async (req, res) => {
             .query('SELECT ContractArrivalTime FROM UserContractHours WHERE UserId = @userId');
         const contractArrival = contractResult.recordset[0]?.ContractArrivalTime || null;
 
-        // Get month range in Gregorian
-        const monthRange = getJalaliMonthRange(jalaliYear, jalaliMonth);
+        // Get month range in Gregorian - استفاده از بازه واقعی بر اساس تنظیمات ادمین
+        const monthRange = await getActualMonthRange(pool, jalaliYear, jalaliMonth);
         const startDate = monthRange.start;
         const endDate = monthRange.end;
 
@@ -348,8 +348,8 @@ const exportUserJalaliMonthlyToExcel = async (req, res) => {
             .query('SELECT ContractArrivalTime FROM UserContractHours WHERE UserId = @userId');
         const contractArrival = contractResult.recordset[0]?.ContractArrivalTime || null;
 
-        // Get month range in Gregorian
-        const monthRange = getJalaliMonthRange(jalaliYear, jalaliMonth);
+        // Get month range in Gregorian - استفاده از بازه واقعی بر اساس تنظیمات ادمین
+        const monthRange = await getActualMonthRange(pool, jalaliYear, jalaliMonth);
         const startDate = monthRange.start;
         const endDate = monthRange.end;
 

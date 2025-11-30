@@ -1,6 +1,6 @@
 const { sql, poolPromise } = require('../../config/db.config');
 const { DateTime } = require('luxon');
-const { getJalaliMonthRange } = require('../../utils/dateConverter');
+const { getJalaliMonthRange, getActualMonthRange } = require('../../utils/dateConverter');
 
 /**
  * @swagger
@@ -48,7 +48,8 @@ const getJalaliMonthlyDetails = async (req, res) => {
             return res.status(400).send('Invalid Jalali year or month');
         }
 
-        const monthRange = getJalaliMonthRange(jalaliYear, jalaliMonth);
+        // استفاده از بازه واقعی بر اساس تنظیمات ادمین
+        const monthRange = await getActualMonthRange(pool, jalaliYear, jalaliMonth);
         const startDate = monthRange.start;
         const endDate = monthRange.end;
 

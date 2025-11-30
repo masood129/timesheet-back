@@ -1,5 +1,5 @@
 const { sql, poolPromise } = require('../../config/db.config');
-const { getJalaliMonthRange } = require('../../utils/dateConverter');
+const { getJalaliMonthRange, getActualMonthRange } = require('../../utils/dateConverter');
 
 const checkRole = (roles) => (req, res, next) => {
     if (!roles.includes(req.user?.role)) return res.status(403).send('Access denied');
@@ -65,7 +65,8 @@ const getMyDrafts = async (req, res) => {
             const drafts = result.recordset;
 
             for (let report of drafts) {
-                const monthRange = getJalaliMonthRange(report.JalaliYear, report.JalaliMonth);
+                // استفاده از بازه واقعی بر اساس تنظیمات ادمین
+                const monthRange = await getActualMonthRange(pool, report.JalaliYear, report.JalaliMonth);
                 const startDate = monthRange.start;
                 const endDate = monthRange.end;
 
@@ -358,14 +359,15 @@ const createMonthlyReportJalali = async (req, res) => {
                 return res.status(400).send('Invalid Jalali year or month');
             }
 
-            const monthRange = getJalaliMonthRange(jalaliYear, jalaliMonth);
+            const pool = await poolPromise;
+            
+            // استفاده از بازه واقعی بر اساس تنظیمات ادمین
+            const monthRange = await getActualMonthRange(pool, jalaliYear, jalaliMonth);
             const startDate = monthRange.start;
             const endDate = monthRange.end;
 
             const gregorianYear = startDate.getFullYear();
             const gregorianMonth = startDate.getMonth() + 1;
-
-            const pool = await poolPromise;
             // Get user's group from users table
             const groupResult = await pool.request()
                 .input('userId', sql.Int, userId)

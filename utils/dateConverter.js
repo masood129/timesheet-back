@@ -32,6 +32,63 @@ function formatJalaliDate(gregorianDate) {
     return `${jalali.jy}/${jalali.jm}/${jalali.jd}`;
 }
 
+/**
+ * دریافت بازه واقعی ماه بر اساس تنظیمات ادمین
+ * این تابع از stored procedure استفاده می‌کند تا بازه سفارشی ادمین را در نظر بگیرد
+ * @param {*} pool - SQL connection pool
+ * @param {number} jalaliYear - سال شمسی
+ * @param {number} jalaliMonth - ماه شمسی (1-12)
+ * @returns {Promise<{start: Date, end: Date, periodInfo: object}>}
+ */
+async function getActualMonthRange(pool, jalaliYear, jalaliMonth) {
+    const { sql } = require('../config/db.config');
+    
+    try {
+        // دریافت بازه از stored procedure
+        const result = await pool.request()
+            .input('year', sql.Int, jalaliYear)
+            .input('month', sql.Int, jalaliMonth)
+            .execute('sp_GetMonthPeriod');
+        
+        if (result.recordset.length === 0) {
+            // اگر بازه پیدا نشد، از بازه پیش‌فرض استفاده کن
+            return {
+                ...getJalaliMonthRange(jalaliYear, jalaliMonth),
+                periodInfo: null
+            };
+        }
+        
+        const period = result.recordset[0];
+        
+        // تبدیل تاریخ شروع به میلادی
+        const startGregorian = jalaliToGregorian(
+            period.StartYear,
+            period.StartMonth,
+            period.StartDay
+        );
+        
+        // تبدیل تاریخ پایان به میلادی
+        const endGregorian = jalaliToGregorian(
+            period.EndYear,
+            period.EndMonth,
+            period.EndDay
+        );
+        
+        return {
+            start: new Date(startGregorian.gy, startGregorian.gm - 1, startGregorian.gd),
+            end: new Date(endGregorian.gy, endGregorian.gm - 1, endGregorian.gd),
+            periodInfo: period
+        };
+    } catch (error) {
+        console.error('Error in getActualMonthRange:', error);
+        // در صورت خطا، از بازه پیش‌فرض استفاده کن
+        return {
+            ...getJalaliMonthRange(jalaliYear, jalaliMonth),
+            periodInfo: null
+        };
+    }
+}
+
 /*
     1	فروردین	3	مارس (March)
     2	 4اردیبهشت	آوریل (April)
@@ -51,5 +108,6 @@ module.exports = {
     jalaliToGregorian,
     gregorianToJalali,
     getJalaliMonthRange,
-    formatJalaliDate
+    formatJalaliDate,
+    getActualMonthRange
 };
