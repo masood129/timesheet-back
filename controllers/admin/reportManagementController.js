@@ -568,6 +568,106 @@ const rejectReport = async (req, res) => {
     }
 };
 
+/**
+ * Delete report (Admin only)
+ */
+const deleteReport = async (req, res) => {
+    const { reportId } = req.params;
+
+    try {
+        const pool = await poolPromise;
+
+        // Check if report exists
+        const reportCheck = await pool
+            .request()
+            .input('reportId', sql.Int, reportId)
+            .query('SELECT * FROM MonthlyReports WHERE ReportId = @reportId');
+
+        if (reportCheck.recordset.length === 0) {
+            return res.status(404).send('گزارش یافت نشد');
+        }
+
+        const report = reportCheck.recordset[0];
+
+        // Delete related daily project tasks first (if foreign key constraints exist)
+        await pool
+            .request()
+            .input('reportId', sql.Int, reportId)
+            .query(`
+                DELETE FROM DailyProjectTasks
+                WHERE UserId = (SELECT UserId FROM MonthlyReports WHERE ReportId = @reportId)
+                  AND Date BETWEEN (SELECT DATEFROMPARTS(Year, Month, 1) FROM MonthlyReports WHERE ReportId = @reportId)
+                  AND EOMONTH((SELECT DATEFROMPARTS(Year, Month, 1) FROM MonthlyReports WHERE ReportId = @reportId))
+            `);
+
+        // Delete daily details
+        await pool
+            .request()
+            .input('reportId', sql.Int, reportId)
+            .query(`
+                DELETE FROM DailyDetails
+                WHERE UserId = (SELECT UserId FROM MonthlyReports WHERE ReportId = @reportId)
+                  AND Date BETWEEN (SELECT DATEFROMPARTS(Year, Month, 1) FROM MonthlyReports WHERE ReportId = @reportId)
+                  AND EOMONTH((SELECT DATEFROMPARTS(Year, Month, 1) FROM MonthlyReports WHERE ReportId = @reportId))
+            `);
+
+        // Delete the monthly report
+        const result = await pool
+            .request()
+            .input('reportId', sql.Int, reportId)
+            .query('DELETE FROM MonthlyReports WHERE ReportId = @reportId');
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).send('گزارش یافت نشد');
+        }
+
+        res.json({
+            success: true,
+            message: 'گزارش با موفقیت حذف شد',
+            reportId: reportId
+        });
+    } catch (err) {
+        console.error('Error in deleteReport:', err.message);
+        res.status(500).send('خطای سرور در حذف گزارش');
+    }
+};
+
+/**
+ * Get report by ID (Admin only)
+ */
+const getReportById = async (req, res) => {
+    const { reportId } = req.params;
+
+    try {
+        const pool = await poolPromise;
+
+        const result = await pool
+            .request()
+            .input('reportId', sql.Int, reportId)
+            .query(`
+                SELECT 
+                    mr.*,
+                    u.id as username,
+                    u.farsifirstname,
+                    u.farsilastname,
+                    g.GroupName
+                FROM MonthlyReports mr
+                JOIN users u ON mr.UserId = u.personalid
+                LEFT JOIN groups g ON mr.GroupId = g.id
+                WHERE mr.ReportId = @reportId
+            `);
+
+        if (result.recordset.length === 0) {
+            return res.status(404).send('گزارش یافت نشد');
+        }
+
+        res.json(result.recordset[0]);
+    } catch (err) {
+        console.error('Error in getReportById:', err.message);
+        res.status(500).send('خطای سرور در دریافت گزارش');
+    }
+};
+
 module.exports = {
     getAllMonthlyReports,
     getAllDailyDetails,
@@ -575,5 +675,7 @@ module.exports = {
     getUserActivitySummary,
     updateReportStatus,
     approveReport,
-    rejectReport
+    rejectReport,
+    deleteReport,
+    getReportById
 };

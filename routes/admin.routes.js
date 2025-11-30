@@ -973,6 +973,54 @@ router.post('/reports/:reportId/approve', reportManagementController.approveRepo
  */
 router.post('/reports/:reportId/reject', reportManagementController.rejectReport);
 
+/**
+ * @swagger
+ * /admin/reports/{reportId}:
+ *   get:
+ *     summary: Get report by ID (Admin only)
+ *     tags: [Admin - Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Report details
+ *       404:
+ *         description: Report not found
+ *       500:
+ *         description: Server error
+ */
+router.get('/reports/:reportId', reportManagementController.getReportById);
+
+/**
+ * @swagger
+ * /admin/reports/{reportId}:
+ *   delete:
+ *     summary: Delete report (Admin only)
+ *     tags: [Admin - Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Report deleted
+ *       404:
+ *         description: Report not found
+ *       500:
+ *         description: Server error
+ */
+router.delete('/reports/:reportId', reportManagementController.deleteReport);
+
 // ============================================
 // SYSTEM CONFIGURATION ROUTES
 // ============================================
