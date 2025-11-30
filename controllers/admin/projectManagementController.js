@@ -135,7 +135,7 @@ const createProject = async (req, res) => {
  */
 const updateProject = async (req, res) => {
     const { id } = req.params;
-    const { projectName } = req.body;
+    const { projectName, id: newId } = req.body;
 
     if (!projectName) {
         return res.status(400).send('نام پروژه الزامی است');
@@ -144,16 +144,34 @@ const updateProject = async (req, res) => {
     try {
         const pool = await poolPromise;
 
-        const result = await pool
-            .request()
-            .input('id', sql.Int, id)
-            .input('projectName', sql.NVarChar, projectName)
-            .query(`
-                UPDATE projects
-                SET projectName = @projectName
-                OUTPUT INSERTED.*
-                WHERE id = @id
-            `);
+        // Build the update query dynamically based on what fields are provided
+        let updateFields = ['projectName = @projectName'];
+        const request = pool.request()
+            .input('oldId', sql.Int, id)
+            .input('projectName', sql.NVarChar, projectName);
+
+        // If a new ID is provided and it's different from the current ID, update it
+        if (newId !== undefined && newId !== null && parseInt(newId) !== parseInt(id)) {
+            // Check if the new ID already exists
+            const existingProject = await pool
+                .request()
+                .input('newId', sql.Int, newId)
+                .query('SELECT id FROM projects WHERE id = @newId');
+
+            if (existingProject.recordset.length > 0) {
+                return res.status(409).send('کد پروژه جدید قبلاً استفاده شده است');
+            }
+
+            updateFields.push('id = @newId');
+            request.input('newId', sql.Int, newId);
+        }
+
+        const result = await request.query(`
+            UPDATE projects
+            SET ${updateFields.join(', ')}
+            OUTPUT INSERTED.*
+            WHERE id = @oldId
+        `);
 
         if (result.recordset.length === 0) {
             return res.status(404).send('پروژه یافت نشد');

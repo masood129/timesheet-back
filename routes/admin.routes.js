@@ -314,6 +314,7 @@ router.post('/projects', projectManagementController.createProject);
  *         required: true
  *         schema:
  *           type: integer
+ *         description: Current project ID
  *     requestBody:
  *       required: true
  *       content:
@@ -321,15 +322,21 @@ router.post('/projects', projectManagementController.createProject);
  *           schema:
  *             type: object
  *             properties:
- *               ProjectName:
+ *               projectName:
  *                 type: string
+ *                 description: New project name
+ *               id:
+ *                 type: integer
+ *                 description: New project ID (optional, to change project code)
  *               securityLevel:
  *                 type: integer
  *     responses:
  *       200:
- *         description: Project updated
+ *         description: Project updated successfully
  *       404:
  *         description: Project not found
+ *       409:
+ *         description: New project ID already exists
  *       500:
  *         description: Server error
  */
