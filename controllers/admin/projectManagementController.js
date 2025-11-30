@@ -13,7 +13,8 @@ const getAllProjects = async (req, res) => {
         const request = pool.request();
 
         if (search) {
-            query += ' AND projectName LIKE @search';
+            // Search by both project ID and project name
+            query += ' AND (CAST(id AS NVARCHAR) LIKE @search OR projectName LIKE @search)';
             request.input('search', sql.NVarChar, `%${search}%`);
         }
 
@@ -28,7 +29,8 @@ const getAllProjects = async (req, res) => {
         const countRequest = pool.request();
 
         if (search) {
-            countQuery += ' AND projectName LIKE @search';
+            // Search by both project ID and project name
+            countQuery += ' AND (CAST(id AS NVARCHAR) LIKE @search OR projectName LIKE @search)';
             countRequest.input('search', sql.NVarChar, `%${search}%`);
         }
 
