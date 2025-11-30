@@ -9,6 +9,7 @@ const reportManagementController = require('../controllers/admin/reportManagemen
 const systemConfigController = require('../controllers/admin/systemConfigController');
 const monthPeriodSettingsController = require('../controllers/admin/monthPeriodSettingsController');
 const logsController = require('../controllers/admin/logs.controller');
+const dashboardSettingsController = require('../controllers/admin/dashboardSettingsController');
 
 // ============================================
 // USER MANAGEMENT ROUTES
@@ -1607,5 +1608,70 @@ router.get('/logs/download/:category/:date', logsController.downloadLog);
  *       - bearerAuth: []
  */
 router.get('/logs/:category', logsController.getLogsByCategory);
+
+// ============================================
+// DASHBOARD SETTINGS ROUTES
+// ============================================
+
+/**
+ * @swagger
+ * /admin/dashboard-settings:
+ *   get:
+ *     summary: Get dashboard settings (Admin only)
+ *     tags: [Admin - Dashboard Settings]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard settings
+ *       500:
+ *         description: Server error
+ */
+router.get('/dashboard-settings', dashboardSettingsController.getDashboardSettings);
+
+/**
+ * @swagger
+ * /admin/dashboard-settings:
+ *   post:
+ *     summary: Save dashboard settings (Admin only)
+ *     tags: [Admin - Dashboard Settings]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - settings
+ *             properties:
+ *               settings:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Settings saved successfully
+ *       400:
+ *         description: Invalid input
+ *       500:
+ *         description: Server error
+ */
+router.post('/dashboard-settings', dashboardSettingsController.saveDashboardSettings);
+
+/**
+ * @swagger
+ * /admin/dashboard-settings:
+ *   delete:
+ *     summary: Reset dashboard settings to default (Admin only)
+ *     tags: [Admin - Dashboard Settings]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Settings reset successfully
+ *       500:
+ *         description: Server error
+ */
+router.delete('/dashboard-settings', dashboardSettingsController.resetDashboardSettings);
 
 module.exports = router;
