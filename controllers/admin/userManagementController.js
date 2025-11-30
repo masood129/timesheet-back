@@ -271,10 +271,13 @@ const deleteUser = async (req, res) => {
  */
 const updateUserRole = async (req, res) => {
     const { id } = req.params;
-    const { role } = req.body;
+    const { Role, role } = req.body;
+    
+    // Support both 'Role' (capitalized) and 'role' (lowercase) for compatibility
+    const userRole = Role || role;
 
-    const validRoles = ['user', 'group_manager'];
-    if (!validRoles.includes(role)) {
+    const validRoles = ['user', 'group_manager', 'general_manager', 'finance_manager', 'admin'];
+    if (!userRole || !validRoles.includes(userRole)) {
         return res.status(400).send('نقش نامعتبر است');
     }
 
@@ -295,7 +298,7 @@ const updateUserRole = async (req, res) => {
         await pool
             .request()
             .input('personalId', sql.Int, id)
-            .input('role', sql.NVarChar, role)
+            .input('role', sql.NVarChar, userRole)
             .query('UPDATE users SET role = @role WHERE personalid = @personalId');
 
         res.json({ message: 'نقش کاربر با موفقیت بروزرسانی شد' });
