@@ -869,6 +869,110 @@ router.get('/reports/statistics', reportManagementController.getSystemStatistics
  */
 router.get('/reports/user/:userId/summary', reportManagementController.getUserActivitySummary);
 
+/**
+ * @swagger
+ * /admin/reports/{reportId}/status:
+ *   put:
+ *     summary: Update report status (Admin only)
+ *     tags: [Admin - Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - Status
+ *             properties:
+ *               Status:
+ *                 type: string
+ *                 enum: [draft, submitted_to_group_manager, submitted_to_general_manager, submitted_to_finance, approved]
+ *               comment:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Status updated
+ *       400:
+ *         description: Invalid status
+ *       404:
+ *         description: Report not found
+ *       500:
+ *         description: Server error
+ */
+router.put('/reports/:reportId/status', reportManagementController.updateReportStatus);
+
+/**
+ * @swagger
+ * /admin/reports/{reportId}/approve:
+ *   post:
+ *     summary: Approve report directly (Admin only)
+ *     tags: [Admin - Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               comment:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Report approved
+ *       404:
+ *         description: Report not found
+ *       500:
+ *         description: Server error
+ */
+router.post('/reports/:reportId/approve', reportManagementController.approveReport);
+
+/**
+ * @swagger
+ * /admin/reports/{reportId}/reject:
+ *   post:
+ *     summary: Reject report to draft (Admin only)
+ *     tags: [Admin - Reports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               comment:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Report rejected
+ *       404:
+ *         description: Report not found
+ *       500:
+ *         description: Server error
+ */
+router.post('/reports/:reportId/reject', reportManagementController.rejectReport);
+
 // ============================================
 // SYSTEM CONFIGURATION ROUTES
 // ============================================

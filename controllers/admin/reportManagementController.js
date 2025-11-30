@@ -324,9 +324,235 @@ const getUserActivitySummary = async (req, res) => {
     }
 };
 
+/**
+ * Update report status (Admin only)
+ * Allows admin to change report status directly
+ */
+const updateReportStatus = async (req, res) => {
+    const { reportId } = req.params;
+    const { Status, comment } = req.body;
+
+    // Validate status
+    const validStatuses = [
+        'draft',
+        'submitted_to_group_manager',
+        'submitted_to_general_manager',
+        'submitted_to_finance',
+        'approved'
+    ];
+
+    if (!Status || !validStatuses.includes(Status)) {
+        return res.status(400).send('وضعیت نامعتبر است. مقادیر مجاز: ' + validStatuses.join(', '));
+    }
+
+    try {
+        const pool = await poolPromise;
+
+        // Check if report exists
+        const reportCheck = await pool
+            .request()
+            .input('reportId', sql.Int, reportId)
+            .query('SELECT * FROM MonthlyReports WHERE ReportId = @reportId');
+
+        if (reportCheck.recordset.length === 0) {
+            return res.status(404).send('گزارش یافت نشد');
+        }
+
+        const currentReport = reportCheck.recordset[0];
+
+        // Build update query
+        let updateQuery = 'UPDATE MonthlyReports SET Status = @status';
+        const request = pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('status', sql.NVarChar, Status);
+
+        // Update timestamps based on status
+        if (Status === 'submitted_to_group_manager' || Status === 'submitted_to_general_manager' || Status === 'submitted_to_finance') {
+            updateQuery += ', SubmittedAt = GETDATE()';
+        }
+
+        if (Status === 'approved') {
+            updateQuery += ', ApprovedAt = GETDATE()';
+        }
+
+        if (Status === 'draft') {
+            updateQuery += ', SubmittedAt = NULL, ApprovedAt = NULL';
+        }
+
+        // Add comment if provided
+        if (comment) {
+            updateQuery += ', ManagerComment = @comment';
+            request.input('comment', sql.NVarChar, comment);
+        }
+
+        updateQuery += ' WHERE ReportId = @reportId';
+
+        await request.query(updateQuery);
+
+        res.json({
+            success: true,
+            message: 'وضعیت گزارش با موفقیت به‌روز شد',
+            reportId: reportId,
+            newStatus: Status
+        });
+    } catch (err) {
+        console.error('Error in updateReportStatus:', err.message);
+        res.status(500).send('خطای سرور در به‌روزرسانی وضعیت گزارش');
+    }
+};
+
+/**
+ * Approve report (Admin only)
+ * Can either approve directly or update status
+ * Supports both {Status: "..."} and {comment: "..."} formats
+ */
+const approveReport = async (req, res) => {
+    const { reportId } = req.params;
+    const { Status, status, Comment, comment } = req.body;
+
+    // Support both uppercase and lowercase field names
+    const targetStatus = Status || status || 'approved';
+    const targetComment = Comment || comment;
+
+    // Validate status
+    const validStatuses = [
+        'draft',
+        'submitted_to_group_manager',
+        'submitted_to_general_manager',
+        'submitted_to_finance',
+        'approved'
+    ];
+
+    if (!validStatuses.includes(targetStatus)) {
+        return res.status(400).send('وضعیت نامعتبر است. مقادیر مجاز: ' + validStatuses.join(', '));
+    }
+
+    try {
+        const pool = await poolPromise;
+
+        // Check if report exists
+        const reportCheck = await pool
+            .request()
+            .input('reportId', sql.Int, reportId)
+            .query('SELECT * FROM MonthlyReports WHERE ReportId = @reportId');
+
+        if (reportCheck.recordset.length === 0) {
+            return res.status(404).send('گزارش یافت نشد');
+        }
+
+        // Build update query
+        let updateQuery = 'UPDATE MonthlyReports SET Status = @status';
+        const request = pool.request()
+            .input('reportId', sql.Int, reportId)
+            .input('status', sql.NVarChar, targetStatus);
+
+        // Update timestamps based on status
+        if (targetStatus === 'submitted_to_group_manager' || 
+            targetStatus === 'submitted_to_general_manager' || 
+            targetStatus === 'submitted_to_finance') {
+            updateQuery += ', SubmittedAt = GETDATE()';
+        }
+
+        if (targetStatus === 'approved') {
+            updateQuery += ', ApprovedAt = GETDATE()';
+        }
+
+        if (targetStatus === 'draft') {
+            updateQuery += ', SubmittedAt = NULL, ApprovedAt = NULL';
+        }
+
+        // Add comment if provided
+        if (targetComment) {
+            updateQuery += ', ManagerComment = @comment';
+            request.input('comment', sql.NVarChar, targetComment);
+        }
+
+        updateQuery += ' WHERE ReportId = @reportId';
+
+        const result = await request.query(updateQuery);
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).send('گزارش یافت نشد');
+        }
+
+        // Prepare response message based on status
+        let message;
+        switch (targetStatus) {
+            case 'approved':
+                message = 'گزارش با موفقیت تایید شد';
+                break;
+            case 'submitted_to_general_manager':
+                message = 'گزارش به مدیر کل ارسال شد';
+                break;
+            case 'submitted_to_finance':
+                message = 'گزارش به واحد مالی ارسال شد';
+                break;
+            case 'submitted_to_group_manager':
+                message = 'گزارش به مدیر گروه ارسال شد';
+                break;
+            case 'draft':
+                message = 'گزارش به وضعیت پیش‌نویس بازگشت';
+                break;
+            default:
+                message = 'وضعیت گزارش به‌روز شد';
+        }
+
+        res.json({
+            success: true,
+            message: message,
+            reportId: reportId,
+            newStatus: targetStatus
+        });
+    } catch (err) {
+        console.error('Error in approveReport:', err.message);
+        res.status(500).send('خطای سرور در به‌روزرسانی گزارش');
+    }
+};
+
+/**
+ * Reject report to draft (Admin only)
+ */
+const rejectReport = async (req, res) => {
+    const { reportId } = req.params;
+    const { comment } = req.body;
+
+    try {
+        const pool = await poolPromise;
+
+        const result = await pool
+            .request()
+            .input('reportId', sql.Int, reportId)
+            .input('comment', sql.NVarChar, comment || 'رد شده توسط ادمین')
+            .query(`
+                UPDATE MonthlyReports
+                SET Status = 'draft',
+                    SubmittedAt = NULL,
+                    ApprovedAt = NULL,
+                    ManagerComment = ISNULL(ManagerComment + '\n', '') + @comment
+                WHERE ReportId = @reportId
+            `);
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).send('گزارش یافت نشد');
+        }
+
+        res.json({
+            success: true,
+            message: 'گزارش رد شد و به وضعیت پیش‌نویس بازگشت',
+            reportId: reportId
+        });
+    } catch (err) {
+        console.error('Error in rejectReport:', err.message);
+        res.status(500).send('خطای سرور در رد گزارش');
+    }
+};
+
 module.exports = {
     getAllMonthlyReports,
     getAllDailyDetails,
     getSystemStatistics,
-    getUserActivitySummary
+    getUserActivitySummary,
+    updateReportStatus,
+    approveReport,
+    rejectReport
 };
