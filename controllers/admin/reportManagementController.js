@@ -411,8 +411,13 @@ const approveReport = async (req, res) => {
     const { Status, status, Comment, comment } = req.body;
 
     // Support both uppercase and lowercase field names
-    const targetStatus = Status || status || 'approved';
+    let targetStatus = Status || status || 'approved';
     const targetComment = Comment || comment;
+
+    // Handle 'rejected' status by converting it to 'draft'
+    if (targetStatus === 'rejected') {
+        targetStatus = 'draft';
+    }
 
     // Validate status
     const validStatuses = [
@@ -420,10 +425,11 @@ const approveReport = async (req, res) => {
         'submitted_to_group_manager',
         'submitted_to_general_manager',
         'submitted_to_finance',
-        'approved'
+        'approved',
+        'rejected' // This will be converted to 'draft'
     ];
 
-    if (!validStatuses.includes(targetStatus)) {
+    if (!validStatuses.includes(Status || status || 'approved')) {
         return res.status(400).send('وضعیت نامعتبر است. مقادیر مجاز: ' + validStatuses.join(', '));
     }
 
@@ -459,10 +465,18 @@ const approveReport = async (req, res) => {
 
         if (targetStatus === 'draft') {
             updateQuery += ', SubmittedAt = NULL, ApprovedAt = NULL';
-        }
-
-        // Add comment if provided
-        if (targetComment) {
+            
+            // If this is a rejection, append to existing comments
+            const originalStatus = Status || status || 'approved';
+            if (originalStatus === 'rejected' && targetComment) {
+                updateQuery += ', ManagerComment = ISNULL(ManagerComment + \'\n\', \'\') + @comment';
+                request.input('comment', sql.NVarChar, targetComment);
+            } else if (targetComment) {
+                updateQuery += ', ManagerComment = @comment';
+                request.input('comment', sql.NVarChar, targetComment);
+            }
+        } else if (targetComment) {
+            // Add comment for other statuses
             updateQuery += ', ManagerComment = @comment';
             request.input('comment', sql.NVarChar, targetComment);
         }
@@ -476,32 +490,39 @@ const approveReport = async (req, res) => {
         }
 
         // Prepare response message based on status
+        const originalStatus = Status || status || 'approved';
         let message;
-        switch (targetStatus) {
-            case 'approved':
-                message = 'گزارش با موفقیت تایید شد';
-                break;
-            case 'submitted_to_general_manager':
-                message = 'گزارش به مدیر کل ارسال شد';
-                break;
-            case 'submitted_to_finance':
-                message = 'گزارش به واحد مالی ارسال شد';
-                break;
-            case 'submitted_to_group_manager':
-                message = 'گزارش به مدیر گروه ارسال شد';
-                break;
-            case 'draft':
-                message = 'گزارش به وضعیت پیش‌نویس بازگشت';
-                break;
-            default:
-                message = 'وضعیت گزارش به‌روز شد';
+        
+        if (originalStatus === 'rejected') {
+            message = 'گزارش رد شد و به وضعیت پیش‌نویس بازگشت';
+        } else {
+            switch (targetStatus) {
+                case 'approved':
+                    message = 'گزارش با موفقیت تایید شد';
+                    break;
+                case 'submitted_to_general_manager':
+                    message = 'گزارش به مدیر کل ارسال شد';
+                    break;
+                case 'submitted_to_finance':
+                    message = 'گزارش به واحد مالی ارسال شد';
+                    break;
+                case 'submitted_to_group_manager':
+                    message = 'گزارش به مدیر گروه ارسال شد';
+                    break;
+                case 'draft':
+                    message = 'گزارش به وضعیت پیش‌نویس بازگشت';
+                    break;
+                default:
+                    message = 'وضعیت گزارش به‌روز شد';
+            }
         }
 
         res.json({
             success: true,
             message: message,
             reportId: reportId,
-            newStatus: targetStatus
+            newStatus: originalStatus === 'rejected' ? 'rejected' : targetStatus,
+            actualStatus: targetStatus // The actual status in database
         });
     } catch (err) {
         console.error('Error in approveReport:', err.message);
