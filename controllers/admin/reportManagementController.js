@@ -4,7 +4,7 @@ const { sql, poolPromise } = require('../../config/db.config');
  * Get all monthly reports with filtering
  */
 const getAllMonthlyReports = async (req, res) => {
-    const { status, userId, year, month, page = 1, limit = 50 } = req.query;
+    const { status, userId, year, month, search, page = 1, limit = 50 } = req.query;
     const offset = (page - 1) * limit;
 
     try {
@@ -41,6 +41,17 @@ const getAllMonthlyReports = async (req, res) => {
             request.input('month', sql.Int, month);
         }
 
+        if (search) {
+            query += ` AND (
+                u.id LIKE @search OR 
+                u.farsifirstname LIKE @search OR 
+                u.farsilastname LIKE @search OR
+                CAST(mr.ReportId AS NVARCHAR) LIKE @search OR
+                mr.ManagerComment LIKE @search
+            )`;
+            request.input('search', sql.NVarChar, `%${search}%`);
+        }
+
         query += ' ORDER BY mr.ReportId DESC OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY';
         request.input('offset', sql.Int, offset);
         request.input('limit', sql.Int, parseInt(limit));
@@ -69,6 +80,17 @@ const getAllMonthlyReports = async (req, res) => {
         if (month) {
             countQuery += ' AND mr.JalaliMonth = @month';
             countRequest.input('month', sql.Int, month);
+        }
+
+        if (search) {
+            countQuery += ` AND (
+                u.id LIKE @search OR 
+                u.farsifirstname LIKE @search OR 
+                u.farsilastname LIKE @search OR
+                CAST(mr.ReportId AS NVARCHAR) LIKE @search OR
+                mr.ManagerComment LIKE @search
+            )`;
+            countRequest.input('search', sql.NVarChar, `%${search}%`);
         }
 
         const countResult = await countRequest.query(countQuery);
