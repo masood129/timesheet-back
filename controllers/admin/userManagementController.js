@@ -189,10 +189,34 @@ const createUser = async (req, res) => {
  */
 const updateUser = async (req, res) => {
     const { id } = req.params;
-    const { username, farsifirstname, farsilastname, email, groupId } = req.body;
+    const { 
+        Username, username, 
+        farsifirstname, 
+        farsilastname, 
+        email, 
+        groupid, groupId,
+        Role, role,
+        IsActive, isActive,
+        directAdminid,
+        ContractArrivalTime,
+        ContractLeaveTime,
+        MinMonthlyHours
+    } = req.body;
 
-    if (!username && !farsifirstname && !farsilastname && !email && groupId == null) {
+    // Support both capitalized and lowercase field names for compatibility
+    const finalUsername = Username || username;
+    const finalGroupId = groupid ?? groupId;
+    const finalRole = Role || role;
+    const finalIsActive = IsActive ?? isActive;
+
+    if (!finalUsername && !farsifirstname && !farsilastname && !email && finalGroupId == null && !finalRole && finalIsActive == null && directAdminid === undefined) {
         return res.status(400).send('حداقل یکی از فیلدها الزامی است');
+    }
+
+    // Validate role if provided
+    const validRoles = ['user', 'group_manager', 'general_manager', 'finance_manager', 'admin'];
+    if (finalRole && !validRoles.includes(finalRole)) {
+        return res.status(400).send('نقش نامعتبر است');
     }
 
     try {
@@ -208,24 +232,115 @@ const updateUser = async (req, res) => {
             return res.status(404).send('کاربر یافت نشد');
         }
 
-        // Update user
-        await pool
-            .request()
-            .input('personalId', sql.Int, id)
-            .input('username', sql.NVarChar, username || null)
-            .input('farsifirstname', sql.NVarChar, farsifirstname || null)
-            .input('farsilastname', sql.NVarChar, farsilastname || null)
-            .input('email', sql.NVarChar, email || null)
-            .input('groupId', sql.Int, groupId ?? null)
-            .query(`
+        // Build dynamic UPDATE query
+        const updateFields = [];
+        const request = pool.request();
+        request.input('personalId', sql.Int, id);
+
+        if (finalUsername !== undefined) {
+            updateFields.push('id = @username');
+            request.input('username', sql.NVarChar, finalUsername);
+        }
+        if (farsifirstname !== undefined) {
+            updateFields.push('farsifirstname = @farsifirstname');
+            request.input('farsifirstname', sql.NVarChar, farsifirstname);
+        }
+        if (farsilastname !== undefined) {
+            updateFields.push('farsilastname = @farsilastname');
+            request.input('farsilastname', sql.NVarChar, farsilastname);
+        }
+        if (email !== undefined) {
+            updateFields.push('email = @email');
+            request.input('email', sql.NVarChar, email);
+        }
+        if (finalGroupId !== undefined) {
+            updateFields.push('groupid = @groupId');
+            request.input('groupId', sql.Int, finalGroupId);
+        }
+        if (finalRole !== undefined) {
+            updateFields.push('role = @role');
+            request.input('role', sql.NVarChar, finalRole);
+        }
+        if (finalIsActive !== undefined) {
+            updateFields.push('IsActive = @isActive');
+            request.input('isActive', sql.Bit, finalIsActive);
+        }
+        if (directAdminid !== undefined) {
+            updateFields.push('directAdminid = @directAdminid');
+            request.input('directAdminid', sql.Int, directAdminid);
+        }
+
+        if (updateFields.length > 0) {
+            const updateQuery = `
                 UPDATE users
-                SET id = COALESCE(@username, id),
-                    farsifirstname = COALESCE(@farsifirstname, farsifirstname),
-                    farsilastname = COALESCE(@farsilastname, farsilastname),
-                    email = COALESCE(@email, email),
-                    groupid = COALESCE(@groupId, groupid)
+                SET ${updateFields.join(', ')}
                 WHERE personalid = @personalId
-            `);
+            `;
+            await request.query(updateQuery);
+        }
+
+        // Update contract hours if provided (only if non-null values are present)
+        const hasNonNullContractValues = (ContractArrivalTime !== undefined && ContractArrivalTime !== null) ||
+                                        (ContractLeaveTime !== undefined && ContractLeaveTime !== null) ||
+                                        (MinMonthlyHours !== undefined && MinMonthlyHours !== null);
+
+        if (hasNonNullContractValues) {
+            // Check if contract hours record exists
+            const contractCheck = await pool
+                .request()
+                .input('userId', sql.Int, id)
+                .query('SELECT COUNT(*) as count FROM UserContractHours WHERE UserId = @userId');
+
+            const contractRequest = pool.request();
+            contractRequest.input('userId', sql.Int, id);
+
+            if (contractCheck.recordset[0].count > 0) {
+                // Update existing record (only non-null values)
+                const contractUpdateFields = [];
+                if (ContractArrivalTime !== undefined && ContractArrivalTime !== null) {
+                    contractUpdateFields.push('ContractArrivalTime = @contractArrivalTime');
+                    contractRequest.input('contractArrivalTime', sql.Time, ContractArrivalTime);
+                }
+                if (ContractLeaveTime !== undefined && ContractLeaveTime !== null) {
+                    contractUpdateFields.push('ContractLeaveTime = @contractLeaveTime');
+                    contractRequest.input('contractLeaveTime', sql.Time, ContractLeaveTime);
+                }
+                if (MinMonthlyHours !== undefined && MinMonthlyHours !== null) {
+                    contractUpdateFields.push('MinMonthlyHours = @minMonthlyHours');
+                    contractRequest.input('minMonthlyHours', sql.Int, MinMonthlyHours);
+                }
+
+                if (contractUpdateFields.length > 0) {
+                    const contractUpdateQuery = `
+                        UPDATE UserContractHours
+                        SET ${contractUpdateFields.join(', ')}
+                        WHERE UserId = @userId
+                    `;
+                    await contractRequest.query(contractUpdateQuery);
+                }
+            } else {
+                // Insert new record only if we have required non-null values
+                // ContractLeaveTime is required (NOT NULL in DB)
+                if (ContractLeaveTime !== null && ContractLeaveTime !== undefined) {
+                    contractRequest
+                        .input('contractArrivalTime', sql.Time, ContractArrivalTime || null)
+                        .input('contractLeaveTime', sql.Time, ContractLeaveTime)
+                        .input('minMonthlyHours', sql.Int, MinMonthlyHours || null);
+                    
+                    await contractRequest.query(`
+                        INSERT INTO UserContractHours (UserId, ContractArrivalTime, ContractLeaveTime, MinMonthlyHours)
+                        VALUES (@userId, @contractArrivalTime, @contractLeaveTime, @minMonthlyHours)
+                    `);
+                }
+            }
+        } else if ((ContractArrivalTime === null || ContractLeaveTime === null || MinMonthlyHours === null) &&
+                   (ContractArrivalTime !== undefined || ContractLeaveTime !== undefined || MinMonthlyHours !== undefined)) {
+            // If all contract values are explicitly set to null, delete the contract hours record
+            await pool
+                .request()
+                .input('userId', sql.Int, id)
+                .query('DELETE FROM UserContractHours WHERE UserId = @userId');
+        }
 
         res.json({ message: 'کاربر با موفقیت بروزرسانی شد' });
     } catch (err) {
