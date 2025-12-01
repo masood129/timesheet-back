@@ -1,0 +1,267 @@
+paths:
+  /admin/groups:
+    get:
+      summary: Get all groups (Admin only)
+      tags:
+        - Admin - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  groups:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Group'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+        '500':
+          description: Server error
+    post:
+      summary: Create new group (Admin only)
+      tags:
+        - Admin - Groups
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - GroupId
+                - GroupName
+              properties:
+                GroupId:
+                  type: integer
+                GroupName:
+                  type: string
+                ManagerId:
+                  type: integer
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '400':
+          description: Invalid input
+        '500':
+          description: Server error
+
+  /admin/groups/{id}:
+    get:
+      summary: Get group by ID (Admin only)
+      tags:
+        - Admin - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Group details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '404':
+          description: Group not found
+        '500':
+          description: Server error
+    put:
+      summary: Update group (Admin only)
+      tags:
+        - Admin - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                GroupName:
+                  type: string
+                ManagerId:
+                  type: integer
+      responses:
+        '200':
+          description: Group updated
+        '404':
+          description: Group not found
+        '500':
+          description: Server error
+    delete:
+      summary: Delete group (Admin only)
+      tags:
+        - Admin - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Group deleted
+        '404':
+          description: Group not found
+        '500':
+          description: Server error
+
+  /admin/groups/{id}/members:
+    get:
+      summary: Get group members (Admin only)
+      tags:
+        - Admin - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '404':
+          description: Group not found
+        '500':
+          description: Server error
+    post:
+      summary: Add user to group (Admin only)
+      tags:
+        - Admin - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - UserId
+              properties:
+                UserId:
+                  type: integer
+      responses:
+        '201':
+          description: User added to group
+        '404':
+          description: Group or user not found
+        '500':
+          description: Server error
+
+  /admin/groups/{id}/members/{userId}:
+    delete:
+      summary: Remove user from group (Admin only)
+      tags:
+        - Admin - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User removed from group
+        '404':
+          description: User not found in group
+        '500':
+          description: Server error
+
+  /admin/groups/{id}/manager:
+    put:
+      summary: Set group manager (Admin only)
+      tags:
+        - Admin - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ManagerId
+              properties:
+                ManagerId:
+                  type: integer
+      responses:
+        '200':
+          description: Manager set
+        '404':
+          description: Group or user not found
+        '500':
+          description: Server error
+
+

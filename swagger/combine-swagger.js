@@ -27,6 +27,8 @@ const baseSwagger = {
     { name: 'DailyDetails', description: 'Daily details endpoints' },
     { name: 'MonthlyReports', description: 'Monthly reports endpoints' },
     { name: 'Users', description: 'User management endpoints' },
+    { name: 'Month Periods', description: 'Month period information endpoints' },
+    { name: 'User Project Access', description: 'User project access management endpoints' },
     { name: 'Admin - Users', description: 'Admin user management endpoints' },
     { name: 'Admin - Projects', description: 'Admin project management endpoints' },
     { name: 'Admin - Groups', description: 'Admin group management endpoints' },
@@ -34,6 +36,7 @@ const baseSwagger = {
     { name: 'Admin - Config', description: 'Admin system configuration endpoints' },
     { name: 'Admin - Month Periods', description: 'Admin month period settings endpoints' },
     { name: 'Admin - Logs', description: 'Admin logs management endpoints' },
+    { name: 'Admin - Dashboard Settings', description: 'Admin dashboard settings endpoints' },
     { name: 'Test', description: 'Test endpoints' }
   ]
 };
@@ -102,6 +105,7 @@ const outputPath = path.join(__dirname, 'swagger.json');
 fs.writeFileSync(outputPath, JSON.stringify(baseSwagger, null, 2), 'utf8');
 console.log(`✅ Swagger JSON file created successfully at ${outputPath}`);
 console.log(`   Total paths: ${Object.keys(baseSwagger.paths).length}`);
+
 
 
 

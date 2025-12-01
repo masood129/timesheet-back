@@ -33,14 +33,22 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/User'
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
         '403':
           description: Access denied
         '500':
           description: Server error
-
     post:
       summary: Create new user (Admin only)
       tags:
@@ -63,16 +71,15 @@ paths:
                   type: string
                 Role:
                   type: string
-                  enum:
-                    - user
-                    - group_manager
-                    - general_manager
-                    - finance_manager
-                    - admin
+                  enum: [user, group_manager, general_manager, finance_manager, admin]
                   default: user
       responses:
         '201':
           description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
         '400':
           description: Invalid input
         '500':
@@ -102,7 +109,6 @@ paths:
           description: User not found
         '500':
           description: Server error
-
     put:
       summary: Update user (Admin only)
       tags:
@@ -127,11 +133,14 @@ paths:
       responses:
         '200':
           description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
         '404':
           description: User not found
         '500':
           description: Server error
-
     delete:
       summary: Delete user (Admin only)
       tags:
@@ -176,12 +185,7 @@ paths:
               properties:
                 Role:
                   type: string
-                  enum:
-                    - user
-                    - group_manager
-                    - general_manager
-                    - finance_manager
-                    - admin
+                  enum: [user, group_manager, general_manager, finance_manager, admin]
       responses:
         '200':
           description: Role updated
@@ -189,7 +193,3 @@ paths:
           description: User not found
         '500':
           description: Server error
-
-
-
-

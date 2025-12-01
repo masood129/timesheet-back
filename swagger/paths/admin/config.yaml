@@ -1,0 +1,117 @@
+paths:
+  /admin/config/contract-hours:
+    get:
+      summary: Get all contract hours (Admin only)
+      tags:
+        - Admin - Config
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of contract hours
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ContractHours'
+        '500':
+          description: Server error
+
+  /admin/config/contract-hours/{userId}:
+    get:
+      summary: Get user contract hours (Admin only)
+      tags:
+        - Admin - Config
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Contract hours
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractHours'
+        '404':
+          description: Not found
+        '500':
+          description: Server error
+    put:
+      summary: Update user contract hours (Admin only)
+      tags:
+        - Admin - Config
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ContractLeaveTime
+                - MinMonthlyHours
+              properties:
+                ContractArrivalTime:
+                  type: string
+                ContractLeaveTime:
+                  type: string
+                MinMonthlyHours:
+                  type: integer
+      responses:
+        '200':
+          description: Contract hours updated
+        '404':
+          description: User not found
+        '500':
+          description: Server error
+    delete:
+      summary: Delete user contract hours (Admin only)
+      tags:
+        - Admin - Config
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Contract hours deleted
+        '404':
+          description: Not found
+        '500':
+          description: Server error
+
+  /admin/config/system:
+    get:
+      summary: Get system configuration (Admin only)
+      tags:
+        - Admin - Config
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: System configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemConfig'
+        '500':
+          description: Server error
+
+

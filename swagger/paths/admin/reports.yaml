@@ -1,0 +1,301 @@
+paths:
+  /admin/reports/monthly:
+    get:
+      summary: Get all monthly reports (Admin only)
+      tags:
+        - Admin - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: userId
+          schema:
+            type: integer
+        - in: query
+          name: year
+          schema:
+            type: integer
+        - in: query
+          name: month
+          schema:
+            type: integer
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: List of monthly reports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reports:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MonthlyReport'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+        '500':
+          description: Server error
+
+  /admin/reports/daily:
+    get:
+      summary: Get all daily details (Admin only)
+      tags:
+        - Admin - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: userId
+          schema:
+            type: integer
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: List of daily details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dailyDetails:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DailyDetail'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+        '500':
+          description: Server error
+
+  /admin/reports/statistics:
+    get:
+      summary: Get system statistics (Admin only)
+      tags:
+        - Admin - Reports
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: System statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStatistics'
+        '500':
+          description: Server error
+
+  /admin/reports/user/{userId}/summary:
+    get:
+      summary: Get user activity summary (Admin only)
+      tags:
+        - Admin - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: User activity summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserActivitySummary'
+        '404':
+          description: User not found
+        '500':
+          description: Server error
+
+  /admin/reports/{reportId}:
+    get:
+      summary: Get report by ID (Admin only)
+      tags:
+        - Admin - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Report details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyReport'
+        '404':
+          description: Report not found
+        '500':
+          description: Server error
+    delete:
+      summary: Delete report (Admin only)
+      tags:
+        - Admin - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Report deleted
+        '404':
+          description: Report not found
+        '500':
+          description: Server error
+
+  /admin/reports/{reportId}/status:
+    put:
+      summary: Update report status (Admin only)
+      tags:
+        - Admin - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Status
+              properties:
+                Status:
+                  type: string
+                  enum: [draft, submitted_to_group_manager, submitted_to_general_manager, submitted_to_finance, approved]
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: Status updated
+        '400':
+          description: Invalid status
+        '404':
+          description: Report not found
+        '500':
+          description: Server error
+
+  /admin/reports/{reportId}/approve:
+    post:
+      summary: Approve report directly (Admin only)
+      tags:
+        - Admin - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: Report approved
+        '404':
+          description: Report not found
+        '500':
+          description: Server error
+
+  /admin/reports/{reportId}/reject:
+    post:
+      summary: Reject report to draft (Admin only)
+      tags:
+        - Admin - Reports
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: reportId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: Report rejected
+        '404':
+          description: Report not found
+        '500':
+          description: Server error
+
+

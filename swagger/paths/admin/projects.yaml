@@ -1,0 +1,245 @@
+paths:
+  /admin/projects:
+    get:
+      summary: Get all projects (Admin only)
+      tags:
+        - Admin - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+        '500':
+          description: Server error
+    post:
+      summary: Create new project (Admin only)
+      tags:
+        - Admin - Projects
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Id
+                - ProjectName
+              properties:
+                Id:
+                  type: integer
+                ProjectName:
+                  type: string
+                securityLevel:
+                  type: integer
+                  default: 1
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Invalid input
+        '500':
+          description: Server error
+
+  /admin/projects/{id}:
+    get:
+      summary: Get project by ID (Admin only)
+      tags:
+        - Admin - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '404':
+          description: Project not found
+        '500':
+          description: Server error
+    put:
+      summary: Update project (Admin only)
+      tags:
+        - Admin - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Current project ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                projectName:
+                  type: string
+                  description: New project name
+                id:
+                  type: integer
+                  description: New project ID (optional, to change project code)
+                securityLevel:
+                  type: integer
+      responses:
+        '200':
+          description: Project updated successfully
+        '404':
+          description: Project not found
+        '409':
+          description: New project ID already exists
+        '500':
+          description: Server error
+    delete:
+      summary: Delete project (Admin only)
+      tags:
+        - Admin - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Project deleted
+        '404':
+          description: Project not found
+        '500':
+          description: Server error
+
+  /admin/projects/{id}/users:
+    get:
+      summary: Get users with access to project (Admin only)
+      tags:
+        - Admin - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '404':
+          description: Project not found
+        '500':
+          description: Server error
+    post:
+      summary: Add user access to project (Admin only)
+      tags:
+        - Admin - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - UserId
+              properties:
+                UserId:
+                  type: integer
+      responses:
+        '201':
+          description: Access granted
+        '400':
+          description: Invalid input
+        '404':
+          description: Project or user not found
+        '500':
+          description: Server error
+
+  /admin/projects/{id}/users/{userId}:
+    delete:
+      summary: Remove user access from project (Admin only)
+      tags:
+        - Admin - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Access removed
+        '404':
+          description: Access not found
+        '500':
+          description: Server error
+
+

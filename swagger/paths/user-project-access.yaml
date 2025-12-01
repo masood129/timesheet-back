@@ -1,0 +1,51 @@
+paths:
+  /user-project-access:
+    get:
+      summary: Get all projects with access status for current user
+      tags:
+        - User Project Access
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of all projects with access status
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectAccessStatus'
+        '500':
+          description: Server error
+
+  /user-project-access/{projectId}:
+    put:
+      summary: Toggle project access for current user
+      tags:
+        - User Project Access
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Access toggled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasAccess:
+                    type: boolean
+                  message:
+                    type: string
+        '404':
+          description: Project not found
+        '500':
+          description: Server error
+
+

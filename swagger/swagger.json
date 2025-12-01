@@ -1,20 +1,20 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Project API",
+    "title": "Timesheet API",
     "description": "API for managing projects, daily details, and monthly reports with MSSQL integration for a Flutter calendar app",
     "version": "1.0.0"
   },
   "servers": [
     {
       "url": "http://localhost:3000",
-      "description": "Local server"
+      "description": "API Server"
     }
   ],
   "paths": {
     "/auth/login": {
       "post": {
-        "summary": "Authenticate user and generate JWT token using username only",
+        "summary": "Authenticate user (admin or regular) and generate JWT token using username only",
         "tags": [
           "Auth"
         ],
@@ -59,7 +59,11 @@
                     },
                     "Role": {
                       "type": "string",
-                      "description": "User's role (user, group_manager, general_manager, finance_manager)"
+                      "description": "User's role (user, group_manager, general_manager, finance_manager, admin)"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Success message"
                     }
                   }
                 }
@@ -71,6 +75,1710 @@
           },
           "401": {
             "description": "Invalid username"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/auth/login-as": {
+      "post": {
+        "summary": "Login as another user (for managers only)",
+        "tags": [
+          "Auth"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "targetUserId"
+                ],
+                "properties": {
+                  "targetUserId": {
+                    "type": "integer",
+                    "description": "ID of the user to impersonate"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Impersonation successful, returns new JWT token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "description": "JWT token for the impersonated user"
+                    },
+                    "userId": {
+                      "type": "integer"
+                    },
+                    "Username": {
+                      "type": "string"
+                    },
+                    "Role": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token provided"
+          },
+          "403": {
+            "description": "Access denied - Only managers can impersonate"
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/daily-details": {
+      "post": {
+        "summary": "Create or update daily details for a specific date",
+        "tags": [
+          "DailyDetails"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "date"
+                ],
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Date of the daily details (YYYY-MM-DD)"
+                  },
+                  "leaveType": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Type of leave"
+                  },
+                  "arrivalTime": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Arrival time (HH:mm)"
+                  },
+                  "leaveTime": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Leave time (HH:mm)"
+                  },
+                  "personalTime": {
+                    "type": "integer",
+                    "nullable": true,
+                    "description": "Personal time in minutes"
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Description"
+                  },
+                  "goCost": {
+                    "type": "integer",
+                    "nullable": true,
+                    "description": "Cost of going"
+                  },
+                  "returnCost": {
+                    "type": "integer",
+                    "nullable": true,
+                    "description": "Cost of returning"
+                  },
+                  "tasks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "projectId": {
+                          "type": "integer"
+                        },
+                        "duration": {
+                          "type": "integer"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "List of tasks for the day"
+                  },
+                  "personalCarCosts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "projectId": {
+                          "type": "integer"
+                        },
+                        "kilometers": {
+                          "type": "integer"
+                        },
+                        "cost": {
+                          "type": "integer"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "description": "List of personal car costs for the day"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Daily details created or updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input (e.g., invalid date format)"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/daily-details/{date}": {
+      "get": {
+        "summary": "Get daily details by date",
+        "tags": [
+          "DailyDetails"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Date of the daily details (YYYY-MM-DD)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid date"
+          },
+          "404": {
+            "description": "No details found for the date"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/daily-details/month/{year}/{month}": {
+      "get": {
+        "summary": "Get monthly details using Gregorian calendar",
+        "tags": [
+          "DailyDetails"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Gregorian year"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Gregorian month (1-12)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monthly details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DailyDetail"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid year or month"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/daily-details/jalali/month/{year}/{month}": {
+      "get": {
+        "summary": "Get monthly details using Jalali calendar",
+        "tags": [
+          "DailyDetails"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year (e.g., 1404)"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Jalali month (1-12, e.g., 6 for Shahrivar)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monthly details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DailyDetail"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Jalali year or month"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/daily-details/range": {
+      "get": {
+        "summary": "Get daily details for a date range",
+        "tags": [
+          "DailyDetails"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "startDate",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Start date of the range (YYYY-MM-DD)"
+          },
+          {
+            "in": "query",
+            "name": "endDate",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "End date of the range (YYYY-MM-DD)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily details for the range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DailyDetail"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input (e.g., missing or invalid parameters)"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/daily-details/user/{userId}/jalali/month/{year}/{month}": {
+      "get": {
+        "summary": "Get monthly details for a specific user using Jalali calendar, formatted for table display",
+        "tags": [
+          "DailyDetails"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID of the user to fetch details for"
+          },
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Jalali month (1-12)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monthly details formatted for table",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Jalali year or month"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/daily-details/user/{userId}/jalali/month/{year}/{month}/export-excel": {
+      "get": {
+        "summary": "Export user monthly details to Excel file",
+        "tags": [
+          "DailyDetails"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "ID of the user"
+          },
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Jalali month (1-12)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Excel file download",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Jalali year or month"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/month-periods/{year}": {
+      "get": {
+        "summary": "Get all month periods for a specific year",
+        "tags": [
+          "Month Periods"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year (e.g., 1404)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of month periods for the year",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MonthPeriod"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid year"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/month-periods/{year}/{month}": {
+      "get": {
+        "summary": "Get month period for a specific year and month",
+        "tags": [
+          "Month Periods"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year (e.g., 1404)"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Jalali month (1-12)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Month period details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthPeriod"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Month period not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/my-drafts": {
+      "get": {
+        "summary": "Get list of draft reports for the current user",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of draft reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MonthlyReport"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/{reportId}/exit-draft": {
+      "delete": {
+        "summary": "Exit from draft state by deleting the draft monthly report (by user)",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The ID of the report to exit from draft"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exited from draft state successfully"
+          },
+          "400": {
+            "description": "Only draft reports can be exited"
+          },
+          "403": {
+            "description": "Access denied (not the owner or invalid role)"
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/{year}/{month}": {
+      "post": {
+        "summary": "Create or update a draft monthly report for a Gregorian month",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Gregorian year"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Gregorian month (1-12)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "totalHours": {
+                    "type": "integer",
+                    "description": "Total hours worked in the month"
+                  },
+                  "gymCost": {
+                    "type": "integer",
+                    "description": "Gym cost for the month"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Report created or updated in draft status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthlyReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or report already submitted"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/jalali/{year}/{month}": {
+      "post": {
+        "summary": "Create or update a draft monthly report for a Jalali month",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year (e.g., 1404)"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Jalali month (1-12, e.g., 6 for Shahrivar)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "totalHours": {
+                    "type": "integer",
+                    "description": "Total hours worked in the month"
+                  },
+                  "gymCost": {
+                    "type": "integer",
+                    "description": "Gym cost for the month"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Report created or updated in draft status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthlyReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or report already submitted"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/{reportId}": {
+      "get": {
+        "summary": "Get report by ID",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The ID of the report"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthlyReport"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/{reportId}/submit-to-group-manager": {
+      "put": {
+        "summary": "Submit report to group manager (by user)",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The ID of the report"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report submitted to manager"
+          },
+          "400": {
+            "description": "Report cannot be submitted; invalid status"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/{reportId}/approve-group-manager": {
+      "put": {
+        "summary": "Approve report by group manager",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The ID of the report"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": {
+                    "type": "string",
+                    "description": "Optional comment"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Report approved by group manager"
+          },
+          "400": {
+            "description": "Report cannot be approved; invalid status"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/{reportId}/approve-general-manager": {
+      "put": {
+        "summary": "Approve report by general manager",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The ID of the report"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": {
+                    "type": "string",
+                    "description": "Optional comment"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Report approved by general manager"
+          },
+          "400": {
+            "description": "Report cannot be approved; invalid status"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/{reportId}/approve-finance": {
+      "put": {
+        "summary": "Approve report by finance manager",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The ID of the report"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": {
+                    "type": "string",
+                    "description": "Optional comment"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Report approved by finance"
+          },
+          "400": {
+            "description": "Report cannot be approved; invalid status"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/{reportId}/reject-to-draft": {
+      "put": {
+        "summary": "Reject report and revert to draft (by managers)",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The ID of the report"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": {
+                    "type": "string",
+                    "description": "Reason for rejection"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Report rejected and reverted to draft"
+          },
+          "400": {
+            "description": "Report cannot be rejected; invalid status"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/check-submitted/jalali/{year}/{month}": {
+      "get": {
+        "summary": "Get the status for the monthly report of the current user in the specified Jalali month",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year (e.g., 1404)"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Jalali month (1-12, e.g., 6 for Shahrivar)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status of the report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The overall status (e.g., 'draft', 'approved', 'submitted_to_group_manager') or null if no report exists"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Jalali year or month"
+          },
+          "403": {
+            "description": "Access denied (not user role)"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/group/{year}/{month}": {
+      "get": {
+        "summary": "Get reports for group manager, general manager, or finance manager using Gregorian calendar",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Gregorian year"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Gregorian month (1-12)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MonthlyReport"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/jalali/group/{year}/{month}": {
+      "get": {
+        "summary": "Get reports for group manager, general manager, or finance manager using Jalali calendar",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year (e.g., 1404)"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Jalali month (1-12, e.g., 6 for Shahrivar)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MonthlyReport"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Jalali year or month"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/group/range/{startYear}/{startMonth}/{endYear}/{endMonth}": {
+      "get": {
+        "summary": "Get reports for group manager, general manager, or finance manager within a year-month range (Gregorian)",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "startYear",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Start year of the range"
+          },
+          {
+            "in": "path",
+            "name": "startMonth",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Start month of the range (1-12)"
+          },
+          {
+            "in": "path",
+            "name": "endYear",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "End year of the range"
+          },
+          {
+            "in": "path",
+            "name": "endMonth",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "End month of the range (1-12)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MonthlyReport"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input (e.g., invalid year or month)"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/report-ids/jalali/{year}/{month}": {
+      "get": {
+        "summary": "Get report IDs and user IDs for the specified Jalali month (for authorized users)",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year (e.g., 1404)"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Jalali month (1-12, e.g., 6 for Shahrivar)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of report IDs and user IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "reportId": {
+                        "type": "integer"
+                      },
+                      "userId": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Jalali year or month"
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/month-periods/{year}": {
+      "get": {
+        "summary": "Get all month periods for a year (public endpoint)",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year (e.g., 1404)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of month periods for the year",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MonthlyReport"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid year"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/month-periods/{year}/{month}": {
+      "get": {
+        "summary": "Get month period for specific year/month (public endpoint)",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year"
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "description": "Jalali month (1-12)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Month period details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthPeriod"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Month period not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/monthly-gym-costs": {
+      "post": {
+        "summary": "Save monthly gym cost (Gregorian)",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "year",
+                  "month",
+                  "gymCost"
+                ],
+                "properties": {
+                  "year": {
+                    "type": "integer"
+                  },
+                  "month": {
+                    "type": "integer"
+                  },
+                  "gymCost": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gym cost saved"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/monthly-reports/jalali-monthly-gym-costs": {
+      "post": {
+        "summary": "Save monthly gym cost (Jalali)",
+        "tags": [
+          "MonthlyReports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "year",
+                  "month",
+                  "gymCost"
+                ],
+                "properties": {
+                  "year": {
+                    "type": "integer"
+                  },
+                  "month": {
+                    "type": "integer"
+                  },
+                  "gymCost": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gym cost saved"
+          },
+          "400": {
+            "description": "Invalid input"
           },
           "500": {
             "description": "Server error"
@@ -210,7 +1918,7 @@
             "schema": {
               "type": "integer"
             },
-            "description": "Project ID"
+            "description": "Current Project ID"
           }
         ],
         "requestBody": {
@@ -220,8 +1928,13 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "ProjectName": {
-                    "type": "string"
+                  "projectName": {
+                    "type": "string",
+                    "description": "New project name"
+                  },
+                  "id": {
+                    "type": "integer",
+                    "description": "New project ID (optional, if you want to change the project code)"
                   },
                   "securityLevel": {
                     "type": "integer"
@@ -242,11 +1955,14 @@
               }
             }
           },
+          "400": {
+            "description": "Invalid input"
+          },
           "404": {
             "description": "Project not found"
           },
-          "400": {
-            "description": "Invalid input"
+          "409": {
+            "description": "New project ID already exists"
           },
           "500": {
             "description": "Server error"
@@ -287,1059 +2003,6 @@
         }
       }
     },
-    "/daily-details/jalali/month/{year}/{month}": {
-      "get": {
-        "summary": "Get monthly details using Jalali calendar",
-        "tags": [
-          "DailyDetails"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "year",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Jalali year (e.g., 1404)"
-          },
-          {
-            "in": "path",
-            "name": "month",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Jalali month (1-12, e.g., 6 for Shahrivar)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Monthly details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DailyDetail"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid Jalali year or month"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/daily-details/range": {
-      "get": {
-        "summary": "Get daily details for a date range",
-        "tags": [
-          "DailyDetails"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "query",
-            "name": "startDate",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            },
-            "description": "Start date of the range (YYYY-MM-DD)"
-          },
-          {
-            "in": "query",
-            "name": "endDate",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            },
-            "description": "End date of the range (YYYY-MM-DD)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Daily details for the range",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DailyDetail"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input (e.g., missing or invalid parameters)"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/daily-details": {
-      "post": {
-        "summary": "Create or update daily details for a specific date",
-        "tags": [
-          "DailyDetails"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "date"
-                ],
-                "properties": {
-                  "date": {
-                    "type": "string",
-                    "format": "date",
-                    "description": "Date of the daily details (YYYY-MM-DD)"
-                  },
-                  "leaveType": {
-                    "type": "string",
-                    "description": "Type of leave"
-                  },
-                  "arrivalTime": {
-                    "type": "string",
-                    "description": "Arrival time (HH:mm)"
-                  },
-                  "leaveTime": {
-                    "type": "string",
-                    "description": "Leave time (HH:mm)"
-                  },
-                  "personalTime": {
-                    "type": "integer",
-                    "description": "Personal time in minutes"
-                  },
-                  "description": {
-                    "type": "string",
-                    "description": "Description"
-                  },
-                  "goCost": {
-                    "type": "integer",
-                    "description": "Cost of going"
-                  },
-                  "returnCost": {
-                    "type": "integer",
-                    "description": "Cost of returning"
-                  },
-                  "tasks": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "projectId": {
-                          "type": "integer"
-                        },
-                        "duration": {
-                          "type": "integer"
-                        },
-                        "description": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "description": "List of tasks for the day"
-                  },
-                  "personalCarCosts": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "projectId": {
-                          "type": "integer"
-                        },
-                        "kilometers": {
-                          "type": "integer"
-                        },
-                        "cost": {
-                          "type": "integer"
-                        },
-                        "description": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "description": "List of personal car costs for the day"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Daily details created or updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DailyDetail"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input (e.g., invalid date format)"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/daily-details/month/{year}/{month}": {
-      "get": {
-        "summary": "Get monthly details",
-        "tags": [
-          "DailyDetails"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "year",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Gregorian year"
-          },
-          {
-            "in": "path",
-            "name": "month",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Gregorian month (1-12)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Monthly details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DailyDetail"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid year or month"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/{reportId}/exit-draft": {
-      "delete": {
-        "summary": "Exit from draft state by deleting the draft monthly report (by user)",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "reportId",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "The ID of the report to exit from draft"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Exited from draft state successfully"
-          },
-          "400": {
-            "description": "Only draft reports can be exited"
-          },
-          "403": {
-            "description": "Access denied (not the owner or invalid role)"
-          },
-          "404": {
-            "description": "Report not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/{reportId}/reject-to-draft": {
-      "put": {
-        "summary": "Reject report and revert to draft (by managers)",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "reportId",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "The ID of the report"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "comment": {
-                    "type": "string",
-                    "description": "Reason for rejection"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Report rejected and reverted to draft"
-          },
-          "400": {
-            "description": "Report cannot be rejected; invalid status"
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "404": {
-            "description": "Report not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/check-submitted/jalali/{year}/{month}": {
-      "get": {
-        "summary": "Get the status for the monthly report of the current user in the specified Jalali month",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "year",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Jalali year (e.g., 1404)"
-          },
-          {
-            "in": "path",
-            "name": "month",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Jalali month (1-12, e.g., 6 for Shahrivar)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Status of the report",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "nullable": true,
-                      "description": "The overall status (e.g., 'draft', 'approved', 'submitted_to_group_manager') or null if no report exists"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid Jalali year or month"
-          },
-          "403": {
-            "description": "Access denied (not user role)"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/jalali/{year}/{month}": {
-      "post": {
-        "summary": "Create or update a draft monthly report for a Jalali month",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "year",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Jalali year (e.g., 1404)"
-          },
-          {
-            "in": "path",
-            "name": "month",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Jalali month (1-12, e.g., 6 for Shahrivar)"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "totalHours": {
-                    "type": "integer",
-                    "description": "Total hours worked in the month"
-                  },
-                  "gymCost": {
-                    "type": "integer",
-                    "description": "Gym cost for the month"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Report created or updated in draft status",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MonthlyReport"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input or report already submitted"
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/{reportId}/submit-to-manager": {
-      "put": {
-        "summary": "Submit report to group manager (by user)",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "reportId",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "The ID of the report"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Report submitted to manager"
-          },
-          "400": {
-            "description": "Report cannot be submitted; invalid status"
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "404": {
-            "description": "Report not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/{reportId}/approve-by-manager": {
-      "put": {
-        "summary": "Approve report by group manager",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "reportId",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "The ID of the report"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "comment": {
-                    "type": "string",
-                    "description": "Optional comment"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Report approved by group manager"
-          },
-          "400": {
-            "description": "Report cannot be approved; invalid status"
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "404": {
-            "description": "Report not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/{reportId}/approve-by-general-manager": {
-      "put": {
-        "summary": "Approve report by general manager",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "reportId",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "The ID of the report"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "comment": {
-                    "type": "string",
-                    "description": "Optional comment"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Report approved by general manager"
-          },
-          "400": {
-            "description": "Report cannot be approved; invalid status"
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "404": {
-            "description": "Report not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/{reportId}/approve-by-finance": {
-      "put": {
-        "summary": "Approve report by finance manager",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "reportId",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "The ID of the report"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "comment": {
-                    "type": "string",
-                    "description": "Optional comment"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Report approved by finance"
-          },
-          "400": {
-            "description": "Report cannot be approved; invalid status"
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "404": {
-            "description": "Report not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/{reportId}": {
-      "get": {
-        "summary": "Get report by ID",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "reportId",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "The ID of the report"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Report details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MonthlyReport"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "404": {
-            "description": "Report not found"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/group/{year}/{month}": {
-      "get": {
-        "summary": "Get reports for group manager, general manager, or finance manager using Gregorian calendar",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "year",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Gregorian year"
-          },
-          {
-            "in": "path",
-            "name": "month",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Gregorian month (1-12)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of reports",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MonthlyReport"
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/jalali/group/{year}/{month}": {
-      "get": {
-        "summary": "Get reports for group manager, general manager, or finance manager using Jalali calendar",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "year",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Jalali year (e.g., 1404)"
-          },
-          {
-            "in": "path",
-            "name": "month",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Jalali month (1-12, e.g., 6 for Shahrivar)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of reports",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MonthlyReport"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid Jalali year or month"
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/group/range/{startYear}/{startMonth}/{endYear}/{endMonth}": {
-      "get": {
-        "summary": "Get reports for group manager, general manager, or finance manager within a year-month range (Gregorian)",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "startYear",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Start year of the range"
-          },
-          {
-            "in": "path",
-            "name": "startMonth",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Start month of the range (1-12)"
-          },
-          {
-            "in": "path",
-            "name": "endYear",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "End year of the range"
-          },
-          {
-            "in": "path",
-            "name": "endMonth",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "End month of the range (1-12)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of reports",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MonthlyReport"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input (e.g., invalid year or month)"
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/report-ids/jalali/{year}/{month}": {
-      "get": {
-        "summary": "Get report IDs and user IDs for the specified Jalali month (for authorized users)",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "year",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Jalali year (e.g., 1404)"
-          },
-          {
-            "in": "path",
-            "name": "month",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Jalali month (1-12, e.g., 6 for Shahrivar)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of report IDs and user IDs",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "reportId": {
-                        "type": "integer"
-                      },
-                      "userId": {
-                        "type": "integer"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid Jalali year or month"
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
-    "/monthly-reports/my-drafts": {
-      "get": {
-        "summary": "Get list of draft reports for the current user",
-        "tags": [
-          "MonthlyReports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of draft reports",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MonthlyReport"
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "500": {
-            "description": "Server error"
-          }
-        }
-      }
-    },
     "/test/jalali/{year}/{month}": {
       "get": {
         "summary": "Test Jalali to Gregorian date conversion",
@@ -1361,7 +2024,9 @@
             "name": "month",
             "required": true,
             "schema": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
             },
             "description": "Jalali month (1-12)"
           }
@@ -1395,6 +2060,2643 @@
           },
           "400": {
             "description": "Invalid input (e.g., invalid year or month)"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/user-project-access": {
+      "get": {
+        "summary": "Get all projects with access status for current user",
+        "tags": [
+          "User Project Access"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of all projects with access status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectAccessStatus"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/user-project-access/{projectId}": {
+      "put": {
+        "summary": "Toggle project access for current user",
+        "tags": [
+          "User Project Access"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Access toggled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hasAccess": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/users/subordinates": {
+      "get": {
+        "summary": "Get list of subordinates or all users based on role (excluding self)",
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of users (subordinates for group managers, all for general/finance managers, excluding the logged-in user)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied - Insufficient permissions"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/config/contract-hours": {
+      "get": {
+        "summary": "Get all contract hours (Admin only)",
+        "tags": [
+          "Admin - Config"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of contract hours",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContractHours"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/config/contract-hours/{userId}": {
+      "get": {
+        "summary": "Get user contract hours (Admin only)",
+        "tags": [
+          "Admin - Config"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contract hours",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContractHours"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update user contract hours (Admin only)",
+        "tags": [
+          "Admin - Config"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ContractLeaveTime",
+                  "MinMonthlyHours"
+                ],
+                "properties": {
+                  "ContractArrivalTime": {
+                    "type": "string"
+                  },
+                  "ContractLeaveTime": {
+                    "type": "string"
+                  },
+                  "MinMonthlyHours": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contract hours updated"
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete user contract hours (Admin only)",
+        "tags": [
+          "Admin - Config"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contract hours deleted"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/config/system": {
+      "get": {
+        "summary": "Get system configuration (Admin only)",
+        "tags": [
+          "Admin - Config"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "System configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemConfig"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/dashboard-settings": {
+      "get": {
+        "summary": "Get dashboard settings (Admin only)",
+        "tags": [
+          "Admin - Dashboard Settings"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSettings"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Save dashboard settings (Admin only)",
+        "tags": [
+          "Admin - Dashboard Settings"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "settings"
+                ],
+                "properties": {
+                  "settings": {
+                    "type": "object",
+                    "description": "Dashboard settings configuration"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings saved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Reset dashboard settings to default (Admin only)",
+        "tags": [
+          "Admin - Dashboard Settings"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings reset successfully"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/groups": {
+      "get": {
+        "summary": "Get all groups (Admin only)",
+        "tags": [
+          "Admin - Groups"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "groups": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Group"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create new group (Admin only)",
+        "tags": [
+          "Admin - Groups"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "GroupId",
+                  "GroupName"
+                ],
+                "properties": {
+                  "GroupId": {
+                    "type": "integer"
+                  },
+                  "GroupName": {
+                    "type": "string"
+                  },
+                  "ManagerId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Group created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Group"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/groups/{id}": {
+      "get": {
+        "summary": "Get group by ID (Admin only)",
+        "tags": [
+          "Admin - Groups"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Group details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Group"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update group (Admin only)",
+        "tags": [
+          "Admin - Groups"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "GroupName": {
+                    "type": "string"
+                  },
+                  "ManagerId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Group updated"
+          },
+          "404": {
+            "description": "Group not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete group (Admin only)",
+        "tags": [
+          "Admin - Groups"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Group deleted"
+          },
+          "404": {
+            "description": "Group not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/groups/{id}/members": {
+      "get": {
+        "summary": "Get group members (Admin only)",
+        "tags": [
+          "Admin - Groups"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of members",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Add user to group (Admin only)",
+        "tags": [
+          "Admin - Groups"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "UserId"
+                ],
+                "properties": {
+                  "UserId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User added to group"
+          },
+          "404": {
+            "description": "Group or user not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/groups/{id}/members/{userId}": {
+      "delete": {
+        "summary": "Remove user from group (Admin only)",
+        "tags": [
+          "Admin - Groups"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User removed from group"
+          },
+          "404": {
+            "description": "User not found in group"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/groups/{id}/manager": {
+      "put": {
+        "summary": "Set group manager (Admin only)",
+        "tags": [
+          "Admin - Groups"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ManagerId"
+                ],
+                "properties": {
+                  "ManagerId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Manager set"
+          },
+          "404": {
+            "description": "Group or user not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/logs/categories": {
+      "get": {
+        "summary": "Get all available log categories and their files",
+        "tags": [
+          "Admin - Logs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of log categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "category": {
+                        "type": "string"
+                      },
+                      "files": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - Admin only"
+          }
+        }
+      }
+    },
+    "/admin/logs/{category}": {
+      "get": {
+        "summary": "Get logs for a specific category",
+        "tags": [
+          "Admin - Logs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Log category (admin, api, auth, database, errors, reports, system, combined)"
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Date in YYYY-MM-DD format"
+          },
+          {
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Log level filter (info, warn, error)"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search term"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logs for the specified category",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "logs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LogEntry"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Log file not found"
+          }
+        }
+      }
+    },
+    "/admin/logs/search/all": {
+      "get": {
+        "summary": "Search across all logs",
+        "tags": [
+          "Admin - Logs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search query"
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by category"
+          },
+          {
+            "in": "query",
+            "name": "level",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by log level"
+          },
+          {
+            "in": "query",
+            "name": "startDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LogEntry"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/logs/download/{category}/{date}": {
+      "get": {
+        "summary": "Download a specific log file",
+        "tags": [
+          "Admin - Logs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Date in YYYY-MM-DD format"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Log file download",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Log file not found"
+          }
+        }
+      }
+    },
+    "/admin/month-periods/{year}": {
+      "get": {
+        "summary": "Get all month periods for a year (Admin only)",
+        "tags": [
+          "Admin - Month Periods"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Jalali year (e.g., 1404)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of month periods for the year",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MonthPeriod"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid year"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/month-periods/{year}/{month}": {
+      "get": {
+        "summary": "Get month period for specific year/month (Admin only)",
+        "tags": [
+          "Admin - Month Periods"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Month period details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthPeriod"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Month period not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update month period (Admin only)",
+        "tags": [
+          "Admin - Month Periods"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "StartDay",
+                  "StartMonth",
+                  "EndDay",
+                  "EndMonth",
+                  "CurrentJalaliYear",
+                  "CurrentJalaliMonth"
+                ],
+                "properties": {
+                  "StartDay": {
+                    "type": "integer"
+                  },
+                  "StartMonth": {
+                    "type": "integer"
+                  },
+                  "EndDay": {
+                    "type": "integer"
+                  },
+                  "EndMonth": {
+                    "type": "integer"
+                  },
+                  "CurrentJalaliYear": {
+                    "type": "integer"
+                  },
+                  "CurrentJalaliMonth": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Month period updated"
+          },
+          "400": {
+            "description": "Invalid input or month is in the past"
+          },
+          "404": {
+            "description": "Month period not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete month period (revert to default) (Admin only)",
+        "tags": [
+          "Admin - Month Periods"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "CurrentJalaliYear": {
+                    "type": "integer"
+                  },
+                  "CurrentJalaliMonth": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Month period deleted (reverted to default)"
+          },
+          "400": {
+            "description": "Month is in the past"
+          },
+          "404": {
+            "description": "Month period not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/month-periods": {
+      "post": {
+        "summary": "Create new month period (Admin only)",
+        "tags": [
+          "Admin - Month Periods"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "Year",
+                  "Month",
+                  "StartDay",
+                  "StartMonth",
+                  "EndDay",
+                  "EndMonth",
+                  "CurrentJalaliYear",
+                  "CurrentJalaliMonth"
+                ],
+                "properties": {
+                  "Year": {
+                    "type": "integer"
+                  },
+                  "Month": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "StartDay": {
+                    "type": "integer"
+                  },
+                  "StartMonth": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "EndDay": {
+                    "type": "integer"
+                  },
+                  "EndMonth": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12
+                  },
+                  "CurrentJalaliYear": {
+                    "type": "integer",
+                    "description": "Current Jalali year for validation"
+                  },
+                  "CurrentJalaliMonth": {
+                    "type": "integer",
+                    "description": "Current Jalali month for validation"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Month period created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthPeriod"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or month is in the past"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/projects": {
+      "get": {
+        "summary": "Get all projects (Admin only)",
+        "tags": [
+          "Admin - Projects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of projects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Project"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create new project (Admin only)",
+        "tags": [
+          "Admin - Projects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "Id",
+                  "ProjectName"
+                ],
+                "properties": {
+                  "Id": {
+                    "type": "integer"
+                  },
+                  "ProjectName": {
+                    "type": "string"
+                  },
+                  "securityLevel": {
+                    "type": "integer",
+                    "default": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Project created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/projects/{id}": {
+      "get": {
+        "summary": "Get project by ID (Admin only)",
+        "tags": [
+          "Admin - Projects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update project (Admin only)",
+        "tags": [
+          "Admin - Projects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Current project ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "projectName": {
+                    "type": "string",
+                    "description": "New project name"
+                  },
+                  "id": {
+                    "type": "integer",
+                    "description": "New project ID (optional, to change project code)"
+                  },
+                  "securityLevel": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Project updated successfully"
+          },
+          "404": {
+            "description": "Project not found"
+          },
+          "409": {
+            "description": "New project ID already exists"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete project (Admin only)",
+        "tags": [
+          "Admin - Projects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project deleted"
+          },
+          "404": {
+            "description": "Project not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/projects/{id}/users": {
+      "get": {
+        "summary": "Get users with access to project (Admin only)",
+        "tags": [
+          "Admin - Projects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Add user access to project (Admin only)",
+        "tags": [
+          "Admin - Projects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "UserId"
+                ],
+                "properties": {
+                  "UserId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Access granted"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "404": {
+            "description": "Project or user not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/projects/{id}/users/{userId}": {
+      "delete": {
+        "summary": "Remove user access from project (Admin only)",
+        "tags": [
+          "Admin - Projects"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Access removed"
+          },
+          "404": {
+            "description": "Access not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/reports/monthly": {
+      "get": {
+        "summary": "Get all monthly reports (Admin only)",
+        "tags": [
+          "Admin - Reports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "userId",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of monthly reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "reports": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MonthlyReport"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/reports/daily": {
+      "get": {
+        "summary": "Get all daily details (Admin only)",
+        "tags": [
+          "Admin - Reports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "userId",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "startDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of daily details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dailyDetails": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DailyDetail"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/reports/statistics": {
+      "get": {
+        "summary": "Get system statistics (Admin only)",
+        "tags": [
+          "Admin - Reports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "System statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatistics"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/reports/user/{userId}/summary": {
+      "get": {
+        "summary": "Get user activity summary (Admin only)",
+        "tags": [
+          "Admin - Reports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "startDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User activity summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserActivitySummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/reports/{reportId}": {
+      "get": {
+        "summary": "Get report by ID (Admin only)",
+        "tags": [
+          "Admin - Reports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthlyReport"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete report (Admin only)",
+        "tags": [
+          "Admin - Reports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report deleted"
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/reports/{reportId}/status": {
+      "put": {
+        "summary": "Update report status (Admin only)",
+        "tags": [
+          "Admin - Reports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "Status"
+                ],
+                "properties": {
+                  "Status": {
+                    "type": "string",
+                    "enum": [
+                      "draft",
+                      "submitted_to_group_manager",
+                      "submitted_to_general_manager",
+                      "submitted_to_finance",
+                      "approved"
+                    ]
+                  },
+                  "comment": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status updated"
+          },
+          "400": {
+            "description": "Invalid status"
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/reports/{reportId}/approve": {
+      "post": {
+        "summary": "Approve report directly (Admin only)",
+        "tags": [
+          "Admin - Reports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Report approved"
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/reports/{reportId}/reject": {
+      "post": {
+        "summary": "Reject report to draft (Admin only)",
+        "tags": [
+          "Admin - Reports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reportId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Report rejected"
+          },
+          "404": {
+            "description": "Report not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "summary": "Get all users (Admin only)",
+        "tags": [
+          "Admin - Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "role",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by role"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search by username"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/User"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create new user (Admin only)",
+        "tags": [
+          "Admin - Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "UserId",
+                  "Username"
+                ],
+                "properties": {
+                  "UserId": {
+                    "type": "integer"
+                  },
+                  "Username": {
+                    "type": "string"
+                  },
+                  "Role": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "group_manager",
+                      "general_manager",
+                      "finance_manager",
+                      "admin"
+                    ],
+                    "default": "user"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/users/{id}": {
+      "get": {
+        "summary": "Get user by ID (Admin only)",
+        "tags": [
+          "Admin - Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update user (Admin only)",
+        "tags": [
+          "Admin - Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Username": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete user (Admin only)",
+        "tags": [
+          "Admin - Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User deleted"
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/admin/users/{id}/role": {
+      "put": {
+        "summary": "Update user role (Admin only)",
+        "tags": [
+          "Admin - Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "Role"
+                ],
+                "properties": {
+                  "Role": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "group_manager",
+                      "general_manager",
+                      "finance_manager",
+                      "admin"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Role updated"
+          },
+          "404": {
+            "description": "User not found"
           },
           "500": {
             "description": "Server error"
@@ -1458,30 +4760,37 @@
           },
           "LeaveType": {
             "type": "string",
+            "nullable": true,
             "description": "Type of leave"
           },
           "ArrivalTime": {
             "type": "string",
+            "nullable": true,
             "description": "Arrival time"
           },
           "LeaveTime": {
             "type": "string",
+            "nullable": true,
             "description": "Leave time"
           },
           "PersonalTime": {
             "type": "integer",
+            "nullable": true,
             "description": "Personal time in minutes"
           },
           "Description": {
             "type": "string",
+            "nullable": true,
             "description": "Description"
           },
           "GoCost": {
             "type": "integer",
+            "nullable": true,
             "description": "Cost of going"
           },
           "ReturnCost": {
             "type": "integer",
+            "nullable": true,
             "description": "Cost of returning"
           },
           "tasks": {
@@ -1522,6 +4831,7 @@
           },
           "Description": {
             "type": "string",
+            "nullable": true,
             "description": "Description of the task"
           }
         }
@@ -1548,6 +4858,7 @@
           },
           "Description": {
             "type": "string",
+            "nullable": true,
             "description": "Description of the cost"
           }
         }
@@ -1581,10 +4892,12 @@
           },
           "TotalHours": {
             "type": "integer",
+            "nullable": true,
             "description": "Total hours worked in the month"
           },
           "GymCost": {
             "type": "integer",
+            "nullable": true,
             "description": "Gym cost for the month"
           },
           "Status": {
@@ -1593,33 +4906,298 @@
           },
           "ManagerComment": {
             "type": "string",
+            "nullable": true,
             "description": "Comment from the manager"
           },
           "FinanceComment": {
             "type": "string",
+            "nullable": true,
             "description": "Comment from the finance team"
           },
           "SubmittedAt": {
             "type": "string",
             "format": "date-time",
+            "nullable": true,
             "description": "Date and time when the report was submitted to manager"
           },
           "ApprovedAt": {
             "type": "string",
             "format": "date-time",
+            "nullable": true,
             "description": "Date and time when the report was final approved"
           },
           "GroupId": {
             "type": "integer",
+            "nullable": true,
             "description": "Identifier of the group"
           },
           "GeneralManagerStatus": {
             "type": "string",
+            "nullable": true,
             "description": "Status of general manager approval (pending, approved_by_general_manager)"
           },
           "Username": {
             "type": "string",
+            "nullable": true,
             "description": "Username of the report owner (included in group reports)"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "UserId": {
+            "type": "integer",
+            "description": "User ID"
+          },
+          "Username": {
+            "type": "string",
+            "description": "Username"
+          },
+          "Role": {
+            "type": "string",
+            "description": "User role"
+          },
+          "GroupId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Group ID"
+          },
+          "GroupName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Group name"
+          },
+          "FarsiFirstName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Persian first name"
+          },
+          "FarsiLastName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Persian last name"
+          }
+        }
+      },
+      "Group": {
+        "type": "object",
+        "properties": {
+          "GroupId": {
+            "type": "integer",
+            "description": "Group ID"
+          },
+          "GroupName": {
+            "type": "string",
+            "description": "Group name"
+          },
+          "ManagerId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Manager user ID"
+          }
+        }
+      },
+      "MonthPeriod": {
+        "type": "object",
+        "properties": {
+          "Year": {
+            "type": "integer",
+            "description": "Jalali year"
+          },
+          "Month": {
+            "type": "integer",
+            "description": "Jalali month (1-12)"
+          },
+          "StartDay": {
+            "type": "integer",
+            "description": "Start day"
+          },
+          "StartMonth": {
+            "type": "integer",
+            "description": "Start month (1-12)"
+          },
+          "EndDay": {
+            "type": "integer",
+            "description": "End day"
+          },
+          "EndMonth": {
+            "type": "integer",
+            "description": "End month (1-12)"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true,
+            "description": "Error code"
+          }
+        }
+      },
+      "ContractHours": {
+        "type": "object",
+        "properties": {
+          "UserId": {
+            "type": "integer",
+            "description": "User ID"
+          },
+          "ContractArrivalTime": {
+            "type": "string",
+            "nullable": true,
+            "description": "Contract arrival time"
+          },
+          "ContractLeaveTime": {
+            "type": "string",
+            "description": "Contract leave time"
+          },
+          "MinMonthlyHours": {
+            "type": "integer",
+            "description": "Minimum monthly hours"
+          }
+        }
+      },
+      "SystemConfig": {
+        "type": "object",
+        "properties": {
+          "configKey": {
+            "type": "string",
+            "description": "Configuration key"
+          },
+          "configValue": {
+            "type": "string",
+            "description": "Configuration value"
+          }
+        }
+      },
+      "SystemStatistics": {
+        "type": "object",
+        "properties": {
+          "totalUsers": {
+            "type": "integer",
+            "description": "Total number of users"
+          },
+          "totalProjects": {
+            "type": "integer",
+            "description": "Total number of projects"
+          },
+          "totalGroups": {
+            "type": "integer",
+            "description": "Total number of groups"
+          },
+          "totalReports": {
+            "type": "integer",
+            "description": "Total number of monthly reports"
+          },
+          "pendingReports": {
+            "type": "integer",
+            "description": "Number of pending reports"
+          },
+          "approvedReports": {
+            "type": "integer",
+            "description": "Number of approved reports"
+          }
+        }
+      },
+      "UserActivitySummary": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "description": "User ID"
+          },
+          "username": {
+            "type": "string",
+            "description": "Username"
+          },
+          "totalHours": {
+            "type": "integer",
+            "description": "Total hours worked"
+          },
+          "totalDays": {
+            "type": "integer",
+            "description": "Total days worked"
+          },
+          "totalReports": {
+            "type": "integer",
+            "description": "Total reports submitted"
+          },
+          "averageHoursPerDay": {
+            "type": "number",
+            "format": "float",
+            "description": "Average hours per day"
+          }
+        }
+      },
+      "LogEntry": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Log timestamp"
+          },
+          "level": {
+            "type": "string",
+            "description": "Log level (info, warn, error)"
+          },
+          "message": {
+            "type": "string",
+            "description": "Log message"
+          },
+          "category": {
+            "type": "string",
+            "description": "Log category"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional metadata"
+          }
+        }
+      },
+      "DashboardSettings": {
+        "type": "object",
+        "properties": {
+          "settingsId": {
+            "type": "integer",
+            "description": "Settings ID"
+          },
+          "settings": {
+            "type": "object",
+            "description": "Dashboard configuration settings"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation timestamp"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp"
+          }
+        }
+      },
+      "ProjectAccessStatus": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Project ID"
+          },
+          "projectName": {
+            "type": "string",
+            "description": "Project name"
+          },
+          "hasAccess": {
+            "type": "boolean",
+            "description": "Whether the user has access to this project"
           }
         }
       }
@@ -1628,8 +5206,75 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT"
+        "bearerFormat": "JWT",
+        "description": "JWT token obtained from /auth/login endpoint"
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Authentication endpoints"
+    },
+    {
+      "name": "Projects",
+      "description": "Project management endpoints"
+    },
+    {
+      "name": "DailyDetails",
+      "description": "Daily details endpoints"
+    },
+    {
+      "name": "MonthlyReports",
+      "description": "Monthly reports endpoints"
+    },
+    {
+      "name": "Users",
+      "description": "User management endpoints"
+    },
+    {
+      "name": "Month Periods",
+      "description": "Month period information endpoints"
+    },
+    {
+      "name": "User Project Access",
+      "description": "User project access management endpoints"
+    },
+    {
+      "name": "Admin - Users",
+      "description": "Admin user management endpoints"
+    },
+    {
+      "name": "Admin - Projects",
+      "description": "Admin project management endpoints"
+    },
+    {
+      "name": "Admin - Groups",
+      "description": "Admin group management endpoints"
+    },
+    {
+      "name": "Admin - Reports",
+      "description": "Admin reports and analytics endpoints"
+    },
+    {
+      "name": "Admin - Config",
+      "description": "Admin system configuration endpoints"
+    },
+    {
+      "name": "Admin - Month Periods",
+      "description": "Admin month period settings endpoints"
+    },
+    {
+      "name": "Admin - Logs",
+      "description": "Admin logs management endpoints"
+    },
+    {
+      "name": "Admin - Dashboard Settings",
+      "description": "Admin dashboard settings endpoints"
+    },
+    {
+      "name": "Test",
+      "description": "Test endpoints"
+    }
+  ]
 }

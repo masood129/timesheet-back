@@ -1,0 +1,59 @@
+paths:
+  /admin/dashboard-settings:
+    get:
+      summary: Get dashboard settings (Admin only)
+      tags:
+        - Admin - Dashboard Settings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSettings'
+        '500':
+          description: Server error
+    post:
+      summary: Save dashboard settings (Admin only)
+      tags:
+        - Admin - Dashboard Settings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - settings
+              properties:
+                settings:
+                  type: object
+                  description: Dashboard settings configuration
+      responses:
+        '200':
+          description: Settings saved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSettings'
+        '400':
+          description: Invalid input
+        '500':
+          description: Server error
+    delete:
+      summary: Reset dashboard settings to default (Admin only)
+      tags:
+        - Admin - Dashboard Settings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Settings reset successfully
+        '500':
+          description: Server error
+
+

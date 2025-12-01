@@ -1,0 +1,64 @@
+paths:
+  /month-periods/{year}:
+    get:
+      summary: Get all month periods for a specific year
+      tags:
+        - Month Periods
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Jalali year (e.g., 1404)
+      responses:
+        '200':
+          description: List of month periods for the year
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MonthPeriod'
+        '400':
+          description: Invalid year
+        '500':
+          description: Server error
+
+  /month-periods/{year}/{month}:
+    get:
+      summary: Get month period for a specific year and month
+      tags:
+        - Month Periods
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: year
+          required: true
+          schema:
+            type: integer
+          description: Jalali year (e.g., 1404)
+        - in: path
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Jalali month (1-12)
+      responses:
+        '200':
+          description: Month period details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthPeriod'
+        '404':
+          description: Month period not found
+        '500':
+          description: Server error
+
+
