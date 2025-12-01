@@ -12,6 +12,7 @@ const userRoutes = require('./routes/user.routes');
 const adminRoutes = require('./routes/admin.routes');
 const userProjectAccessRoutes = require('./routes/userProjectAccess.routes');
 const { getJalaliMonthRange } = require('./utils/dateConverter');
+const eosRoutes = require('./routes/eos.routes');
 const logger = require('./utils/logger.service');
 const { requestLogger, errorLogger } = require('./middleware/logging.middleware');
 require('dotenv').config();
@@ -100,6 +101,7 @@ app.use('/month-periods', authMiddleware, monthPeriodsRoutes);
 app.use('/users', authMiddleware, userRoutes);
 app.use('/user-project-access', authMiddleware, userProjectAccessRoutes);
 app.use('/admin', authMiddleware, adminMiddleware, adminRoutes);
+app.use('/eos', authMiddleware, eosRoutes);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Error logging middleware (should be last)
