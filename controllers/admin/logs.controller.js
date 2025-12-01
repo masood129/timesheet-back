@@ -158,9 +158,7 @@ exports.searchLogs = async (req, res) => {
             requestUserId: req.user.userId
         });
 
-        if (!searchQuery) {
-            return res.status(400).json({ error: 'Search query is required' });
-        }
+        // Search query is optional - if not provided, return all logs with filters
 
         const files = await fs.readdir(logsDir);
         let allLogs = [];
