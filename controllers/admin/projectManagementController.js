@@ -9,7 +9,7 @@ const getAllProjects = async (req, res) => {
 
     try {
         const pool = await poolPromise;
-        let query = 'SELECT id, projectName FROM projects WHERE 1=1';
+        let query = 'SELECT id, projectName, IsActive FROM projects WHERE 1=1';
         const request = pool.request();
 
         if (search) {
@@ -59,7 +59,7 @@ const getProjectById = async (req, res) => {
         const result = await pool
             .request()
             .input('projectId', sql.Int, id)
-            .query('SELECT id, projectName FROM projects WHERE id = @projectId');
+            .query('SELECT id, projectName, IsActive FROM projects WHERE id = @projectId');
 
         if (result.recordset.length === 0) {
             return res.status(404).send('پروژه یافت نشد');
@@ -96,7 +96,7 @@ const getProjectById = async (req, res) => {
  * Create new project
  */
 const createProject = async (req, res) => {
-    const { id, projectName } = req.body;
+    const { id, projectName, IsActive } = req.body;
 
     if (!id || !projectName) {
         return res.status(400).send('شناسه و نام پروژه الزامی است');
@@ -115,14 +115,18 @@ const createProject = async (req, res) => {
             return res.status(400).send('پروژه با این شناسه قبلاً وجود دارد');
         }
 
+        // Default IsActive to 1 (true) if not provided
+        const isActive = IsActive !== undefined ? (IsActive ? 1 : 0) : 1;
+
         const result = await pool
             .request()
             .input('id', sql.Int, id)
             .input('projectName', sql.NVarChar, projectName)
+            .input('IsActive', sql.Bit, isActive)
             .query(`
-                INSERT INTO projects (id, projectName)
+                INSERT INTO projects (id, projectName, IsActive)
                 OUTPUT INSERTED.*
-                VALUES (@id, @projectName)
+                VALUES (@id, @projectName, @IsActive)
             `);
 
         res.status(201).json(result.recordset[0]);
@@ -137,7 +141,7 @@ const createProject = async (req, res) => {
  */
 const updateProject = async (req, res) => {
     const { id } = req.params;
-    const { projectName, id: newId } = req.body;
+    const { projectName, id: newId, IsActive } = req.body;
 
     if (!projectName) {
         return res.status(400).send('نام پروژه الزامی است');
@@ -166,6 +170,12 @@ const updateProject = async (req, res) => {
 
             updateFields.push('id = @newId');
             request.input('newId', sql.Int, newId);
+        }
+
+        // Update IsActive if provided
+        if (IsActive !== undefined) {
+            updateFields.push('IsActive = @IsActive');
+            request.input('IsActive', sql.Bit, IsActive ? 1 : 0);
         }
 
         const result = await request.query(`
