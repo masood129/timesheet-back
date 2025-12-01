@@ -9,7 +9,20 @@ const getAllProjects = async (req, res) => {
 
     try {
         const pool = await poolPromise;
-        let query = 'SELECT id, projectName, IsActive FROM projects WHERE 1=1';
+        let query = `
+            SELECT 
+                p.id, 
+                p.projectName, 
+                p.IsActive,
+                p.DirectAdminId,
+                u.personalid as directAdminPersonalid,
+                u.id as directAdminUsername,
+                u.farsifirstname as directAdminFirstname,
+                u.farsilastname as directAdminLastname
+            FROM projects p
+            LEFT JOIN users u ON p.DirectAdminId = u.personalid
+            WHERE 1=1
+        `;
         const request = pool.request();
 
         if (search) {
@@ -59,7 +72,20 @@ const getProjectById = async (req, res) => {
         const result = await pool
             .request()
             .input('projectId', sql.Int, id)
-            .query('SELECT id, projectName, IsActive FROM projects WHERE id = @projectId');
+            .query(`
+                SELECT 
+                    p.id, 
+                    p.projectName, 
+                    p.IsActive,
+                    p.DirectAdminId,
+                    u.personalid as directAdminPersonalid,
+                    u.id as directAdminUsername,
+                    u.farsifirstname as directAdminFirstname,
+                    u.farsilastname as directAdminLastname
+                FROM projects p
+                LEFT JOIN users u ON p.DirectAdminId = u.personalid
+                WHERE p.id = @projectId
+            `);
 
         if (result.recordset.length === 0) {
             return res.status(404).send('پروژه یافت نشد');
@@ -96,7 +122,7 @@ const getProjectById = async (req, res) => {
  * Create new project
  */
 const createProject = async (req, res) => {
-    const { id, projectName, IsActive } = req.body;
+    const { id, projectName, IsActive, DirectAdminId } = req.body;
 
     if (!id || !projectName) {
         return res.status(400).send('شناسه و نام پروژه الزامی است');
@@ -118,15 +144,28 @@ const createProject = async (req, res) => {
         // Default IsActive to 1 (true) if not provided
         const isActive = IsActive !== undefined ? (IsActive ? 1 : 0) : 1;
 
+        // Validate DirectAdminId if provided
+        if (DirectAdminId !== undefined && DirectAdminId !== null) {
+            const userCheck = await pool
+                .request()
+                .input('personalId', sql.Int, DirectAdminId)
+                .query('SELECT COUNT(*) as count FROM users WHERE personalid = @personalId AND IsActive = 1');
+
+            if (userCheck.recordset[0].count === 0) {
+                return res.status(400).send('مدیر مستقیم یافت نشد');
+            }
+        }
+
         const result = await pool
             .request()
             .input('id', sql.Int, id)
             .input('projectName', sql.NVarChar, projectName)
             .input('IsActive', sql.Bit, isActive)
+            .input('DirectAdminId', sql.Int, DirectAdminId || null)
             .query(`
-                INSERT INTO projects (id, projectName, IsActive)
+                INSERT INTO projects (id, projectName, IsActive, DirectAdminId)
                 OUTPUT INSERTED.*
-                VALUES (@id, @projectName, @IsActive)
+                VALUES (@id, @projectName, @IsActive, @DirectAdminId)
             `);
 
         res.status(201).json(result.recordset[0]);
@@ -141,7 +180,7 @@ const createProject = async (req, res) => {
  */
 const updateProject = async (req, res) => {
     const { id } = req.params;
-    const { projectName, id: newId, IsActive } = req.body;
+    const { projectName, id: newId, IsActive, DirectAdminId } = req.body;
 
     if (!projectName) {
         return res.status(400).send('نام پروژه الزامی است');
@@ -176,6 +215,24 @@ const updateProject = async (req, res) => {
         if (IsActive !== undefined) {
             updateFields.push('IsActive = @IsActive');
             request.input('IsActive', sql.Bit, IsActive ? 1 : 0);
+        }
+
+        // Update DirectAdminId if provided
+        if (DirectAdminId !== undefined) {
+            // Validate DirectAdminId if not null
+            if (DirectAdminId !== null) {
+                const userCheck = await pool
+                    .request()
+                    .input('personalId', sql.Int, DirectAdminId)
+                    .query('SELECT COUNT(*) as count FROM users WHERE personalid = @personalId AND IsActive = 1');
+
+                if (userCheck.recordset[0].count === 0) {
+                    return res.status(400).send('مدیر مستقیم یافت نشد');
+                }
+            }
+
+            updateFields.push('DirectAdminId = @DirectAdminId');
+            request.input('DirectAdminId', sql.Int, DirectAdminId || null);
         }
 
         const result = await request.query(`
