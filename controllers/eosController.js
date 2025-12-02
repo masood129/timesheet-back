@@ -16,8 +16,14 @@ exports.getTimeRecords = async (req, res) => {
             .input('date', sql.NVarChar, date)
             .query('SELECT * FROM timeRecords WHERE CardNo = @cardNo AND Rdate = @date ORDER BY Rtime');
 
-        logger.api.info('Fetched time records', { cardNo, date, count: result.recordset.length });
-        res.status(200).json(result.recordset);
+        const cleanRecords = result.recordset.map(record => ({
+            cardNo: record.CardNo?.toString().trim(),
+            date: record.RDate?.trim(),
+            time: record.RTime?.trim()
+        }));
+
+        logger.api.info('Fetched time records', { cardNo, date, count: cleanRecords.length });
+        res.status(200).json(cleanRecords);
     } catch (err) {
         logger.errors.error('Error fetching time records', { error: err.message, cardNo: req.query.cardNo, date: req.query.date });
         res.status(500).send({ message: 'Error fetching time records.' });
