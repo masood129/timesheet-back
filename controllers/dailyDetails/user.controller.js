@@ -500,7 +500,7 @@ const exportUserJalaliMonthlyToExcel = async (req, res) => {
                 case 'work':
                     return 'روزکاری';
                 case 'annual_leave':
-                    return 'مرخصی سالانه';
+                    return 'مرخصی استحقاقی';
                 case 'sick_leave':
                     return 'مرخصی استعلاجی';
                 case 'gift_leave':
