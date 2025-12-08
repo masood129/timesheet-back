@@ -83,6 +83,8 @@ router.post('/login', async (req, res) => {
                 userId: admin.UserId,
                 Username: admin.Username,
                 Role: admin.Role,
+                farsifirstname: null,
+                farsilastname: null,
                 message: 'Admin login successful'
             });
         }
@@ -91,7 +93,7 @@ router.post('/login', async (req, res) => {
         const userResult = await pool
             .request()
             .input('username', sql.NVarChar, username)
-            .query('SELECT personalid as UserId, id as Username, role as Role FROM users WHERE id = @username AND IsActive = 1');
+            .query('SELECT personalid as UserId, id as Username, role as Role, farsifirstname, farsilastname FROM users WHERE id = @username AND IsActive = 1');
 
         if (userResult.recordset.length === 0) {
             return res.status(401).send('Invalid username');
@@ -109,6 +111,8 @@ router.post('/login', async (req, res) => {
             userId: user.UserId,
             Username: user.Username,
             Role: user.Role,
+            farsifirstname: user.farsifirstname,
+            farsilastname: user.farsilastname,
             message: 'Login successful'
         });
     } catch (err) {
