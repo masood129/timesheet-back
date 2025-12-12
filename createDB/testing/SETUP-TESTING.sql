@@ -15,11 +15,15 @@ PRINT N'';
 
 -- اجرای فایل ساخت جداول
 PRINT N'→ مرحله 1: ایجاد جداول...';
-:r ../production/SETUP-PRODUCTION.sql
+-- چون SQLCMD mode با مسیر نسبی مشکل دارد، فایل را جداگانه اجرا کنید
+-- یا مسیر کامل را وارد کنید:
+-- :r C:\Users\Masood\StudioProjects\timesheet-back\createDB\production\SETUP-PRODUCTION.sql
 
 PRINT N'';
 PRINT N'→ مرحله 2: وارد کردن داده‌های تستی ساده...';
-:r simple-data.sql
+-- :r simple-data.sql
+-- یا مسیر کامل:
+-- :r C:\Users\Masood\StudioProjects\timesheet-back\createDB\testing\simple-data.sql
 
 PRINT N'';
 PRINT N'========================================';
