@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نمای کلی دیتابیس EOSDB - سیستم Timesheet</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 20px 30px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #495057;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .tab.active {
+            background: white;
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            color: #2d3748;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            display: inline-block;
+        }
+
+        .table-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .table-card {
+            background: linear-gradient(135deg, #f6f8fb 0%, #ffffff 100%);
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .table-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+            border-color: #667eea;
+        }
+
+        .table-card.new {
+            border-color: #48bb78;
+            background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%);
+        }
+
+        .table-card.existing {
+            border-color: #4299e1;
+            background: linear-gradient(135deg, #ebf8ff 0%, #ffffff 100%);
+        }
+
+        .table-name {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .table-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .badge-new {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .badge-existing {
+            background: #bee3f8;
+            color: #2c5282;
+        }
+
+        .table-description {
+            color: #718096;
+            font-size: 0.95em;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .table-fields {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        .field {
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .field:last-child {
+            border-bottom: none;
+        }
+
+        .field-name {
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .field-type {
+            color: #718096;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+
+        .relationship-diagram {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-top: 20px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .relation-group {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 10px;
+            border-right: 4px solid #667eea;
+        }
+
+        .relation-title {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 15px;
+        }
+
+        .relation-item {
+            padding: 12px;
+            margin: 10px 0;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .relation-arrow {
+            font-size: 1.5em;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .data-sample {
+            background: #f7fafc;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+
+        .data-sample-title {
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            line-height: 1.6;
+        }
+
+        .highlight {
+            color: #48bb78;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 1em;
+            opacity: 0.9;
+        }
+
+        .info-box {
+            background: #fef5e7;
+            border-right: 4px solid #f39c12;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .success-box {
+            background: #d4edda;
+            border-right: 4px solid #28a745;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-right: 4px solid #ffc107;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .icon {
+            margin-left: 10px;
+        }
+
+        ul {
+            list-style: none;
+            padding-right: 20px;
+        }
+
+        ul li {
+            padding: 8px 0;
+            position: relative;
+        }
+
+        ul li:before {
+            content: "●";
+            color: #667eea;
+            font-weight: bold;
+            display: inline-block;
+            width: 1em;
+            margin-right: -1em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 نمای کلی دیتابیس EOSDB</h1>
+            <p>سیستم مدیریت Timesheet و گزارش‌گیری کارکنان</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('overview')">📋 خلاصه</button>
+            <button class="tab" onclick="showTab('existing')">🗄️ جداول موجود (UMD)</button>
+            <button class="tab" onclick="showTab('new')">✨ جداول جدید (Timesheet)</button>
+            <button class="tab" onclick="showTab('relations')">🔗 روابط جداول</button>
+            <button class="tab" onclick="showTab('samples')">📦 داده‌های تستی</button>
+            <button class="tab" onclick="showTab('guide')">🚀 راهنمای استفاده</button>
+        </div>
+
+        <div class="content">
+            <!-- Overview Tab -->
+            <div id="overview" class="tab-content active">
+                <div class="section">
+                    <h2 class="section-title">📊 آمار کلی</h2>
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-number">5</div>
+                            <div class="stat-label">جداول پایه (UMD)</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">9</div>
+                            <div class="stat-label">جداول جدید (Timesheet)</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">14</div>
+                            <div class="stat-label">کارمند نمونه</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">200+</div>
+                            <div class="stat-label">رکورد تستی</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2 class="section-title">🎯 ساختار کلی سیستم</h2>
+                    <div class="info-box">
+                        <h3 style="margin-bottom: 15px;">💡 دو بخش اصلی:</h3>
+                        <ul>
+                            <li><strong>UMD (پایه)</strong>: شامل اطلاعات کارمندان، گروه‌ها، پروژه‌ها و موقعیت‌های شغلی
+                            </li>
+                            <li><strong>Timesheet (برنامه)</strong>: شامل ثبت ساعات کاری، گزارش‌ها، هزینه‌ها و تنظیمات
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2 class="section-title">🔄 جریان کار سیستم</h2>
+                    <div class="relation-group">
+                        <div class="relation-item">
+                            <span>1️⃣ ثبت اطلاعات پایه</span>
+                            <span class="relation-arrow">→</span>
+                            <span>کارمندان، گروه‌ها، پروژه‌ها</span>
+                        </div>
+                        <div class="relation-item">
+                            <span>2️⃣ تعریف قراردادها</span>
+                            <span class="relation-arrow">→</span>
+                            <span>ساعات کاری، دسترسی‌ها</span>
+                        </div>
+                        <div class="relation-item">
+                            <span>3️⃣ ثبت روزانه</span>
+                            <span class="relation-arrow">→</span>
+                            <span>ورود/خروج، وظایف، هزینه‌ها</span>
+                        </div>
+                        <div class="relation-item">
+                            <span>4️⃣ گزارش ماهیانه</span>
+                            <span class="relation-arrow">→</span>
+                            <span>تایید مدیر، امور مالی</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Existing Tables Tab -->
+            <div id="existing" class="tab-content">
+                <div class="section">
+                    <h2 class="section-title">🗄️ جداول موجود (دیتابیس UMD)</h2>
+                    <p style="color: #718096; margin-bottom: 20px;">این جداول از قبل در سیستم وجود دارند و اطلاعات پایه
+                        را نگهداری می‌کنند.</p>
+
+                    <div class="table-grid">
+                        <div class="table-card existing">
+                            <span class="table-badge badge-existing">موجود</span>
+                            <div class="table-name">Users</div>
+                            <div class="table-description">اطلاعات کاربران و کارمندان سیستم</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">UserId</span>
+                                    <span class="field-type">INT PRIMARY KEY</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">FirstName</span>
+                                    <span class="field-type">NVARCHAR(100)</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">LastName</span>
+                                    <span class="field-type">NVARCHAR(100)</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">NationalCode</span>
+                                    <span class="field-type">NVARCHAR(10)</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">GroupId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-card existing">
+                            <span class="table-badge badge-existing">موجود</span>
+                            <div class="table-name">Groups</div>
+                            <div class="table-description">گروه‌های سازمانی و واحدهای کاری</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">GroupId</span>
+                                    <span class="field-type">INT PRIMARY KEY</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">GroupName</span>
+                                    <span class="field-type">NVARCHAR(200)</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">ManagerId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-card existing">
+                            <span class="table-badge badge-existing">موجود</span>
+                            <div class="table-name">Projects</div>
+                            <div class="table-description">پروژه‌های سازمان</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">ProjectId</span>
+                                    <span class="field-type">INT PRIMARY KEY</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">ProjectName</span>
+                                    <span class="field-type">NVARCHAR(200)</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">GroupId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">IsActive</span>
+                                    <span class="field-type">BIT</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-card existing">
+                            <span class="table-badge badge-existing">موجود</span>
+                            <div class="table-name">Positions</div>
+                            <div class="table-description">موقعیت‌های شغلی</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">PositionId</span>
+                                    <span class="field-type">INT PRIMARY KEY</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">PositionTitle</span>
+                                    <span class="field-type">NVARCHAR(100)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-card existing">
+                            <span class="table-badge badge-existing">موجود</span>
+                            <div class="table-name">UserPositions</div>
+                            <div class="table-description">ارتباط کاربران و موقعیت‌های شغلی</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">UserId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">PositionId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- New Tables Tab -->
+            <div id="new" class="tab-content">
+                <div class="section">
+                    <h2 class="section-title">✨ جداول جدید (سیستم Timesheet)</h2>
+                    <p style="color: #718096; margin-bottom: 20px;">این جداول برای سیستم Timesheet ایجاد می‌شوند.</p>
+
+                    <div class="table-grid">
+                        <div class="table-card new">
+                            <span class="table-badge badge-new">جدید</span>
+                            <div class="table-name">Admins</div>
+                            <div class="table-description">مدیران سیستم با دسترسی ویژه</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">AdminId</span>
+                                    <span class="field-type">INT PRIMARY KEY</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">Username</span>
+                                    <span class="field-type">NVARCHAR(100)</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">PasswordHash</span>
+                                    <span class="field-type">NVARCHAR(256)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-card new">
+                            <span class="table-badge badge-new">جدید</span>
+                            <div class="table-name">UserContractHours</div>
+                            <div class="table-description">قراردادهای کاری کارمندان</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">UserId</span>
+                                    <span class="field-type">INT PRIMARY KEY</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">ContractArrivalTime</span>
+                                    <span class="field-type">NVARCHAR(8)</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">ContractLeaveTime</span>
+                                    <span class="field-type">NVARCHAR(8)</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">MinMonthlyHours</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-card new">
+                            <span class="table-badge badge-new">جدید</span>
+                            <div class="table-name">UserProjectAccess</div>
+                            <div class="table-description">دسترسی کارمندان به پروژه‌ها</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">UserId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">ProjectId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-card new">
+                            <span class="table-badge badge-new">جدید</span>
+                            <div class="table-name">DailyDetails</div>
+                            <div class="table-description">جزئیات حضور روزانه کارمندان</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">Id</span>
+                                    <span class="field-type">INT PRIMARY KEY</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">Date</span>
+                                    <span class="field-type">DATE</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">UserId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">ArrivalTime</span>
+                                    <span class="field-type">NVARCHAR(8)</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">LeaveTime</span>
+                                    <span class="field-type">NVARCHAR(8)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-card new">
+                            <span class="table-badge badge-new">جدید</span>
+                            <div class="table-name">DailyProjectTasks</div>
+                            <div class="table-description">وظایف روزانه پروژه‌ها</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">Id</span>
+                                    <span class="field-type">INT PRIMARY KEY</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">Date</span>
+                                    <span class="field-type">DATE</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">UserId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">ProjectId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">Duration</span>
+                                    <span class="field-type">INT (دقیقه)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-card new">
+                            <span class="table-badge badge-new">جدید</span>
+                            <div class="table-name">MonthlyReports</div>
+                            <div class="table-description">گزارش‌های ماهیانه کارکنان</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">ReportId</span>
+                                    <span class="field-type">INT PRIMARY KEY</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">UserId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">JalaliYear</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">JalaliMonth</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">TotalHours</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">Status</span>
+                                    <span class="field-type">NVARCHAR(50)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-card new">
+                            <span class="table-badge badge-new">جدید</span>
+                            <div class="table-name">MonthlyGymCosts</div>
+                            <div class="table-description">هزینه‌های ورزشی ماهیانه</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">Id</span>
+                                    <span class="field-type">INT PRIMARY KEY</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">UserId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">Year/Month</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">Cost</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-card new">
+                            <span class="table-badge badge-new">جدید</span>
+                            <div class="table-name">DailyPersonalCarCosts</div>
+                            <div class="table-description">هزینه‌های ماشین شخصی</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">Date</span>
+                                    <span class="field-type">DATE</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">UserId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">ProjectId</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">Kilometers</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">Cost</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-card new">
+                            <span class="table-badge badge-new">جدید</span>
+                            <div class="table-name">MonthPeriodSettings</div>
+                            <div class="table-description">تنظیمات بازه زمانی ماه‌ها</div>
+                            <div class="table-fields">
+                                <div class="field">
+                                    <span class="field-name">Id</span>
+                                    <span class="field-type">INT PRIMARY KEY</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">Year/Month</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">StartDay</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                                <div class="field">
+                                    <span class="field-name">EndDay</span>
+                                    <span class="field-type">INT</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Relations Tab -->
+            <div id="relations" class="tab-content">
+                <div class="section">
+                    <h2 class="section-title">🔗 روابط بین جداول</h2>
+
+                    <div class="relation-group">
+                        <div class="relation-title">👤 کارمندان و اطلاعات پایه</div>
+                        <div class="relation-item">
+                            <span><strong>Users</strong></span>
+                            <span class="relation-arrow">→</span>
+                            <span><strong>Groups</strong> (از طریق GroupId)</span>
+                        </div>
+                        <div class="relation-item">
+                            <span><strong>Users</strong></span>
+                            <span class="relation-arrow">→</span>
+                            <span><strong>UserPositions</strong> (از طریق UserId)</span>
+                        </div>
+                        <div class="relation-item">
+                            <span><strong>Groups</strong></span>
+                            <span class="relation-arrow">→</span>
+                            <span><strong>Users</strong> (مدیر از طریق ManagerId)</span>
+                        </div>
+                    </div>
+
+                    <div class="relation-group">
+                        <div class="relation-title">📋 قراردادها و دسترسی‌ها</div>
+                        <div class="relation-item">
+                            <span><strong>Users</strong></span>
+                            <span class="relation-arrow">→</span>
+                            <span><strong>UserContractHours</strong> (قرارداد کاری)</span>
+                        </div>
+                        <div class="relation-item">
+                            <span><strong>Users</strong></span>
+                            <span class="relation-arrow">→</span>
+                            <span><strong>UserProjectAccess</strong></span>
+                            <span class="relation-arrow">←</span>
+                            <span><strong>Projects</strong></span>
+                        </div>
+                    </div>
+
+                    <div class="relation-group">
+                        <div class="relation-title">📅 فعالیت‌های روزانه</div>
+                        <div class="relation-item">
+                            <span><strong>Users</strong></span>
+                            <span class="relation-arrow">→</span>
+                            <span><strong>DailyDetails</strong> (حضور و غیاب روزانه)</span>
+                        </div>
+                        <div class="relation-item">
+                            <span><strong>Users + Projects</strong></span>
+                            <span class="relation-arrow">→</span>
+                            <span><strong>DailyProjectTasks</strong> (وظایف روزانه)</span>
+                        </div>
+                        <div class="relation-item">
+                            <span><strong>Users + Projects</strong></span>
+                            <span class="relation-arrow">→</span>
+                            <span><strong>DailyPersonalCarCosts</strong> (هزینه ماشین)</span>
+                        </div>
+                    </div>
+
+                    <div class="relation-group">
+                        <div class="relation-title">📊 گزارش‌های ماهیانه</div>
+                        <div class="relation-item">
+                            <span><strong>Users</strong></span>
+                            <span class="relation-arrow">→</span>
+                            <span><strong>MonthlyReports</strong> (گزارش ماهیانه)</span>
+                        </div>
+                        <div class="relation-item">
+                            <span><strong>Users</strong></span>
+                            <span class="relation-arrow">→</span>
+                            <span><strong>MonthlyGymCosts</strong> (هزینه ورزش)</span>
+                        </div>
+                    </div>
+
+                    <div class="success-box" style="margin-top: 30px;">
+                        <h3 style="margin-bottom: 10px;">✅ نکات مهم روابط:</h3>
+                        <ul>
+                            <li>همه جداول Timesheet به جدول <strong>Users</strong> متصل هستند</li>
+                            <li>جدول <strong>DailyProjectTasks</strong> به هر دو <strong>Users</strong> و
+                                <strong>Projects</strong> وابسته است</li>
+                            <li>جدول <strong>MonthlyReports</strong> به <strong>Groups</strong> نیز متصل است (برای تایید
+                                مدیر)</li>
+                            <li>تمام روابط از طریق <strong>Foreign Key</strong> پیاده‌سازی نمی‌شوند (انعطاف بیشتر)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Samples Tab -->
+            <div id="samples" class="tab-content">
+                <div class="section">
+                    <h2 class="section-title">📦 داده‌های تستی</h2>
+
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-number">14</div>
+                            <div class="stat-label">کارمند نمونه</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">8</div>
+                            <div class="stat-label">نوع قرارداد</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">100+</div>
+                            <div class="stat-label">وظیفه پروژه</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">80+</div>
+                            <div class="stat-label">روز کاری</div>
+                        </div>
+                    </div>
+
+                    <div class="data-sample">
+                        <div class="data-sample-title">👥 کارمندان نمونه (UserIds: 3001-3008, 4001-4006)</div>
+                        <ul>
+                            <li><strong>3001</strong>: Backend Developer - تمام وقت منظم</li>
+                            <li><strong>3002</strong>: Backend Developer - با تأخیرهای جبران شده</li>
+                            <li><strong>3003</strong>: Full-Stack Developer - اضافه کاری زیاد</li>
+                            <li><strong>3004</strong>: Frontend Developer - Part-time صبح</li>
+                            <li><strong>3005</strong>: Mobile Developer - Part-time عصر</li>
+                            <li><strong>3006</strong>: DevOps Engineer - قرارداد پروژه‌ای</li>
+                            <li><strong>4001</strong>: Developer - اضافه کاری شبانه سنگین</li>
+                            <li><strong>4002</strong>: Senior Developer - مرخصی 10 روزه</li>
+                            <li><strong>4003</strong>: DevOps - ماموریت برون شهری</li>
+                            <li><strong>4004</strong>: Full-Stack - کار روی 5 پروژه همزمان</li>
+                            <li><strong>4005</strong>: Junior Developer - تغییر قرارداد</li>
+                            <li><strong>4006</strong>: Remote Developer - ساعات منعطف</li>
+                        </ul>
+                    </div>
+
+                    <div class="data-sample">
+                        <div class="data-sample-title">🎬 سناریوهای تستی</div>
+                        <ul>
+                            <li>✅ کار عادی با حضور منظم</li>
+                            <li>✅ تأخیر در ورود و جبران</li>
+                            <li>✅ اضافه کاری و شیفت شبانه</li>
+                            <li>✅ مرخصی‌های مختلف (استحقاقی، استعلاجی، ساعتی)</li>
+                            <li>✅ دورکاری با ساعات متغیر</li>
+                            <li>✅ ماموریت برون شهری</li>
+                            <li>✅ کار روی چند پروژه همزمان</li>
+                            <li>✅ تغییر قرارداد در میانه ماه</li>
+                        </ul>
+                    </div>
+
+                    <div class="warning-box">
+                        <h3 style="margin-bottom: 10px;">⚠️ توجه:</h3>
+                        <p>این داده‌ها فقط برای محیط <strong>Development</strong> و <strong>Testing</strong> هستند. در
+                            محیط Production استفاده نکنید!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Guide Tab -->
+            <div id="guide" class="tab-content">
+                <div class="section">
+                    <h2 class="section-title">🚀 راهنمای استفاده ساده</h2>
+
+                    <div class="info-box">
+                        <h3 style="margin-bottom: 15px;">📝 مراحل راه‌اندازی:</h3>
+                        <ol style="list-style: decimal; padding-right: 20px;">
+                            <li style="margin: 15px 0;"><strong>دیتابیس UMD را بسازید</strong> (اگر ندارید)</li>
+                            <li style="margin: 15px 0;"><strong>جداول پایه را ایجاد کنید</strong> با اجرای
+                                <code>01-create-umd-base-tables.sql</code></li>
+                            <li style="margin: 15px 0;"><strong>جداول Timesheet را بسازید</strong> با اجرای
+                                <code>02-create-app-tables.sql</code></li>
+                            <li style="margin: 15px 0;"><strong>داده‌های تستی پایه</strong> را وارد کنید:
+                                <code>03 و 04</code></li>
+                            <li style="margin: 15px 0;"><strong>فایل‌های ساده (کوچک)</strong> را اجرا کنید که در ادامه
+                                توضیح داده می‌شود</li>
+                        </ol>
+                    </div>
+
+                    <div class="success-box" style="margin-top: 30px;">
+                        <h3 style="margin-bottom: 15px;">✨ فایل‌های ساده برای اجرا:</h3>
+                        <p style="margin-bottom: 10px;">به جای فایل‌های بزرگ، از فایل‌های کوچک زیر استفاده کنید:</p>
+                        <ul>
+                            <li><strong>simple-contracts.sql</strong>: قراردادهای کاری ساده</li>
+                            <li><strong>simple-access.sql</strong>: دسترسی‌های پروژه</li>
+                            <li><strong>simple-daily.sql</strong>: چند روز نمونه</li>
+                            <li><strong>simple-monthly.sql</strong>: یک گزارش ماهیانه</li>
+                        </ul>
+                        <p style="margin-top: 15px; color: #2d3748;">👉 این فایل‌ها در ادامه ایجاد می‌شوند...</p>
+                    </div>
+
+                    <div class="code-block" style="margin-top: 30px;">
+                        <span class="highlight">-- نمونه اجرا در SQL Server:</span>
+                        USE UMD;
+                        GO
+
+                        <span class="highlight">-- فایل‌های ساده</span>
+                        :r simple-contracts.sql
+                        :r simple-access.sql
+                        :r simple-daily.sql
+                        :r simple-monthly.sql
+
+                        <span class="highlight">-- بررسی نتیجه</span>
+                        SELECT * FROM UserContractHours;
+                        SELECT * FROM DailyDetails;
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            // Hide all tabs
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+
+            // Remove active from all tabs
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+
+            // Add active to clicked tab
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+
+</html>
