@@ -172,8 +172,22 @@ const createOrUpdateDailyDetails = async (req, res) => {
         const detailResultFetch = await fetchRequest.query('SELECT * FROM DailyDetails WHERE Date = @date AND UserId = @userId');
         const detail = detailResultFetch.recordset[0];
 
-        const tasksResult = await fetchRequest.query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
-        const carCostsResult = await fetchRequest.query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
+        const tasksResult = await fetchRequest.query(`
+            SELECT 
+                dpt.*,
+                p.ProjectName
+            FROM DailyProjectTasks dpt
+            LEFT JOIN Projects p ON dpt.ProjectId = p.Id
+            WHERE dpt.Date = @date AND dpt.UserId = @userId
+        `);
+        const carCostsResult = await fetchRequest.query(`
+            SELECT 
+                dpcc.*,
+                p.ProjectName
+            FROM DailyPersonalCarCosts dpcc
+            LEFT JOIN Projects p ON dpcc.ProjectID = p.Id
+            WHERE dpcc.Date = @date AND dpcc.UserId = @userId
+        `);
 
         const detailDate = DateTime.fromJSDate(parsedDate, {zone: 'Asia/Tehran'});
 

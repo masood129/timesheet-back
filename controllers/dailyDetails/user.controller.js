@@ -192,7 +192,14 @@ const getUserJalaliMonthlyDetails = async (req, res) => {
                 const tasksRequest = pool.request();
                 tasksRequest.input('date', sql.Date, currentDate.toJSDate());
                 tasksRequest.input('userId', sql.Int, targetUserId);
-                const tasksResult = await tasksRequest.query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
+                const tasksResult = await tasksRequest.query(`
+                    SELECT 
+                        dpt.*,
+                        p.ProjectName
+                    FROM DailyProjectTasks dpt
+                    LEFT JOIN Projects p ON dpt.ProjectId = p.Id
+                    WHERE dpt.Date = @date AND dpt.UserId = @userId
+                `);
                 tasks = tasksResult.recordset;
             }
 
@@ -399,7 +406,14 @@ const exportUserJalaliMonthlyToExcel = async (req, res) => {
                 const tasksRequest = pool.request();
                 tasksRequest.input('date', sql.Date, currentDate.toJSDate());
                 tasksRequest.input('userId', sql.Int, targetUserId);
-                const tasksResult = await tasksRequest.query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
+                const tasksResult = await tasksRequest.query(`
+                    SELECT 
+                        dpt.*,
+                        p.ProjectName
+                    FROM DailyProjectTasks dpt
+                    LEFT JOIN Projects p ON dpt.ProjectId = p.Id
+                    WHERE dpt.Date = @date AND dpt.UserId = @userId
+                `);
                 tasks = tasksResult.recordset;
             }
 

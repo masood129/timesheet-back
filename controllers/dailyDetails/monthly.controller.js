@@ -77,13 +77,27 @@ const getJalaliMonthlyDetails = async (req, res) => {
                 .request()
                 .input('date', sql.Date, detail.Date)
                 .input('userId', sql.Int, userId)
-                .query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
+                .query(`
+                    SELECT 
+                        dpt.*,
+                        p.ProjectName
+                    FROM DailyProjectTasks dpt
+                    LEFT JOIN Projects p ON dpt.ProjectId = p.Id
+                    WHERE dpt.Date = @date AND dpt.UserId = @userId
+                `);
 
             const carCostsResult = await pool
                 .request()
                 .input('date', sql.Date, detail.Date)
                 .input('userId', sql.Int, userId)
-                .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
+                .query(`
+                    SELECT 
+                        dpcc.*,
+                        p.ProjectName
+                    FROM DailyPersonalCarCosts dpcc
+                    LEFT JOIN Projects p ON dpcc.ProjectID = p.Id
+                    WHERE dpcc.Date = @date AND dpcc.UserId = @userId
+                `);
 
             const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
 
@@ -201,13 +215,27 @@ const getMonthlyDetails = async (req, res) => {
                 .request()
                 .input('date', sql.Date, detail.Date)
                 .input('userId', sql.Int, userId)
-                .query('SELECT * FROM DailyProjectTasks WHERE Date = @date AND UserId = @userId');
+                .query(`
+                    SELECT 
+                        dpt.*,
+                        p.ProjectName
+                    FROM DailyProjectTasks dpt
+                    LEFT JOIN Projects p ON dpt.ProjectId = p.Id
+                    WHERE dpt.Date = @date AND dpt.UserId = @userId
+                `);
 
             const carCostsResult = await pool
                 .request()
                 .input('date', sql.Date, detail.Date)
                 .input('userId', sql.Int, userId)
-                .query('SELECT * FROM DailyPersonalCarCosts WHERE Date = @date AND UserId = @userId');
+                .query(`
+                    SELECT 
+                        dpcc.*,
+                        p.ProjectName
+                    FROM DailyPersonalCarCosts dpcc
+                    LEFT JOIN Projects p ON dpcc.ProjectID = p.Id
+                    WHERE dpcc.Date = @date AND dpcc.UserId = @userId
+                `);
 
             const detailDate = DateTime.fromJSDate(detail.Date, { zone: 'Asia/Tehran' });
 
