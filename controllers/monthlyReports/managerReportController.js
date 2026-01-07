@@ -58,12 +58,11 @@ const getReportById = async (req, res) => {
                         u.id as username,
                         u.farsifirstname,
                         u.farsilastname,
-                        g.groupname,
-                        m.id AS managerUsername
+                        g.groupname AS GroupName,
+                        u.directAdmin AS ManagerUsername
                     FROM MonthlyReports mr
                     JOIN users u ON mr.UserId = u.personalid
                     LEFT JOIN groups g ON mr.GroupId = g.id
-                    LEFT JOIN users m ON g.managerID = m.personalid
                     WHERE mr.ReportId = @reportId
                       AND u.IsActive = 1
                 `);

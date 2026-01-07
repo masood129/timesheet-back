@@ -18,9 +18,13 @@ const getAllUsers = async (req, res) => {
                 u.email,
                 u.role,
                 u.groupid,
-                g.groupname
+                g.groupname,
+                u.IsActive,
+                u.directAdminid,
+                CONCAT(da.farsifirstname, ' ', da.farsilastname) AS directAdmin
             FROM users u
             LEFT JOIN groups g ON u.groupid = g.id
+            LEFT JOIN users da ON u.directAdminid = da.personalid
             WHERE u.IsActive = 1
         `;
 
@@ -91,11 +95,15 @@ const getUserById = async (req, res) => {
                     u.role,
                     u.groupid,
                     g.groupname,
+                    u.IsActive,
+                    u.directAdminid,
+                    CONCAT(da.farsifirstname, ' ', da.farsilastname) AS directAdmin,
                     uch.ContractArrivalTime,
                     uch.ContractLeaveTime,
                     uch.MinMonthlyHours
                 FROM users u
                 LEFT JOIN groups g ON u.groupid = g.id
+                LEFT JOIN users da ON u.directAdminid = da.personalid
                 LEFT JOIN UserContractHours uch ON u.personalid = uch.UserId
                 WHERE u.personalid = @personalId AND u.IsActive = 1
             `);
@@ -256,6 +264,23 @@ const updateUser = async (req, res) => {
         if (finalGroupId !== undefined) {
             updateFields.push('groupid = @groupId');
             request.input('groupId', sql.Int, finalGroupId);
+            
+            // Also update groups field with the group name
+            if (finalGroupId !== null) {
+                // Get the group name
+                const groupResult = await pool.request()
+                    .input('grpId', sql.Int, finalGroupId)
+                    .query('SELECT groupname FROM groups WHERE id = @grpId');
+                
+                if (groupResult.recordset.length > 0) {
+                    const groupName = groupResult.recordset[0].groupname;
+                    updateFields.push('groups = @groups');
+                    request.input('groups', sql.NVarChar, groupName);
+                }
+            } else {
+                // If groupid is null, clear groups too
+                updateFields.push('groups = NULL');
+            }
         }
         if (finalRole !== undefined) {
             updateFields.push('role = @role');
@@ -268,6 +293,24 @@ const updateUser = async (req, res) => {
         if (directAdminid !== undefined) {
             updateFields.push('directAdminid = @directAdminid');
             request.input('directAdminid', sql.Int, directAdminid);
+            
+            // Also update directAdmin field with the full name
+            if (directAdminid !== null) {
+                // Get the full name of the direct admin
+                const adminResult = await pool.request()
+                    .input('adminId', sql.Int, directAdminid)
+                    .query('SELECT farsifirstname, farsilastname FROM users WHERE personalid = @adminId');
+                
+                if (adminResult.recordset.length > 0) {
+                    const admin = adminResult.recordset[0];
+                    const fullName = `${admin.farsifirstname} ${admin.farsilastname}`;
+                    updateFields.push('directAdmin = @directAdmin');
+                    request.input('directAdmin', sql.NVarChar, fullName);
+                }
+            } else {
+                // If directAdminid is null, clear directAdmin too
+                updateFields.push('directAdmin = NULL');
+            }
         }
 
         if (updateFields.length > 0) {
