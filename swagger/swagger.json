@@ -2181,6 +2181,54 @@
         }
       }
     },
+    "/users/by-direct-admin/{directAdminId}": {
+      "get": {
+        "summary": "Get list of employees by directAdminId",
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "directAdminId",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The personalId of the direct admin"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of employees with the specified directAdminId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid directAdminId - must be a number"
+          },
+          "403": {
+            "description": "Access denied - Insufficient permissions"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
     "/admin/config/contract-hours": {
       "get": {
         "summary": "Get all contract hours (Admin only)",

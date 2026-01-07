@@ -1,43 +1,6 @@
-// Add this to a new file or an existing routes file, e.g., user.routes.js
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db.config');
-
-// Assuming you have a authMiddleware already defined in index.js
-
-/**
- * @swagger
- * /users/subordinates:
- *   get:
- *     summary: Get list of subordinates or all users based on role (excluding self)
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of users (subordinates for group managers, all for general/finance managers, excluding the logged-in user)
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   UserId:
- *                     type: integer
- *                   Username:
- *                     type: string
- *                   Role:
- *                     type: string
- *                   GroupId:
- *                     type: integer
- *                   GroupName:
-// Add this to a new file or an existing routes file, e.g., user.routes.js
-const express = require('express');
-const router = express.Router();
-const { sql, poolPromise } = require('../config/db.config');
-
-// Assuming you have a authMiddleware already defined in index.js
 
 /**
  * @swagger
@@ -134,6 +97,88 @@ router.get('/subordinates', async (req, res) => {
         res.json(result.recordset);
     } catch (err) {
         console.error('Error in GET /users/subordinates:', err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+/**
+ * @swagger
+ * /users/by-direct-admin/{directAdminId}:
+ *   get:
+ *     summary: Get list of employees by directAdminId
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: directAdminId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The personalId of the direct admin
+ *     responses:
+ *       200:
+ *         description: List of employees with the specified directAdminId
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   UserId:
+ *                     type: integer
+ *                   Username:
+ *                     type: string
+ *                   Role:
+ *                     type: string
+ *                   GroupId:
+ *                     type: integer
+ *                   GroupName:
+ *                     type: string
+ *       400:
+ *         description: Invalid directAdminId - must be a number
+ *       403:
+ *         description: Access denied - Insufficient permissions
+ *       500:
+ *         description: Server error
+ */
+router.get('/by-direct-admin/:directAdminId', async (req, res) => {
+    const { directAdminId } = req.params;
+    const user = req.user; // From authMiddleware
+
+    try {
+        const pool = await poolPromise;
+
+        // Validate that directAdminId is a number
+        const adminId = parseInt(directAdminId);
+        if (isNaN(adminId)) {
+            return res.status(400).send('Invalid directAdminId: must be a number');
+        }
+
+        // Get employees where directAdminid equals the provided directAdminId
+        const result = await pool
+            .request()
+            .input('directAdminId', sql.Int, adminId)
+            .query(`
+                SELECT 
+                    u.personalid as UserId, 
+                    u.id as Username, 
+                    u.role as Role, 
+                    u.farsifirstname,
+                    u.farsilastname,
+                    g.id as GroupId, 
+                    g.groupname as GroupName
+                FROM users u
+                LEFT JOIN groups g ON u.groupid = g.id
+                WHERE u.directAdminid = @directAdminId
+                  AND u.IsActive = 1
+                ORDER BY u.personalid
+            `);
+
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error in GET /users/by-direct-admin/:directAdminId:', err.message);
         res.status(500).send('Server error');
     }
 });
