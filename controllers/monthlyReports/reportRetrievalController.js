@@ -121,9 +121,9 @@ const getGroupReportsGregorian = async (req, res) => {
         const role = req.user.role;
         try {
             const pool = await poolPromise;
-            let query = 'SELECT mr.*, u.id as username FROM MonthlyReports mr JOIN users u ON mr.UserId = u.personalid WHERE Year = @year AND Month = @month AND u.IsActive = 1';
+            let query = 'SELECT mr.*, u.id as username FROM MonthlyReports mr JOIN users u ON mr.UserId = u.personalid WHERE mr.Year = @year AND mr.Month = @month AND u.IsActive = 1';
             if (role === 'group_manager') {
-                query += ' AND GroupId IN (SELECT id FROM groups WHERE managerID = @userId)';
+                query += ' AND mr.GroupId IN (SELECT id FROM groups WHERE managerID = @userId)';
             }
 
             const result = await pool.request()
@@ -204,12 +204,12 @@ const getGroupRangeReports = async (req, res) => {
                 SELECT mr.*, u.id as username
                 FROM MonthlyReports mr
                 JOIN users u ON mr.UserId = u.personalid
-                WHERE (Year > @startYear OR (Year = @startYear AND Month >= @startMonth))
-                  AND (Year < @endYear OR (Year = @endYear AND Month <= @endMonth))
+                WHERE (mr.Year > @startYear OR (mr.Year = @startYear AND mr.Month >= @startMonth))
+                  AND (mr.Year < @endYear OR (mr.Year = @endYear AND mr.Month <= @endMonth))
                   AND u.IsActive = 1
             `;
             if (role === 'group_manager') {
-                query += ' AND GroupId IN (SELECT id FROM groups WHERE managerID = @userId)';
+                query += ' AND mr.GroupId IN (SELECT id FROM groups WHERE managerID = @userId)';
             }
 
             const result = await pool.request()
