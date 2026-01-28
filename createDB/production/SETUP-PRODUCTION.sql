@@ -33,7 +33,7 @@ BEGIN
         IsActive BIT NOT NULL DEFAULT 1,
         directAdminid INT NULL,
         groupid INT NULL,
-        role NVARCHAR(50) NULL
+        role NVARCHAR(50) NULL CHECK (role IN ('user', 'group_manager', 'general_manager', 'finance_manager', 'admin'))
     );
     
     CREATE INDEX IX_users_IsActive ON users(IsActive);
@@ -41,7 +41,7 @@ BEGIN
     CREATE INDEX IX_users_directAdminid ON users(directAdminid);
     CREATE INDEX IX_users_role ON users(role);
     
-    PRINT N'✓ جدول users ایجاد شد';
+    PRINT N'✓ جدول users ایجاد شد (با محدودیت role)';
 END
 ELSE
 BEGIN
@@ -52,11 +52,29 @@ BEGIN
     BEGIN
         PRINT N'→ اضافه کردن ستون role به جدول users...';
         ALTER TABLE users ADD role NVARCHAR(50) NULL;
+        
+        -- اضافه کردن CHECK constraint برای role
+        ALTER TABLE users ADD CONSTRAINT CK_users_role 
+            CHECK (role IN ('user', 'group_manager', 'general_manager', 'finance_manager', 'admin'));
+        
         CREATE INDEX IX_users_role ON users(role);
-        PRINT N'✓ ستون role اضافه شد';
+        PRINT N'✓ ستون role با محدودیت‌های اعتبارسنجی اضافه شد';
     END
     ELSE
+    BEGIN
         PRINT N'○ ستون role از قبل وجود دارد';
+        
+        -- بررسی وجود constraint و اضافه کردن در صورت نبود
+        IF NOT EXISTS (SELECT * FROM sys.check_constraints WHERE name = 'CK_users_role')
+        BEGIN
+            PRINT N'→ اضافه کردن محدودیت اعتبارسنجی برای role...';
+            ALTER TABLE users ADD CONSTRAINT CK_users_role 
+                CHECK (role IN ('user', 'group_manager', 'general_manager', 'finance_manager', 'admin'));
+            PRINT N'✓ محدودیت اعتبارسنجی role اضافه شد';
+        END
+        ELSE
+            PRINT N'○ محدودیت اعتبارسنجی role از قبل وجود دارد';
+    END
 END
 GO
 
