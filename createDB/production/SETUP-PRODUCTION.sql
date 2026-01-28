@@ -15,6 +15,103 @@ PRINT N'========================================';
 PRINT N'';
 
 -- =============================================
+-- بخش 0: جداول پایه UMD (پیش‌نیاز برنامه)
+-- =============================================
+PRINT N'→ بررسی و ایجاد جداول پایه UMD...';
+
+-- جدول users: اطلاعات کاربران
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'users')
+BEGIN
+    CREATE TABLE users (
+        personalid INT PRIMARY KEY,
+        farsifirstname NVARCHAR(100) NOT NULL,
+        farsilastname NVARCHAR(100) NOT NULL,
+        email NVARCHAR(256) NULL,
+        id NVARCHAR(100) NOT NULL UNIQUE,
+        directAdmin NVARCHAR(200) NULL,
+        groups NVARCHAR(100) NULL,
+        IsActive BIT NOT NULL DEFAULT 1,
+        directAdminid INT NULL,
+        groupid INT NULL,
+        role NVARCHAR(50) NULL
+    );
+    
+    CREATE INDEX IX_users_IsActive ON users(IsActive);
+    CREATE INDEX IX_users_groupid ON users(groupid);
+    CREATE INDEX IX_users_directAdminid ON users(directAdminid);
+    CREATE INDEX IX_users_role ON users(role);
+    
+    PRINT N'✓ جدول users ایجاد شد';
+END
+ELSE
+BEGIN
+    PRINT N'○ جدول users از قبل وجود دارد';
+    
+    -- بررسی و اضافه کردن ستون role اگر وجود ندارد
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'role')
+    BEGIN
+        PRINT N'→ اضافه کردن ستون role به جدول users...';
+        ALTER TABLE users ADD role NVARCHAR(50) NULL;
+        CREATE INDEX IX_users_role ON users(role);
+        PRINT N'✓ ستون role اضافه شد';
+    END
+    ELSE
+        PRINT N'○ ستون role از قبل وجود دارد';
+END
+GO
+
+-- جدول projects: اطلاعات پروژه‌ها
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'projects')
+BEGIN
+    CREATE TABLE projects (
+        id INT PRIMARY KEY,
+        projectName NVARCHAR(100) NOT NULL
+    );
+    
+    PRINT N'✓ جدول projects ایجاد شد';
+END
+ELSE
+    PRINT N'○ جدول projects از قبل وجود دارد';
+GO
+
+-- جدول groups: اطلاعات گروه‌ها
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'groups')
+BEGIN
+    CREATE TABLE groups (
+        id INT PRIMARY KEY,
+        groupname NVARCHAR(100) NOT NULL UNIQUE,
+        managerID INT NOT NULL
+    );
+    
+    CREATE INDEX IX_groups_managerID ON groups(managerID);
+    
+    PRINT N'✓ جدول groups ایجاد شد';
+END
+ELSE
+    PRINT N'○ جدول groups از قبل وجود دارد';
+GO
+
+-- جدول groupManagers: اطلاعات مدیران گروه
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'groupManagers')
+BEGIN
+    CREATE TABLE groupManagers (
+        personalId INT PRIMARY KEY,
+        firstname NVARCHAR(100) NOT NULL,
+        lastname NVARCHAR(100) NOT NULL,
+        email NVARCHAR(256) NULL,
+        groupname NVARCHAR(100) NOT NULL
+    );
+    
+    PRINT N'✓ جدول groupManagers ایجاد شد';
+END
+ELSE
+    PRINT N'○ جدول groupManagers از قبل وجود دارد';
+GO
+
+PRINT N'✓ جداول پایه UMD آماده است';
+PRINT N'';
+
+-- =============================================
 -- بخش 1: جدول مدیران سیستم
 -- =============================================
 PRINT N'→ ایجاد جدول Admins...';
@@ -338,6 +435,9 @@ PRINT N'';
 
 -- شمارش جداول
 DECLARE @TableCount INT;
+DECLARE @UMDTableCount INT;
+
+-- شمارش جداول Timesheet
 SELECT @TableCount = COUNT(*) 
 FROM sys.tables 
 WHERE name IN (
@@ -346,9 +446,22 @@ WHERE name IN (
     'MonthlyGymCosts', 'MonthlyReports', 'MonthPeriodSettings'
 );
 
-PRINT N'📊 تعداد جداول ایجاد شده: ' + CAST(@TableCount AS NVARCHAR(10));
+-- شمارش جداول UMD
+SELECT @UMDTableCount = COUNT(*) 
+FROM sys.tables 
+WHERE name IN ('users', 'projects', 'groups', 'groupManagers');
+
+PRINT N'📊 تعداد کل جداول: ' + CAST((@TableCount + @UMDTableCount) AS NVARCHAR(10));
+PRINT N'  • جداول UMD: ' + CAST(@UMDTableCount AS NVARCHAR(10));
+PRINT N'  • جداول Timesheet: ' + CAST(@TableCount AS NVARCHAR(10));
 PRINT N'';
-PRINT N'جداول ایجاد شده:';
+PRINT N'جداول UMD (پایه):';
+PRINT N'  ✓ users (با ستون role)';
+PRINT N'  ✓ projects';
+PRINT N'  ✓ groups';
+PRINT N'  ✓ groupManagers';
+PRINT N'';
+PRINT N'جداول Timesheet:';
 PRINT N'  ✓ Admins';
 PRINT N'  ✓ UserContractHours';
 PRINT N'  ✓ UserProjectAccess';
@@ -362,8 +475,10 @@ PRINT N'';
 PRINT N'⚠️ نکته: هیچ داده تستی وارد نشده است';
 PRINT N'';
 PRINT N'مراحل بعدی:';
-PRINT N'  1. اضافه کردن ادمین اول';
-PRINT N'  2. تعریف قراردادهای کاری';
-PRINT N'  3. تعریف دسترسی‌های پروژه';
+PRINT N'  1. اضافه کردن کاربران و تنظیم role آن‌ها';
+PRINT N'  2. اضافه کردن ادمین اول';
+PRINT N'  3. تعریف پروژه‌ها و گروه‌ها';
+PRINT N'  4. تعریف قراردادهای کاری';
+PRINT N'  5. تعریف دسترسی‌های پروژه';
 PRINT N'';
 GO
