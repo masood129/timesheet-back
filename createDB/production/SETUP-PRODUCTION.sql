@@ -379,7 +379,37 @@ BEGIN
     PRINT N'✓ جدول MonthPeriodSettings ایجاد شد';
 END
 ELSE
+BEGIN
     PRINT N'○ جدول MonthPeriodSettings از قبل وجود دارد';
+    
+    -- بررسی و اضافه کردن ستون StartYear اگر وجود ندارد
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('MonthPeriodSettings') AND name = 'StartYear')
+    BEGIN
+        PRINT N'→ اضافه کردن ستون StartYear به جدول MonthPeriodSettings...';
+        ALTER TABLE MonthPeriodSettings ADD StartYear INT NULL;
+        -- بروزرسانی مقادیر NULL به Year
+        UPDATE MonthPeriodSettings SET StartYear = Year WHERE StartYear IS NULL;
+        -- تبدیل به NOT NULL
+        ALTER TABLE MonthPeriodSettings ALTER COLUMN StartYear INT NOT NULL;
+        PRINT N'✓ ستون StartYear اضافه شد';
+    END
+    ELSE
+        PRINT N'○ ستون StartYear از قبل وجود دارد';
+    
+    -- بررسی و اضافه کردن ستون EndYear اگر وجود ندارد
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('MonthPeriodSettings') AND name = 'EndYear')
+    BEGIN
+        PRINT N'→ اضافه کردن ستون EndYear به جدول MonthPeriodSettings...';
+        ALTER TABLE MonthPeriodSettings ADD EndYear INT NULL;
+        -- بروزرسانی مقادیر NULL به Year
+        UPDATE MonthPeriodSettings SET EndYear = Year WHERE EndYear IS NULL;
+        -- تبدیل به NOT NULL
+        ALTER TABLE MonthPeriodSettings ALTER COLUMN EndYear INT NOT NULL;
+        PRINT N'✓ ستون EndYear اضافه شد';
+    END
+    ELSE
+        PRINT N'○ ستون EndYear از قبل وجود دارد';
+END
 GO
 
 -- =============================================
@@ -417,6 +447,393 @@ BEGIN
 END
 ELSE
     PRINT N'○ Function fn_GetMonthLength از قبل وجود دارد';
+GO
+
+-- Function: بررسی قابلیت ویرایش ماه
+IF OBJECT_ID('dbo.fn_IsMonthEditable', 'FN') IS NULL
+BEGIN
+    EXEC('
+    CREATE FUNCTION dbo.fn_IsMonthEditable(
+        @Year INT,
+        @Month INT,
+        @CurrentJalaliYear INT,
+        @CurrentJalaliMonth INT
+    )
+    RETURNS BIT
+    AS
+    BEGIN
+        DECLARE @IsEditable BIT = 0;
+        
+        IF @Year > @CurrentJalaliYear
+            SET @IsEditable = 1;
+        ELSE IF @Year = @CurrentJalaliYear AND @Month >= @CurrentJalaliMonth
+            SET @IsEditable = 1;
+        
+        RETURN @IsEditable;
+    END;
+    ');
+    PRINT N'✓ Function fn_IsMonthEditable ایجاد شد';
+END
+ELSE
+    PRINT N'○ Function fn_IsMonthEditable از قبل وجود دارد';
+GO
+
+-- Function: محاسبه طول بازه زمانی
+IF OBJECT_ID('dbo.fn_GetPeriodLength', 'FN') IS NULL
+BEGIN
+    EXEC('
+    CREATE FUNCTION dbo.fn_GetPeriodLength(
+        @StartYear INT,
+        @StartMonth INT,
+        @StartDay INT,
+        @EndYear INT,
+        @EndMonth INT,
+        @EndDay INT
+    )
+    RETURNS INT
+    AS
+    BEGIN
+        DECLARE @TotalDays INT = 0;
+        DECLARE @CurrentYear INT = @StartYear;
+        DECLARE @CurrentMonth INT = @StartMonth;
+        
+        -- محاسبه تعداد روزها از تاریخ شروع تا پایان
+        WHILE (@CurrentYear < @EndYear) OR (@CurrentYear = @EndYear AND @CurrentMonth <= @EndMonth)
+        BEGIN
+            IF @CurrentYear = @StartYear AND @CurrentMonth = @StartMonth
+                SET @TotalDays = @TotalDays + (dbo.fn_GetMonthLength(@CurrentYear, @CurrentMonth) - @StartDay + 1);
+            ELSE IF @CurrentYear = @EndYear AND @CurrentMonth = @EndMonth
+                SET @TotalDays = @TotalDays + @EndDay;
+            ELSE
+                SET @TotalDays = @TotalDays + dbo.fn_GetMonthLength(@CurrentYear, @CurrentMonth);
+            
+            SET @CurrentMonth = @CurrentMonth + 1;
+            IF @CurrentMonth > 12
+            BEGIN
+                SET @CurrentMonth = 1;
+                SET @CurrentYear = @CurrentYear + 1;
+            END
+        END
+        
+        RETURN @TotalDays;
+    END;
+    ');
+    PRINT N'✓ Function fn_GetPeriodLength ایجاد شد';
+END
+ELSE
+    PRINT N'○ Function fn_GetPeriodLength از قبل وجود دارد';
+GO
+
+-- Stored Procedure: دریافت بازه یک ماه خاص
+IF OBJECT_ID('dbo.sp_GetMonthPeriod', 'P') IS NULL
+BEGIN
+    EXEC('
+    CREATE PROCEDURE sp_GetMonthPeriod
+        @Year INT,
+        @Month INT
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        
+        IF EXISTS (SELECT 1 FROM MonthPeriodSettings WHERE Year = @Year AND Month = @Month)
+        BEGIN
+            SELECT 
+                Year,
+                Month,
+                StartDay, 
+                StartMonth,
+                StartYear,
+                EndDay, 
+                EndMonth,
+                EndYear
+            FROM MonthPeriodSettings
+            WHERE Year = @Year AND Month = @Month;
+            RETURN;
+        END
+        
+        DECLARE @PrevMonth INT = CASE WHEN @Month = 1 THEN 12 ELSE @Month - 1 END;
+        DECLARE @PrevYear INT = CASE WHEN @Month = 1 THEN @Year - 1 ELSE @Year END;
+        
+        IF EXISTS (SELECT 1 FROM MonthPeriodSettings WHERE Year = @PrevYear AND Month = @PrevMonth)
+        BEGIN
+            DECLARE @PrevEndDay INT, @PrevEndMonth INT, @PrevEndYear INT;
+            SELECT @PrevEndDay = EndDay, @PrevEndMonth = EndMonth, @PrevEndYear = EndYear
+            FROM MonthPeriodSettings
+            WHERE Year = @PrevYear AND Month = @PrevMonth;
+            
+            IF @PrevEndMonth = @Month AND @PrevEndYear = @Year
+            BEGIN
+                SELECT 
+                    @Year AS Year,
+                    @Month AS Month,
+                    @PrevEndDay + 1 AS StartDay,
+                    @Month AS StartMonth,
+                    @Year AS StartYear,
+                    dbo.fn_GetMonthLength(@Year, @Month) AS EndDay,
+                    @Month AS EndMonth,
+                    @Year AS EndYear;
+            END
+            ELSE
+            BEGIN
+                SELECT 
+                    @Year AS Year,
+                    @Month AS Month,
+                    1 AS StartDay,
+                    @Month AS StartMonth,
+                    @Year AS StartYear,
+                    dbo.fn_GetMonthLength(@Year, @Month) AS EndDay,
+                    @Month AS EndMonth,
+                    @Year AS EndYear;
+            END
+        END
+        ELSE
+        BEGIN
+            SELECT 
+                @Year AS Year,
+                @Month AS Month,
+                1 AS StartDay,
+                @Month AS StartMonth,
+                @Year AS StartYear,
+                dbo.fn_GetMonthLength(@Year, @Month) AS EndDay,
+                @Month AS EndMonth,
+                @Year AS EndYear;
+        END
+    END;
+    ');
+    PRINT N'✓ Stored Procedure sp_GetMonthPeriod ایجاد شد';
+END
+ELSE
+    PRINT N'○ Stored Procedure sp_GetMonthPeriod از قبل وجود دارد';
+GO
+
+-- Stored Procedure: دریافت تمام بازه‌های یک سال
+IF OBJECT_ID('dbo.sp_GetYearMonthPeriods', 'P') IS NULL
+BEGIN
+    EXEC('
+    CREATE PROCEDURE sp_GetYearMonthPeriods
+        @Year INT
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        
+        CREATE TABLE #MonthPeriods (
+            Year INT,
+            Month INT,
+            StartDay INT,
+            StartMonth INT,
+            StartYear INT,
+            EndDay INT,
+            EndMonth INT,
+            EndYear INT,
+            IsCustom BIT
+        );
+        
+        DECLARE @CurrentMonth INT = 1;
+        DECLARE @StartDay INT, @StartMonth INT, @StartYear INT;
+        DECLARE @EndDay INT, @EndMonth INT, @EndYear INT, @IsCustom BIT;
+        DECLARE @PrevMonth INT, @PrevYear INT, @PrevEndDay INT, @PrevEndMonth INT, @PrevEndYear INT;
+        
+        WHILE @CurrentMonth <= 12
+        BEGIN
+            IF EXISTS (SELECT 1 FROM MonthPeriodSettings WHERE Year = @Year AND Month = @CurrentMonth)
+            BEGIN
+                SELECT 
+                    @StartDay = StartDay,
+                    @StartMonth = StartMonth,
+                    @StartYear = StartYear,
+                    @EndDay = EndDay,
+                    @EndMonth = EndMonth,
+                    @EndYear = EndYear
+                FROM MonthPeriodSettings
+                WHERE Year = @Year AND Month = @CurrentMonth;
+                
+                SET @IsCustom = 1;
+            END
+            ELSE
+            BEGIN
+                SET @PrevMonth = CASE WHEN @CurrentMonth = 1 THEN 12 ELSE @CurrentMonth - 1 END;
+                SET @PrevYear = CASE WHEN @CurrentMonth = 1 THEN @Year - 1 ELSE @Year END;
+                
+                IF @PrevYear = @Year AND EXISTS (SELECT 1 FROM #MonthPeriods WHERE Month = @PrevMonth)
+                BEGIN
+                    SELECT @PrevEndDay = EndDay, @PrevEndMonth = EndMonth, @PrevEndYear = EndYear
+                    FROM #MonthPeriods
+                    WHERE Month = @PrevMonth;
+                    
+                    IF @PrevEndMonth = @CurrentMonth AND @PrevEndYear = @Year
+                    BEGIN
+                        SET @StartDay = @PrevEndDay + 1;
+                        SET @StartMonth = @CurrentMonth;
+                        SET @StartYear = @Year;
+                    END
+                    ELSE
+                    BEGIN
+                        SET @StartDay = 1;
+                        SET @StartMonth = @CurrentMonth;
+                        SET @StartYear = @Year;
+                    END
+                END
+                ELSE IF EXISTS (SELECT 1 FROM MonthPeriodSettings WHERE Year = @PrevYear AND Month = @PrevMonth)
+                BEGIN
+                    SELECT @PrevEndDay = EndDay, @PrevEndMonth = EndMonth, @PrevEndYear = EndYear
+                    FROM MonthPeriodSettings
+                    WHERE Year = @PrevYear AND Month = @PrevMonth;
+                    
+                    IF @PrevEndMonth = @CurrentMonth AND @PrevEndYear = @Year
+                    BEGIN
+                        SET @StartDay = @PrevEndDay + 1;
+                        SET @StartMonth = @CurrentMonth;
+                        SET @StartYear = @Year;
+                    END
+                    ELSE
+                    BEGIN
+                        SET @StartDay = 1;
+                        SET @StartMonth = @CurrentMonth;
+                        SET @StartYear = @Year;
+                    END
+                END
+                ELSE
+                BEGIN
+                    SET @StartDay = 1;
+                    SET @StartMonth = @CurrentMonth;
+                    SET @StartYear = @Year;
+                END
+                
+                SET @EndDay = dbo.fn_GetMonthLength(@Year, @CurrentMonth);
+                SET @EndMonth = @CurrentMonth;
+                SET @EndYear = @Year;
+                SET @IsCustom = 0;
+            END
+            
+            INSERT INTO #MonthPeriods (Year, Month, StartDay, StartMonth, StartYear, EndDay, EndMonth, EndYear, IsCustom)
+            VALUES (@Year, @CurrentMonth, @StartDay, @StartMonth, @StartYear, @EndDay, @EndMonth, @EndYear, @IsCustom);
+            
+            SET @CurrentMonth = @CurrentMonth + 1;
+        END
+        
+        SELECT * FROM #MonthPeriods ORDER BY Month;
+        DROP TABLE #MonthPeriods;
+    END;
+    ');
+    PRINT N'✓ Stored Procedure sp_GetYearMonthPeriods ایجاد شد';
+END
+ELSE
+    PRINT N'○ Stored Procedure sp_GetYearMonthPeriods از قبل وجود دارد';
+GO
+
+-- Stored Procedure: اعتبارسنجی بازه با ماه‌های مجاور
+IF OBJECT_ID('dbo.sp_ValidatePeriodWithNeighbors', 'P') IS NULL
+BEGIN
+    EXEC('
+    CREATE PROCEDURE sp_ValidatePeriodWithNeighbors
+        @Year INT,
+        @Month INT,
+        @StartDay INT,
+        @StartMonth INT,
+        @StartYear INT,
+        @EndDay INT,
+        @EndMonth INT,
+        @EndYear INT
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        
+        -- بررسی overlap یا gap با ماه قبل
+        DECLARE @PrevMonth INT = CASE WHEN @Month = 1 THEN 12 ELSE @Month - 1 END;
+        DECLARE @PrevYear INT = CASE WHEN @Month = 1 THEN @Year - 1 ELSE @Year END;
+        
+        IF EXISTS (SELECT 1 FROM MonthPeriodSettings WHERE Year = @PrevYear AND Month = @PrevMonth AND Year != @Year OR Month != @Month)
+        BEGIN
+            DECLARE @PrevEndDay INT, @PrevEndMonth INT, @PrevEndYear INT;
+            SELECT @PrevEndDay = EndDay, @PrevEndMonth = EndMonth, @PrevEndYear = EndYear
+            FROM MonthPeriodSettings
+            WHERE Year = @PrevYear AND Month = @PrevMonth;
+            
+            -- بررسی اینکه آیا gap وجود دارد
+            IF (@StartYear > @PrevEndYear) OR 
+               (@StartYear = @PrevEndYear AND @StartMonth > @PrevEndMonth) OR
+               (@StartYear = @PrevEndYear AND @StartMonth = @PrevEndMonth AND @StartDay > @PrevEndDay + 1)
+            BEGIN
+                SELECT ''شکاف زمانی بین ماه جاری و ماه قبل وجود دارد'' AS ErrorMessage;
+                RETURN;
+            END
+            
+            -- بررسی اینکه آیا overlap وجود دارد
+            IF (@StartYear < @PrevEndYear) OR
+               (@StartYear = @PrevEndYear AND @StartMonth < @PrevEndMonth) OR
+               (@StartYear = @PrevEndYear AND @StartMonth = @PrevEndMonth AND @StartDay <= @PrevEndDay)
+            BEGIN
+                SELECT ''تداخل زمانی با ماه قبل وجود دارد'' AS ErrorMessage;
+                RETURN;
+            END
+        END
+        
+        -- بررسی overlap یا gap با ماه بعد
+        DECLARE @NextMonth INT = CASE WHEN @Month = 12 THEN 1 ELSE @Month + 1 END;
+        DECLARE @NextYear INT = CASE WHEN @Month = 12 THEN @Year + 1 ELSE @Year END;
+        
+        IF EXISTS (SELECT 1 FROM MonthPeriodSettings WHERE Year = @NextYear AND Month = @NextMonth AND Year != @Year OR Month != @Month)
+        BEGIN
+            DECLARE @NextStartDay INT, @NextStartMonth INT, @NextStartYear INT;
+            SELECT @NextStartDay = StartDay, @NextStartMonth = StartMonth, @NextStartYear = StartYear
+            FROM MonthPeriodSettings
+            WHERE Year = @NextYear AND Month = @NextMonth;
+            
+            -- بررسی اینکه آیا gap وجود دارد
+            IF (@NextStartYear > @EndYear) OR
+               (@NextStartYear = @EndYear AND @NextStartMonth > @EndMonth) OR
+               (@NextStartYear = @EndYear AND @NextStartMonth = @EndMonth AND @NextStartDay > @EndDay + 1)
+            BEGIN
+                SELECT ''شکاف زمانی بین ماه جاری و ماه بعد وجود دارد'' AS ErrorMessage;
+                RETURN;
+            END
+            
+            -- بررسی اینکه آیا overlap وجود دارد
+            IF (@NextStartYear < @EndYear) OR
+               (@NextStartYear = @EndYear AND @NextStartMonth < @EndMonth) OR
+               (@NextStartYear = @EndYear AND @NextStartMonth = @EndMonth AND @NextStartDay <= @EndDay)
+            BEGIN
+                SELECT ''تداخل زمانی با ماه بعد وجود دارد'' AS ErrorMessage;
+                RETURN;
+            END
+        END
+    END;
+    ');
+    PRINT N'✓ Stored Procedure sp_ValidatePeriodWithNeighbors ایجاد شد';
+END
+ELSE
+    PRINT N'○ Stored Procedure sp_ValidatePeriodWithNeighbors از قبل وجود دارد';
+GO
+
+-- Stored Procedure: تنظیم خودکار ماه‌های مجاور
+IF OBJECT_ID('dbo.sp_AutoAdjustNeighborMonths', 'P') IS NULL
+BEGIN
+    EXEC('
+    CREATE PROCEDURE sp_AutoAdjustNeighborMonths
+        @Year INT,
+        @Month INT,
+        @StartDay INT,
+        @StartMonth INT,
+        @StartYear INT,
+        @EndDay INT,
+        @EndMonth INT,
+        @EndYear INT,
+        @CurrentJalaliYear INT,
+        @CurrentJalaliMonth INT
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        
+        -- این stored procedure می‌تواند منطق تنظیم خودکار ماه‌های قبل و بعد را پیاده‌سازی کند
+        -- فعلاً خالی است و می‌توان آن را در آینده توسعه داد
+        
+        PRINT ''Auto-adjustment of neighbor months completed (placeholder)'';
+    END;
+    ');
+    PRINT N'✓ Stored Procedure sp_AutoAdjustNeighborMonths ایجاد شد';
+END
+ELSE
+    PRINT N'○ Stored Procedure sp_AutoAdjustNeighborMonths از قبل وجود دارد';
 GO
 
 -- Trigger: به‌روزرسانی UpdatedAt
