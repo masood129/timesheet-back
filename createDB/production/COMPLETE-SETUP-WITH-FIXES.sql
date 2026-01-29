@@ -130,11 +130,14 @@ BEGIN TRY
     INSERT INTO @TestResult
     EXEC sp_GetYearMonthPeriods @Year = 1404;
     
-    IF (SELECT COUNT(*) FROM @TestResult) = 12
+    DECLARE @ResultCount INT;
+    SELECT @ResultCount = COUNT(*) FROM @TestResult;
+    
+    IF @ResultCount = 12
         PRINT N'✓ sp_GetYearMonthPeriods به درستی کار می‌کند (12 ماه برگشت)';
     ELSE
         PRINT N'⚠️ sp_GetYearMonthPeriods تعداد ماه‌ها اشتباه است: ' + 
-              CAST((SELECT COUNT(*) FROM @TestResult) AS NVARCHAR(10));
+              CAST(@ResultCount AS NVARCHAR(10));
 END TRY
 BEGIN CATCH
     PRINT N'❌ خطا در sp_GetYearMonthPeriods: ' + ERROR_MESSAGE();
@@ -200,11 +203,15 @@ SELECT @UMDTableCount = COUNT(*)
 FROM sys.tables 
 WHERE name IN ('users', 'projects', 'groups', 'groupManagers');
 
+DECLARE @FunctionCount INT, @StoredProcCount INT;
+SELECT @FunctionCount = COUNT(*) FROM sys.objects WHERE type = 'FN' AND name LIKE 'fn_%';
+SELECT @StoredProcCount = COUNT(*) FROM sys.objects WHERE type = 'P' AND name LIKE 'sp_%';
+
 PRINT N'📊 آمار دیتابیس:';
 PRINT N'  • جداول UMD: ' + CAST(@UMDTableCount AS NVARCHAR(10)) + ' / 4';
 PRINT N'  • جداول Timesheet: ' + CAST(@TableCount AS NVARCHAR(10)) + ' / 9';
-PRINT N'  • Functions: ' + CAST((SELECT COUNT(*) FROM sys.objects WHERE type = 'FN' AND name LIKE 'fn_%') AS NVARCHAR(10));
-PRINT N'  • Stored Procedures: ' + CAST((SELECT COUNT(*) FROM sys.objects WHERE type = 'P' AND name LIKE 'sp_%') AS NVARCHAR(10));
+PRINT N'  • Functions: ' + CAST(@FunctionCount AS NVARCHAR(10));
+PRINT N'  • Stored Procedures: ' + CAST(@StoredProcCount AS NVARCHAR(10));
 PRINT N'';
 
 -- بررسی تعداد داده‌ها
