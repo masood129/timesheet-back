@@ -23,6 +23,49 @@ const port = process.env.PORT || 3000;
 // Log application startup
 logger.system.info('Application starting...', { port, nodeEnv: process.env.NODE_ENV });
 
+// Health check endpoint
+app.get('/health', async (req, res) => {
+    try {
+        const { poolPromise } = require('./config/db.config');
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT 1 as healthy');
+        
+        const healthStatus = {
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            database: {
+                connected: true,
+                responseTime: 'OK'
+            },
+            server: {
+                uptime: process.uptime(),
+                memory: process.memoryUsage(),
+                nodeVersion: process.version
+            }
+        };
+        
+        logger.system.info('Health check passed', healthStatus);
+        res.json(healthStatus);
+    } catch (err) {
+        const errorStatus = {
+            status: 'unhealthy',
+            timestamp: new Date().toISOString(),
+            database: {
+                connected: false,
+                error: err.message
+            },
+            server: {
+                uptime: process.uptime(),
+                memory: process.memoryUsage(),
+                nodeVersion: process.version
+            }
+        };
+        
+        logger.errors.error('Health check failed', errorStatus);
+        res.status(503).json(errorStatus);
+    }
+});
+
 // Test endpoint for Jalali date conversion
 app.get('/test/jalali/:year/:month', (req, res) => {
     const { year, month } = req.params;
@@ -52,21 +95,69 @@ app.get('/test/jalali/:year/:month', (req, res) => {
 const authMiddleware = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     if (!authHeader) {
-        logger.auth.warn('Authentication failed: No token provided', { url: req.originalUrl });
+        logger.auth.warn('Authentication failed: No token provided', { 
+            url: req.originalUrl,
+            method: req.method,
+            ip: req.ip
+        });
         return res.status(401).send('Access denied: No token provided');
     }
 
     const token = authHeader.replace('Bearer ', '');
+    if (!token || token.trim() === '') {
+        logger.auth.warn('Authentication failed: Empty token', { url: req.originalUrl });
+        return res.status(401).send('Access denied: Empty token');
+    }
+
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        // Validate decoded token has required fields
+        if (!decoded.userId || !decoded.role) {
+            logger.auth.error('JWT token missing required fields', { 
+                decoded,
+                url: req.originalUrl 
+            });
+            return res.status(401).send('Access denied: Invalid token structure');
+        }
+        
+        // Ensure userId is an integer
+        const userId = typeof decoded.userId === 'string' 
+            ? parseInt(decoded.userId, 10) 
+            : decoded.userId;
+        
+        if (isNaN(userId)) {
+            logger.auth.error('JWT token has invalid userId', { 
+                userId: decoded.userId,
+                url: req.originalUrl 
+            });
+            return res.status(401).send('Access denied: Invalid userId in token');
+        }
+        
         req.user = {
-            userId: decoded.userId,
+            userId: userId,
             role: decoded.role
         };
-        logger.auth.info('User authenticated', { userId: decoded.userId, role: decoded.role });
+        
+        logger.auth.info('User authenticated', { 
+            userId: userId, 
+            role: decoded.role,
+            url: req.originalUrl 
+        });
         next();
     } catch (err) {
-        logger.auth.error('JWT verification error', { error: err.message });
+        logger.auth.error('JWT verification error', { 
+            error: err.message,
+            name: err.name,
+            url: req.originalUrl
+        });
+        
+        if (err.name === 'TokenExpiredError') {
+            return res.status(401).send('Access denied: Token expired');
+        } else if (err.name === 'JsonWebTokenError') {
+            return res.status(401).send('Access denied: Invalid token format');
+        }
+        
         res.status(401).send('Access denied: Invalid token');
     }
 };
