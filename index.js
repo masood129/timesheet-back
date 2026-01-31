@@ -199,11 +199,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use(errorLogger);
 
 // Start server
-app.listen(port, () => {
-    logger.system.info(`Server running on http://localhost:${port}`);
-    logger.system.info(`Swagger UI available at http://localhost:${port}/api-docs`);
-    console.log(`🛩️️😶‍🌫️Server running on http://localhost:${port}🎶🎶`);
-    console.log(`🍏🍊Swagger UI available at http://localhost:${port}/api-docs🍊🍏`);
+app.listen(port, '0.0.0.0', () => {
+    logger.system.info(`Server running on http://0.0.0.0:${port}`);
+    logger.system.info(`Swagger UI available at http://0.0.0.0:${port}/api-docs`);
+    console.log(`🛩️️😶‍🌫️Server running on http://0.0.0.0:${port}🎶🎶`);
+    console.log(`🍏🍊Swagger UI available at http://0.0.0.0:${port}/api-docs🍊🍏`);
 });
 
 // Handle graceful shutdown

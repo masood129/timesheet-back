@@ -14,13 +14,13 @@ const getAllProjects = async (req, res) => {
                 p.id, 
                 p.projectName, 
                 p.IsActive,
-                p.DirectAdminId,
-                u.personalid as directAdminPersonalid,
-                u.id as directAdminUsername,
-                u.farsifirstname as directAdminFirstname,
-                u.farsilastname as directAdminLastname
+                p.FinanceCenterCost,
+                p.BaseCenterCost,
+                p.BLine,
+                p.SystemType,
+                p.ContractType,
+                p.CenterType
             FROM projects p
-            LEFT JOIN users u ON p.DirectAdminId = u.personalid
             WHERE 1=1
         `;
         const request = pool.request();
@@ -77,13 +77,13 @@ const getProjectById = async (req, res) => {
                     p.id, 
                     p.projectName, 
                     p.IsActive,
-                    p.DirectAdminId,
-                    u.personalid as directAdminPersonalid,
-                    u.id as directAdminUsername,
-                    u.farsifirstname as directAdminFirstname,
-                    u.farsilastname as directAdminLastname
+                    p.FinanceCenterCost,
+                    p.BaseCenterCost,
+                    p.BLine,
+                    p.SystemType,
+                    p.ContractType,
+                    p.CenterType
                 FROM projects p
-                LEFT JOIN users u ON p.DirectAdminId = u.personalid
                 WHERE p.id = @projectId
             `);
 
@@ -122,10 +122,20 @@ const getProjectById = async (req, res) => {
  * Create new project
  */
 const createProject = async (req, res) => {
-    const { id, projectName, IsActive, DirectAdminId } = req.body;
+    const { 
+        id, 
+        projectName, 
+        IsActive, 
+        FinanceCenterCost,
+        BaseCenterCost,
+        BLine,
+        SystemType,
+        ContractType,
+        CenterType
+    } = req.body;
 
-    if (!id || !projectName) {
-        return res.status(400).send('شناسه و نام پروژه الزامی است');
+    if (!id) {
+        return res.status(400).send('شناسه پروژه الزامی است');
     }
 
     try {
@@ -144,28 +154,41 @@ const createProject = async (req, res) => {
         // Default IsActive to 1 (true) if not provided
         const isActive = IsActive !== undefined ? (IsActive ? 1 : 0) : 1;
 
-        // Validate DirectAdminId if provided
-        if (DirectAdminId !== undefined && DirectAdminId !== null) {
-            const userCheck = await pool
-                .request()
-                .input('personalId', sql.Int, DirectAdminId)
-                .query('SELECT COUNT(*) as count FROM users WHERE personalid = @personalId AND IsActive = 1');
-
-            if (userCheck.recordset[0].count === 0) {
-                return res.status(400).send('مدیر مستقیم یافت نشد');
-            }
-        }
-
         const result = await pool
             .request()
             .input('id', sql.Int, id)
-            .input('projectName', sql.NVarChar, projectName)
+            .input('projectName', sql.NVarChar, projectName || null)
             .input('IsActive', sql.Bit, isActive)
-            .input('DirectAdminId', sql.Int, DirectAdminId || null)
+            .input('FinanceCenterCost', sql.Int, FinanceCenterCost || null)
+            .input('BaseCenterCost', sql.NVarChar(50), BaseCenterCost || null)
+            .input('BLine', sql.NVarChar(50), BLine || null)
+            .input('SystemType', sql.NVarChar(50), SystemType || null)
+            .input('ContractType', sql.NVarChar(50), ContractType || null)
+            .input('CenterType', sql.NVarChar(50), CenterType || null)
             .query(`
-                INSERT INTO projects (id, projectName, IsActive, DirectAdminId)
+                INSERT INTO projects (
+                    id, 
+                    projectName, 
+                    IsActive, 
+                    FinanceCenterCost,
+                    BaseCenterCost,
+                    BLine,
+                    SystemType,
+                    ContractType,
+                    CenterType
+                )
                 OUTPUT INSERTED.*
-                VALUES (@id, @projectName, @IsActive, @DirectAdminId)
+                VALUES (
+                    @id, 
+                    @projectName, 
+                    @IsActive, 
+                    @FinanceCenterCost,
+                    @BaseCenterCost,
+                    @BLine,
+                    @SystemType,
+                    @ContractType,
+                    @CenterType
+                )
             `);
 
         res.status(201).json(result.recordset[0]);
@@ -180,20 +203,25 @@ const createProject = async (req, res) => {
  */
 const updateProject = async (req, res) => {
     const { id } = req.params;
-    const { projectName, id: newId, IsActive, DirectAdminId } = req.body;
-
-    if (!projectName) {
-        return res.status(400).send('نام پروژه الزامی است');
-    }
+    const { 
+        projectName, 
+        id: newId, 
+        IsActive,
+        FinanceCenterCost,
+        BaseCenterCost,
+        BLine,
+        SystemType,
+        ContractType,
+        CenterType
+    } = req.body;
 
     try {
         const pool = await poolPromise;
 
         // Build the update query dynamically based on what fields are provided
-        let updateFields = ['projectName = @projectName'];
+        let updateFields = [];
         const request = pool.request()
-            .input('oldId', sql.Int, id)
-            .input('projectName', sql.NVarChar, projectName);
+            .input('oldId', sql.Int, id);
 
         // If a new ID is provided and it's different from the current ID, update it
         if (newId !== undefined && newId !== null && parseInt(newId) !== parseInt(id)) {
@@ -211,28 +239,56 @@ const updateProject = async (req, res) => {
             request.input('newId', sql.Int, newId);
         }
 
+        // Update projectName if provided
+        if (projectName !== undefined) {
+            updateFields.push('projectName = @projectName');
+            request.input('projectName', sql.NVarChar, projectName);
+        }
+
         // Update IsActive if provided
         if (IsActive !== undefined) {
             updateFields.push('IsActive = @IsActive');
             request.input('IsActive', sql.Bit, IsActive ? 1 : 0);
         }
 
-        // Update DirectAdminId if provided
-        if (DirectAdminId !== undefined) {
-            // Validate DirectAdminId if not null
-            if (DirectAdminId !== null) {
-                const userCheck = await pool
-                    .request()
-                    .input('personalId', sql.Int, DirectAdminId)
-                    .query('SELECT COUNT(*) as count FROM users WHERE personalid = @personalId AND IsActive = 1');
+        // Update FinanceCenterCost if provided
+        if (FinanceCenterCost !== undefined) {
+            updateFields.push('FinanceCenterCost = @FinanceCenterCost');
+            request.input('FinanceCenterCost', sql.Int, FinanceCenterCost || null);
+        }
 
-                if (userCheck.recordset[0].count === 0) {
-                    return res.status(400).send('مدیر مستقیم یافت نشد');
-                }
-            }
+        // Update BaseCenterCost if provided
+        if (BaseCenterCost !== undefined) {
+            updateFields.push('BaseCenterCost = @BaseCenterCost');
+            request.input('BaseCenterCost', sql.NVarChar(50), BaseCenterCost || null);
+        }
 
-            updateFields.push('DirectAdminId = @DirectAdminId');
-            request.input('DirectAdminId', sql.Int, DirectAdminId || null);
+        // Update BLine if provided
+        if (BLine !== undefined) {
+            updateFields.push('BLine = @BLine');
+            request.input('BLine', sql.NVarChar(50), BLine || null);
+        }
+
+        // Update SystemType if provided
+        if (SystemType !== undefined) {
+            updateFields.push('SystemType = @SystemType');
+            request.input('SystemType', sql.NVarChar(50), SystemType || null);
+        }
+
+        // Update ContractType if provided
+        if (ContractType !== undefined) {
+            updateFields.push('ContractType = @ContractType');
+            request.input('ContractType', sql.NVarChar(50), ContractType || null);
+        }
+
+        // Update CenterType if provided
+        if (CenterType !== undefined) {
+            updateFields.push('CenterType = @CenterType');
+            request.input('CenterType', sql.NVarChar(50), CenterType || null);
+        }
+
+        if (updateFields.length === 0) {
+            return res.status(400).send('هیچ فیلدی برای بروزرسانی ارسال نشده است');
         }
 
         const result = await request.query(`

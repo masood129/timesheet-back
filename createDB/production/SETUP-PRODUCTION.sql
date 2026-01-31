@@ -83,7 +83,14 @@ IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'projects')
 BEGIN
     CREATE TABLE projects (
         id INT PRIMARY KEY,
-        projectName NVARCHAR(100) NOT NULL
+        FinanceCenterCost INT NULL,
+        projectName NVARCHAR(50) NULL,
+        BaseCenterCost NVARCHAR(50) NULL,
+        BLine NVARCHAR(50) NULL,
+        SystemType NVARCHAR(50) NULL,
+        ContractType NVARCHAR(50) NULL,
+        CenterType NVARCHAR(50) NULL,
+        IsActive BIT NOT NULL DEFAULT 1
     );
     
     PRINT N'✓ جدول projects ایجاد شد';

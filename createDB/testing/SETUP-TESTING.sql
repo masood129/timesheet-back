@@ -13,20 +13,32 @@ PRINT N'   ساخت جداول + داده تستی - TESTING';
 PRINT N'========================================';
 PRINT N'';
 
--- اجرای فایل ساخت جداول
 PRINT N'→ مرحله 1: ایجاد جداول...';
--- چون SQLCMD mode با مسیر نسبی مشکل دارد، فایل را جداگانه اجرا کنید
--- یا مسیر کامل را وارد کنید:
--- :r C:\Users\Masood\StudioProjects\timesheet-back\createDB\production\SETUP-PRODUCTION.sql
-
+PRINT N'   ابتدا SETUP-PRODUCTION.sql را از پوشه production اجرا کنید';
 PRINT N'';
-PRINT N'→ مرحله 2: وارد کردن داده‌های تستی ساده...';
+
+PRINT N'→ مرحله 2: بروزرسانی ساختار پروژه‌ها...';
+PRINT N'   فایل MIGRATE-PROJECT-STRUCTURE-TEST.sql را اجرا کنید';
+PRINT N'   یا به صورت دستی:';
+-- :r MIGRATE-PROJECT-STRUCTURE-TEST.sql
+PRINT N'';
+
+PRINT N'→ مرحله 3: ایجاد پروژه‌های تستی...';
+-- :r simple-projects.sql
+PRINT N'   فایل simple-projects.sql را اجرا کنید';
+PRINT N'';
+
+PRINT N'→ مرحله 4: وارد کردن داده‌های تستی...';
 -- :r simple-data.sql
--- یا مسیر کامل:
--- :r C:\Users\Masood\StudioProjects\timesheet-back\createDB\testing\simple-data.sql
-
+PRINT N'   فایل simple-data.sql را اجرا کنید';
 PRINT N'';
+
 PRINT N'========================================';
-PRINT N'    ✓ محیط تستی آماده است';
+PRINT N'نکته: برای اجرای خودکار همه فایل‌ها:';
+PRINT N'';
+PRINT N'  1. SETUP-PRODUCTION.sql';
+PRINT N'  2. MIGRATE-PROJECT-STRUCTURE-TEST.sql';
+PRINT N'  3. simple-projects.sql';
+PRINT N'  4. simple-data.sql';
 PRINT N'========================================';
 GO
