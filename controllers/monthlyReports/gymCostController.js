@@ -29,7 +29,7 @@ const checkRole = (roles) => (req, res, next) => {
  *       500: { description: Server error }
  */
 const saveMonthlyGymCost = async (req, res) => {
-    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
+    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager', 'admin'])(req, res, async () => {
         const userId = req.user.userId;
         const {year, month, cost, hours} = req.body;
         if (!year || !month || !cost) {
@@ -104,7 +104,7 @@ const saveMonthlyGymCost = async (req, res) => {
  *         description: Server error
  */
 const saveMonthlyGymCostJalali = async (req, res) => {
-    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
+    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager', 'admin'])(req, res, async () => {
         const userId = req.user.userId;
         const {year, month, cost, hours} = req.body;
 

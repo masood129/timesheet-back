@@ -15,7 +15,7 @@ const validateReportId = (req, res, next) => {
 };
 
 const getReportIdsJalali = async (req, res) => {
-    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
+    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager', 'admin'])(req, res, async () => {
         const { year, month } = req.params;
         
         // Validate req.user exists
@@ -74,7 +74,7 @@ const getReportIdsJalali = async (req, res) => {
 };
 
 const checkSubmittedJalali = async (req, res) => {
-    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
+    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager', 'admin'])(req, res, async () => {
         const { year, month } = req.params;
         
         // Validate req.user exists
@@ -150,7 +150,7 @@ const getReportById = async (req, res) => {
 };
 
 const getGroupReportsGregorian = async (req, res) => {
-    checkRole(['group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
+    checkRole(['group_manager', 'general_manager', 'finance_manager', 'admin'])(req, res, async () => {
         const { year, month } = req.params;
         const userId = req.user.userId;
         const role = req.user.role;
@@ -174,7 +174,7 @@ const getGroupReportsGregorian = async (req, res) => {
 };
 
 const getGroupReportsJalali = async (req, res) => {
-    checkRole(['group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
+    checkRole(['group_manager', 'general_manager', 'finance_manager', 'admin'])(req, res, async () => {
         const { year, month } = req.params;
         
         // Validate req.user exists
@@ -234,7 +234,7 @@ const getGroupReportsJalali = async (req, res) => {
 };
 
 const getGroupRangeReports = async (req, res) => {
-    checkRole(['group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
+    checkRole(['group_manager', 'general_manager', 'finance_manager', 'admin'])(req, res, async () => {
         const { startYear, startMonth, endYear, endMonth } = req.params;
         const userId = req.user.userId;
         const role = req.user.role;

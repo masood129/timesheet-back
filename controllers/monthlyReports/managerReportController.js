@@ -41,7 +41,7 @@ const checkRole = (roles) => (req, res, next) => {
  *         description: Server error
  */
 const getReportById = async (req, res) => {
-    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
+    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager', 'admin'])(req, res, async () => {
         const { reportId } = req.body;
 
         if (!reportId) {
@@ -89,7 +89,7 @@ const getReportById = async (req, res) => {
                 if (groupResult.recordset.length > 0 && groupResult.recordset[0].managerID === currentUserId) {
                     hasAccess = true;
                 }
-            } else if (currentRole === 'general_manager' || currentRole === 'finance_manager') {
+            } else if (currentRole === 'general_manager' || currentRole === 'finance_manager' || currentRole === 'admin') {
                 hasAccess = true;
             }
 

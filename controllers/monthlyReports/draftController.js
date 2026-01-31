@@ -38,7 +38,7 @@ const validateReportId = (req, res, next) => {
  *         description: Server error
  */
 const getMyDrafts = async (req, res) => {
-    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
+    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager', 'admin'])(req, res, async () => {
         const userId = req.user.userId;
 
         try {
@@ -170,7 +170,7 @@ const getMyDrafts = async (req, res) => {
  *         description: Server error
  */
 const exitDraft = async (req, res) => {
-    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
+    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager', 'admin'])(req, res, async () => {
         validateReportId(req, res, async () => {
             const { reportId } = req.params;
             const userId = req.user.userId;
@@ -232,7 +232,7 @@ const exitDraft = async (req, res) => {
  *       500: { description: Server error }
  */
 const createMonthlyReportGregorian = async (req, res) => {
-    checkRole(['user', 'group_manager', 'general_manager'])(req, res, async () => {
+    checkRole(['user', 'group_manager', 'general_manager', 'admin'])(req, res, async () => {
         const { year, month } = req.params;
         const userId = req.user.userId;
         try {
@@ -346,7 +346,7 @@ const createMonthlyReportGregorian = async (req, res) => {
  *       500: { description: Server error }
  */
 const createMonthlyReportJalali = async (req, res) => {
-    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
+    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager', 'admin'])(req, res, async () => {
         const { year, month } = req.params;
         const userId = req.user.userId;
 

@@ -32,7 +32,7 @@ const validateReportId = (req, res, next) => {
  *       500: { description: Server error }
  */
 const submitToGroupManager = async (req, res) => {
-    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
+    checkRole(['user', 'group_manager', 'general_manager', 'finance_manager', 'admin'])(req, res, async () => {
         validateReportId(req, res, async () => {
             const { reportId } = req.params;
             const userId = req.user.userId;
@@ -113,7 +113,7 @@ const submitToGroupManager = async (req, res) => {
  *       500: { description: Server error }
  */
 const approveGroupManager = async (req, res) => {
-    checkRole(['group_manager'])(req, res, async () => {
+    checkRole(['group_manager', 'admin'])(req, res, async () => {
         validateReportId(req, res, async () => {
             const { reportId } = req.params;
             const { comment, toGeneralManager } = req.body;
@@ -180,7 +180,7 @@ const approveGroupManager = async (req, res) => {
  *       500: { description: Server error }
  */
 const approveGeneralManager = async (req, res) => {
-    checkRole(['general_manager'])(req, res, async () => {
+    checkRole(['general_manager', 'admin'])(req, res, async () => {
         validateReportId(req, res, async () => {
             const { reportId } = req.params;
             const { comment } = req.body;
@@ -230,7 +230,7 @@ const approveGeneralManager = async (req, res) => {
  *       500: { description: Server error }
  */
 const approveFinance = async (req, res) => {
-    checkRole(['finance_manager'])(req, res, async () => {
+    checkRole(['finance_manager', 'admin'])(req, res, async () => {
         validateReportId(req, res, async () => {
             const { reportId } = req.params;
             const { comment } = req.body;
@@ -284,7 +284,7 @@ const approveFinance = async (req, res) => {
  *       500: { description: Server error }
  */
 const rejectToDraft = async (req, res) => {
-    checkRole(['group_manager', 'general_manager', 'finance_manager'])(req, res, async () => {
+    checkRole(['group_manager', 'general_manager', 'finance_manager', 'admin'])(req, res, async () => {
         validateReportId(req, res, async () => {
             const { reportId } = req.params;
             const { comment } = req.body;
