@@ -257,10 +257,10 @@ checkSubmittedJalali: Query result { status: null, recordCount: 0 }
 
 ## 📚 فایل‌های مرتبط
 
-1. **EMPTY-TABLE-BEHAVIOR.md** - توضیحات کامل رفتار با جدول خالی
-2. **test-empty-table-scenarios.sql** - اسکریپت تست SQL
-3. **FIX-CHECK-SUBMIT-SUMMARY.md** - خلاصه تمام تغییرات
-4. **TEST-CHECK-SUBMIT-ENDPOINT.md** - راهنمای تست و Debug
+1. [EMPTY-TABLE-BEHAVIOR.md](../database/EMPTY-TABLE-BEHAVIOR.md) - توضیحات کامل رفتار با جدول خالی
+2. **test-empty-table-scenarios.sql** - اسکریپت تست SQL (createDB/testing/)
+3. [FIX-CHECK-SUBMIT-SUMMARY.md](../fixes/FIX-CHECK-SUBMIT-SUMMARY.md) - خلاصه تمام تغییرات
+4. [TEST-CHECK-SUBMIT-ENDPOINT.md](./TEST-CHECK-SUBMIT-ENDPOINT.md) - راهنمای تست و Debug
 
 ---
 

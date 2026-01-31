@@ -106,7 +106,7 @@ if (isNaN(userId)) {
 
 ### 3. فایل‌های مستندات
 
-#### `TEST-CHECK-SUBMIT-ENDPOINT.md`
+#### [TEST-CHECK-SUBMIT-ENDPOINT.md](../testing/TEST-CHECK-SUBMIT-ENDPOINT.md)
 راهنمای جامع برای:
 - تشخیص مشکلات
 - بررسی JWT Token
@@ -314,7 +314,7 @@ const status = result.recordset.length > 0 ? result.recordset[0].Status : null;
 - رکورد موجود است: `{ "status": "draft" }` با HTTP 200
 - خطای سرور: پیام خطا با HTTP 500
 
-**برای جزئیات بیشتر:** `EMPTY-TABLE-BEHAVIOR.md` را مطالعه کنید.
+**برای جزئیات بیشتر:** [EMPTY-TABLE-BEHAVIOR.md](../database/EMPTY-TABLE-BEHAVIOR.md) را مطالعه کنید.
 
 ---
 
