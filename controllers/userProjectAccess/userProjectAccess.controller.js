@@ -25,6 +25,7 @@ const getAllProjectsWithAccess = async (req, res) => {
                 FROM projects p
                 LEFT JOIN UserProjectAccess upa 
                     ON p.id = upa.ProjectId AND upa.UserId = @userId
+                WHERE p.IsActive = 1
                 ORDER BY p.projectName
             `);
 
@@ -63,17 +64,19 @@ const toggleProjectAccess = async (req, res) => {
     try {
         const pool = await poolPromise;
 
-        // Check if project exists
+        // Check if project exists and is active
         const projectCheck = await pool.request()
             .input('projectId', sql.Int, projectId)
-            .query('SELECT COUNT(*) as count FROM projects WHERE id = @projectId');
+            .query('SELECT id, IsActive FROM projects WHERE id = @projectId');
 
-        if (projectCheck.recordset[0].count === 0) {
+        if (!projectCheck.recordset.length) {
             logger.api.warn('Project not found', { userId, projectId });
             return res.status(404).json({
                 error: 'پروژه یافت نشد'
             });
         }
+
+        const isProjectActive = projectCheck.recordset[0].IsActive === true || projectCheck.recordset[0].IsActive === 1;
 
         // Check current access status
         const accessCheck = await pool.request()
@@ -86,6 +89,14 @@ const toggleProjectAccess = async (req, res) => {
             `);
 
         const hasAccess = accessCheck.recordset[0].count > 0;
+
+        // Allow adding access only for active projects
+        if (!hasAccess && !isProjectActive) {
+            logger.api.warn('Cannot add access to inactive project', { userId, projectId });
+            return res.status(400).json({
+                error: 'امکان افزودن دسترسی به پروژه غیرفعال وجود ندارد'
+            });
+        }
 
         if (hasAccess) {
             // Remove access
