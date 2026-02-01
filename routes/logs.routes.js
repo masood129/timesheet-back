@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const logsController = require('../controllers/admin/logs.controller');
+const adminController = require('../controllers/admin');
 
 /**
  * @swagger
@@ -18,7 +18,7 @@ const logsController = require('../controllers/admin/logs.controller');
  *       403:
  *         description: Forbidden - Admin only
  */
-router.get('/categories', logsController.getLogCategories);
+router.get('/categories', adminController.getLogCategories);
 
 /**
  * @swagger
@@ -60,7 +60,7 @@ router.get('/categories', logsController.getLogCategories);
  *       404:
  *         description: Log file not found
  */
-router.get('/:category', logsController.getLogsByCategory);
+router.get('/:category', adminController.getLogsByCategory);
 
 /**
  * @swagger
@@ -96,7 +96,7 @@ router.get('/:category', logsController.getLogsByCategory);
  *       200:
  *         description: Search results
  */
-router.get('/search/all', logsController.searchLogs);
+router.get('/search/all', adminController.searchLogs);
 
 /**
  * @swagger
@@ -123,6 +123,6 @@ router.get('/search/all', logsController.searchLogs);
  *       404:
  *         description: Log file not found
  */
-router.get('/download/:category/:date', logsController.downloadLog);
+router.get('/download/:category/:date', adminController.downloadLog);
 
 module.exports = router;

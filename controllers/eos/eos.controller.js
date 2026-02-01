@@ -1,7 +1,10 @@
-const { sql, poolPromise } = require('../config/eos_db.config');
-const logger = require('../utils/logger.service');
+const { sql, poolPromise } = require('../../config/eos_db.config');
+const logger = require('../../utils/logger.service');
 
-exports.getTimeRecords = async (req, res) => {
+/**
+ * @description Get time records from EOS system
+ */
+const getTimeRecords = async (req, res) => {
     try {
         const { cardNo, date } = req.query; // date should be in Shamsi format e.g. 1403/09/10
 
@@ -25,7 +28,15 @@ exports.getTimeRecords = async (req, res) => {
         logger.api.info('Fetched time records', { cardNo, date, count: cleanRecords.length });
         res.status(200).json(cleanRecords);
     } catch (err) {
-        logger.errors.error('Error fetching time records', { error: err.message, cardNo: req.query.cardNo, date: req.query.date });
+        logger.errors.error('Error fetching time records', { 
+            error: err.message, 
+            cardNo: req.query.cardNo, 
+            date: req.query.date 
+        });
         res.status(500).send({ message: 'Error fetching time records.' });
     }
+};
+
+module.exports = {
+    getTimeRecords
 };

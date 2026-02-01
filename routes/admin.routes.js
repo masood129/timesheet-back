@@ -1,15 +1,6 @@
 const express = require('express');
 const router = express.Router();
-
-// Import controllers
-const userManagementController = require('../controllers/admin/userManagementController');
-const projectManagementController = require('../controllers/admin/projectManagementController');
-const groupManagementController = require('../controllers/admin/groupManagementController');
-const reportManagementController = require('../controllers/admin/reportManagementController');
-const systemConfigController = require('../controllers/admin/systemConfigController');
-const monthPeriodSettingsController = require('../controllers/admin/monthPeriodSettingsController');
-const logsController = require('../controllers/admin/logs.controller');
-const dashboardSettingsController = require('../controllers/admin/dashboardSettingsController');
+const adminController = require('../controllers/admin');
 
 // ============================================
 // USER MANAGEMENT ROUTES
@@ -52,7 +43,7 @@ const dashboardSettingsController = require('../controllers/admin/dashboardSetti
  *       500:
  *         description: Server error
  */
-router.get('/users', userManagementController.getAllUsers);
+router.get('/users', adminController.getAllUsers);
 
 /**
  * @swagger
@@ -76,7 +67,7 @@ router.get('/users', userManagementController.getAllUsers);
  *       500:
  *         description: Server error
  */
-router.get('/users/:id', userManagementController.getUserById);
+router.get('/users/:id', adminController.getUserById);
 
 /**
  * @swagger
@@ -112,7 +103,7 @@ router.get('/users/:id', userManagementController.getUserById);
  *       500:
  *         description: Server error
  */
-router.post('/users', userManagementController.createUser);
+router.post('/users', adminController.createUser);
 
 /**
  * @swagger
@@ -145,7 +136,7 @@ router.post('/users', userManagementController.createUser);
  *       500:
  *         description: Server error
  */
-router.put('/users/:id', userManagementController.updateUser);
+router.put('/users/:id', adminController.updateUser);
 
 /**
  * @swagger
@@ -169,7 +160,7 @@ router.put('/users/:id', userManagementController.updateUser);
  *       500:
  *         description: Server error
  */
-router.delete('/users/:id', userManagementController.deleteUser);
+router.delete('/users/:id', adminController.deleteUser);
 
 /**
  * @swagger
@@ -205,7 +196,7 @@ router.delete('/users/:id', userManagementController.deleteUser);
  *       500:
  *         description: Server error
  */
-router.put('/users/:id/role', userManagementController.updateUserRole);
+router.put('/users/:id/role', adminController.updateUserRole);
 
 // ============================================
 // PROJECT MANAGEMENT ROUTES
@@ -240,7 +231,7 @@ router.put('/users/:id/role', userManagementController.updateUserRole);
  *       500:
  *         description: Server error
  */
-router.get('/projects', projectManagementController.getAllProjects);
+router.get('/projects', adminController.adminGetAllProjects);
 
 /**
  * @swagger
@@ -264,7 +255,7 @@ router.get('/projects', projectManagementController.getAllProjects);
  *       500:
  *         description: Server error
  */
-router.get('/projects/:id', projectManagementController.getProjectById);
+router.get('/projects/:id', adminController.adminGetProjectById);
 
 /**
  * @swagger
@@ -299,7 +290,7 @@ router.get('/projects/:id', projectManagementController.getProjectById);
  *       500:
  *         description: Server error
  */
-router.post('/projects', projectManagementController.createProject);
+router.post('/projects', adminController.adminCreateProject);
 
 /**
  * @swagger
@@ -341,7 +332,7 @@ router.post('/projects', projectManagementController.createProject);
  *       500:
  *         description: Server error
  */
-router.put('/projects/:id', projectManagementController.updateProject);
+router.put('/projects/:id', adminController.adminUpdateProject);
 
 /**
  * @swagger
@@ -365,7 +356,7 @@ router.put('/projects/:id', projectManagementController.updateProject);
  *       500:
  *         description: Server error
  */
-router.delete('/projects/:id', projectManagementController.deleteProject);
+router.delete('/projects/:id', adminController.adminDeleteProject);
 
 /**
  * @swagger
@@ -389,7 +380,7 @@ router.delete('/projects/:id', projectManagementController.deleteProject);
  *       500:
  *         description: Server error
  */
-router.get('/projects/:id/users', projectManagementController.getProjectUsers);
+router.get('/projects/:id/users', adminController.getProjectUsers);
 
 /**
  * @swagger
@@ -426,7 +417,7 @@ router.get('/projects/:id/users', projectManagementController.getProjectUsers);
  *       500:
  *         description: Server error
  */
-router.post('/projects/:id/users', projectManagementController.addUserToProject);
+router.post('/projects/:id/users', adminController.addUserToProject);
 
 /**
  * @swagger
@@ -455,7 +446,7 @@ router.post('/projects/:id/users', projectManagementController.addUserToProject)
  *       500:
  *         description: Server error
  */
-router.delete('/projects/:id/users/:userId', projectManagementController.removeUserFromProject);
+router.delete('/projects/:id/users/:userId', adminController.removeUserFromProject);
 
 // ============================================
 // GROUP MANAGEMENT ROUTES
@@ -490,7 +481,7 @@ router.delete('/projects/:id/users/:userId', projectManagementController.removeU
  *       500:
  *         description: Server error
  */
-router.get('/groups', groupManagementController.getAllGroups);
+router.get('/groups', adminController.getAllGroups);
 
 /**
  * @swagger
@@ -514,7 +505,7 @@ router.get('/groups', groupManagementController.getAllGroups);
  *       500:
  *         description: Server error
  */
-router.get('/groups/:id', groupManagementController.getGroupById);
+router.get('/groups/:id', adminController.getGroupById);
 
 /**
  * @swagger
@@ -548,7 +539,7 @@ router.get('/groups/:id', groupManagementController.getGroupById);
  *       500:
  *         description: Server error
  */
-router.post('/groups', groupManagementController.createGroup);
+router.post('/groups', adminController.createGroup);
 
 /**
  * @swagger
@@ -583,7 +574,7 @@ router.post('/groups', groupManagementController.createGroup);
  *       500:
  *         description: Server error
  */
-router.put('/groups/:id', groupManagementController.updateGroup);
+router.put('/groups/:id', adminController.updateGroup);
 
 /**
  * @swagger
@@ -607,7 +598,7 @@ router.put('/groups/:id', groupManagementController.updateGroup);
  *       500:
  *         description: Server error
  */
-router.delete('/groups/:id', groupManagementController.deleteGroup);
+router.delete('/groups/:id', adminController.deleteGroup);
 
 /**
  * @swagger
@@ -631,7 +622,7 @@ router.delete('/groups/:id', groupManagementController.deleteGroup);
  *       500:
  *         description: Server error
  */
-router.get('/groups/:id/members', groupManagementController.getGroupMembers);
+router.get('/groups/:id/members', adminController.getGroupMembers);
 
 /**
  * @swagger
@@ -666,7 +657,7 @@ router.get('/groups/:id/members', groupManagementController.getGroupMembers);
  *       500:
  *         description: Server error
  */
-router.post('/groups/:id/members', groupManagementController.addUserToGroup);
+router.post('/groups/:id/members', adminController.addUserToGroup);
 
 /**
  * @swagger
@@ -695,7 +686,7 @@ router.post('/groups/:id/members', groupManagementController.addUserToGroup);
  *       500:
  *         description: Server error
  */
-router.delete('/groups/:id/members/:userId', groupManagementController.removeUserFromGroup);
+router.delete('/groups/:id/members/:userId', adminController.removeUserFromGroup);
 
 /**
  * @swagger
@@ -730,7 +721,7 @@ router.delete('/groups/:id/members/:userId', groupManagementController.removeUse
  *       500:
  *         description: Server error
  */
-router.put('/groups/:id/manager', groupManagementController.setGroupManager);
+router.put('/groups/:id/manager', adminController.setGroupManager);
 
 // ============================================
 // REPORTS & ANALYTICS ROUTES
@@ -777,7 +768,7 @@ router.put('/groups/:id/manager', groupManagementController.setGroupManager);
  *       500:
  *         description: Server error
  */
-router.get('/reports/monthly', reportManagementController.getAllMonthlyReports);
+router.get('/reports/monthly', adminController.getAllMonthlyReports);
 
 /**
  * @swagger
@@ -818,7 +809,7 @@ router.get('/reports/monthly', reportManagementController.getAllMonthlyReports);
  *       500:
  *         description: Server error
  */
-router.get('/reports/daily', reportManagementController.getAllDailyDetails);
+router.get('/reports/daily', adminController.getAllDailyDetails);
 
 /**
  * @swagger
@@ -834,7 +825,7 @@ router.get('/reports/daily', reportManagementController.getAllDailyDetails);
  *       500:
  *         description: Server error
  */
-router.get('/reports/statistics', reportManagementController.getSystemStatistics);
+router.get('/reports/statistics', adminController.getSystemStatistics);
 
 /**
  * @swagger
@@ -868,7 +859,7 @@ router.get('/reports/statistics', reportManagementController.getSystemStatistics
  *       500:
  *         description: Server error
  */
-router.get('/reports/user/:userId/summary', reportManagementController.getUserActivitySummary);
+router.get('/reports/user/:userId/summary', adminController.getUserActivitySummary);
 
 /**
  * @swagger
@@ -908,7 +899,7 @@ router.get('/reports/user/:userId/summary', reportManagementController.getUserAc
  *       500:
  *         description: Server error
  */
-router.put('/reports/:reportId/status', reportManagementController.updateReportStatus);
+router.put('/reports/:reportId/status', adminController.updateReportStatus);
 
 /**
  * @swagger
@@ -940,7 +931,7 @@ router.put('/reports/:reportId/status', reportManagementController.updateReportS
  *       500:
  *         description: Server error
  */
-router.post('/reports/:reportId/approve', reportManagementController.approveReport);
+router.post('/reports/:reportId/approve', adminController.approveReport);
 
 /**
  * @swagger
@@ -972,7 +963,7 @@ router.post('/reports/:reportId/approve', reportManagementController.approveRepo
  *       500:
  *         description: Server error
  */
-router.post('/reports/:reportId/reject', reportManagementController.rejectReport);
+router.post('/reports/:reportId/reject', adminController.rejectReport);
 
 /**
  * @swagger
@@ -996,7 +987,7 @@ router.post('/reports/:reportId/reject', reportManagementController.rejectReport
  *       500:
  *         description: Server error
  */
-router.get('/reports/:reportId', reportManagementController.getReportById);
+router.get('/reports/:reportId', adminController.adminGetReportById);
 
 /**
  * @swagger
@@ -1020,7 +1011,7 @@ router.get('/reports/:reportId', reportManagementController.getReportById);
  *       500:
  *         description: Server error
  */
-router.delete('/reports/:reportId', reportManagementController.deleteReport);
+router.delete('/reports/:reportId', adminController.deleteReport);
 
 // ============================================
 // SYSTEM CONFIGURATION ROUTES
@@ -1040,7 +1031,7 @@ router.delete('/reports/:reportId', reportManagementController.deleteReport);
  *       500:
  *         description: Server error
  */
-router.get('/config/contract-hours', systemConfigController.getAllContractHours);
+router.get('/config/contract-hours', adminController.getAllContractHours);
 
 /**
  * @swagger
@@ -1064,7 +1055,7 @@ router.get('/config/contract-hours', systemConfigController.getAllContractHours)
  *       500:
  *         description: Server error
  */
-router.get('/config/contract-hours/:userId', systemConfigController.getUserContractHours);
+router.get('/config/contract-hours/:userId', adminController.getUserContractHours);
 
 /**
  * @swagger
@@ -1104,7 +1095,7 @@ router.get('/config/contract-hours/:userId', systemConfigController.getUserContr
  *       500:
  *         description: Server error
  */
-router.put('/config/contract-hours/:userId', systemConfigController.updateUserContractHours);
+router.put('/config/contract-hours/:userId', adminController.updateUserContractHours);
 
 /**
  * @swagger
@@ -1128,7 +1119,7 @@ router.put('/config/contract-hours/:userId', systemConfigController.updateUserCo
  *       500:
  *         description: Server error
  */
-router.delete('/config/contract-hours/:userId', systemConfigController.deleteUserContractHours);
+router.delete('/config/contract-hours/:userId', adminController.deleteUserContractHours);
 
 /**
  * @swagger
@@ -1144,7 +1135,7 @@ router.delete('/config/contract-hours/:userId', systemConfigController.deleteUse
  *       500:
  *         description: Server error
  */
-router.get('/config/system', systemConfigController.getSystemConfig);
+router.get('/config/system', adminController.getSystemConfig);
 
 // ============================================
 // MONTH PERIOD SETTINGS ROUTES
@@ -1356,210 +1347,7 @@ router.put('/month-periods/:year/:month', monthPeriodSettingsController.updateMo
  *         description: Month period deleted (reverted to default)
  *       404:
  *         description: Month period not found
-const logsController = require('../controllers/logsController');
-
-/**
- *         required: true
- *         schema:
- *           type: integer
- *         description: Jalali year (e.g., 1404)
- *     responses:
- *       200:
- *         description: List of month periods for the year
- *       400:
- *         description: Invalid year
- *       500:
- *         description: Server error
- */
-router.get('/month-periods/:year', monthPeriodSettingsController.getAllMonthPeriods);
-
-/**
- * @swagger
- * /admin/month-periods/{year}/{month}:
- *   get:
- *     summary: Get month period for specific year/month (Admin only)
- *     tags: [Admin - Month Periods]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: year
- *         required: true
- *         schema:
- *           type: integer
- *       - in: path
- *         name: month
- *         required: true
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 12
- *     responses:
- *       200:
- *         description: Month period details
- *       404:
- *         description: Month period not found
- *       500:
- *         description: Server error
- */
-router.get('/month-periods/:year/:month', monthPeriodSettingsController.getMonthPeriod);
-
-/**
- * @swagger
- * /admin/month-periods:
- *   post:
- *     summary: Create new month period (Admin only)
- *     tags: [Admin - Month Periods]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - Year
- *               - Month
- *               - StartDay
- *               - StartMonth
- *               - EndDay
- *               - EndMonth
- *               - CurrentJalaliYear
- *               - CurrentJalaliMonth
- *             properties:
- *               Year:
- *                 type: integer
- *               Month:
- *                 type: integer
- *                 minimum: 1
- *                 maximum: 12
- *               StartDay:
- *                 type: integer
- *               StartMonth:
- *                 type: integer
- *                 minimum: 1
- *                 maximum: 12
- *               EndDay:
- *                 type: integer
- *               EndMonth:
- *                 type: integer
- *                 minimum: 1
- *                 maximum: 12
- *               CurrentJalaliYear:
- *                 type: integer
- *                 description: Current Jalali year for validation
- *               CurrentJalaliMonth:
- *                 type: integer
- *                 description: Current Jalali month for validation
- *     responses:
- *       201:
- *         description: Month period created
- *       400:
- *         description: Invalid input or month is in the past
- *       500:
- *         description: Server error
- */
-router.post('/month-periods', monthPeriodSettingsController.createMonthPeriod);
-
-/**
- * @swagger
- * /admin/month-periods/{year}/{month}:
- *   put:
- *     summary: Update month period (Admin only)
- *     tags: [Admin - Month Periods]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: year
- *         required: true
- *         schema:
- *           type: integer
- *       - in: path
- *         name: month
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - StartDay
- *               - StartMonth
- *               - EndDay
- *               - EndMonth
- *               - CurrentJalaliYear
- *               - CurrentJalaliMonth
- *             properties:
- *               StartDay:
- *                 type: integer
- *               StartMonth:
- *                 type: integer
- *               EndDay:
- *                 type: integer
- *               EndMonth:
- *                 type: integer
- *               CurrentJalaliYear:
- *                 type: integer
- *               CurrentJalaliMonth:
- *                 type: integer
- *     responses:
- *       200:
- *         description: Month period updated
- *       404:
- *         description: Month period not found
- *       400:
- *         description: Invalid input or month is in the past
- *       500:
- *         description: Server error
- */
-router.put('/month-periods/:year/:month', monthPeriodSettingsController.updateMonthPeriod);
-
-/**
- * @swagger
- * /admin/month-periods/{year}/{month}:
- *   delete:
- *     summary: Delete month period (revert to default) (Admin only)
- *     tags: [Admin - Month Periods]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: year
- *         required: true
- *         schema:
- *           type: integer
- *       - in: path
- *         name: month
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               CurrentJalaliYear:
- *                 type: integer
- *               CurrentJalaliMonth:
- *                 type: integer
- *     responses:
- *       200:
- *         description: Month period deleted (reverted to default)
- *       404:
- *         description: Month period not found
- *       400:
- *         description: Month is in the past
- *       500:
- *         description: Server error
- */
-router.delete('/month-periods/:year/:month', monthPeriodSettingsController.deleteMonthPeriod);
+router.delete('/month-periods/:year/:month', adminController.deleteMonthPeriod);
 
 // ============================================
 // LOGS MANAGEMENT ROUTES
@@ -1574,7 +1362,7 @@ router.delete('/month-periods/:year/:month', monthPeriodSettingsController.delet
  *     security:
  *       - bearerAuth: []
  */
-router.get('/logs/categories', logsController.getLogCategories);
+router.get('/logs/categories', adminController.getLogCategories);
 
 /**
  * @swagger
@@ -1585,7 +1373,7 @@ router.get('/logs/categories', logsController.getLogCategories);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/logs/search/all', logsController.searchLogs);
+router.get('/logs/search/all', adminController.searchLogs);
 
 /**
  * @swagger
@@ -1596,7 +1384,7 @@ router.get('/logs/search/all', logsController.searchLogs);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/logs/download/:category/:date', logsController.downloadLog);
+router.get('/logs/download/:category/:date', adminController.downloadLog);
 
 /**
  * @swagger
@@ -1607,7 +1395,7 @@ router.get('/logs/download/:category/:date', logsController.downloadLog);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/logs/:category', logsController.getLogsByCategory);
+router.get('/logs/:category', adminController.getLogsByCategory);
 
 // ============================================
 // DASHBOARD SETTINGS ROUTES
@@ -1627,7 +1415,7 @@ router.get('/logs/:category', logsController.getLogsByCategory);
  *       500:
  *         description: Server error
  */
-router.get('/dashboard-settings', dashboardSettingsController.getDashboardSettings);
+router.get('/dashboard-settings', adminController.getDashboardSettings);
 
 /**
  * @swagger
@@ -1656,7 +1444,7 @@ router.get('/dashboard-settings', dashboardSettingsController.getDashboardSettin
  *       500:
  *         description: Server error
  */
-router.post('/dashboard-settings', dashboardSettingsController.saveDashboardSettings);
+router.post('/dashboard-settings', adminController.saveDashboardSettings);
 
 /**
  * @swagger
@@ -1672,6 +1460,6 @@ router.post('/dashboard-settings', dashboardSettingsController.saveDashboardSett
  *       500:
  *         description: Server error
  */
-router.delete('/dashboard-settings', dashboardSettingsController.resetDashboardSettings);
+router.delete('/dashboard-settings', adminController.resetDashboardSettings);
 
 module.exports = router;
